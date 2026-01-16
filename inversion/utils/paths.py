@@ -1,50 +1,27 @@
-from pyprojroot import here
 from pathlib import Path
-from typing import (
-    Union,
-    Callable,
-    Iterable,
-)
+import os
 
-def make_dir_function(
-    dir_name: Union[str, Iterable[str]]
-) -> Callable[..., Path]:
-    """Generate a fucntion that converts a string or iterable of strings into
-    a path relative to the project directory.
+# 1. Definir la raíz del proyecto
+# __file__ es .../inversion/utils/paths.py
+# parents[0] = utils
+# parents[1] = inversion (paquete)
+# parents[2] = inversion (carpeta raíz del proyecto)
+PROJECT_DIR = Path(__file__).resolve().parents[2]
 
-    Args:
-        dirname: Name of the subdirectories to extend the path of the main
-            project.
-            If an iterable of strings is passed as an argument, then it is
-            collapsed to a single steing with anchors dependent on the
-            operating system.
+# 2. Definir directorios principales
+DATA_DIR = PROJECT_DIR / "data"
+RAW_DATA_DIR = DATA_DIR / "raw"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+MODELS_DIR = PROJECT_DIR / "models"
 
-    Returns:
-        A function that returns the path relative to a directory that can
-        receive `n` number of arguments for expansion.
-    """
+# 3. Definir archivos específicos
+# Eliminamos el "import config" y definimos el nombre por defecto aquí
+RAW_DATA_FILE = RAW_DATA_DIR / "data.csv" 
 
-    def dir_path(*args) -> Path:
-        if isinstance(dir_name, str):
-            return here().joinpath(dir_name, *args)
-        else:
-            return here().joinpath(*dir_name, *args)
+# Nombres genéricos para los modelos (se pueden sobrescribir en el main si es necesario)
+SCALER_FILE = MODELS_DIR / "scaler.pkl"
+MODEL_FILE = MODELS_DIR / "rf_model.pkl"
 
-    return dir_path
-
-project_dir = make_dir_function("")
-
-for dir_type in [
-        ["data"],
-        ["data", "raw"],
-        ["data", "processed"],
-        ["data", "interim"],
-        ["data", "external"],
-        ["models"],
-        ["notebooks"],
-        ["references"],
-        ["reports"],
-        ["reports", "figures"]
-    ]:
-    dir_var = '_'.join(dir_type) + "_dir"
-    exec(f"{dir_var} = make_dir_function({dir_type})")
+# 4. Asegurar que existan las carpetas
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
