@@ -21,6 +21,10 @@ dependencies = [
   "pyjanitor",
   "pyprojroot",
   "seaborn",
+  "dotenv",
+  "nltk",
+  "yfinance",
+  "scikit-learn",
   ]
 
 [tool.setuptools]

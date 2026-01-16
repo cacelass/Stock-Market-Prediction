@@ -43,7 +43,7 @@ def main():
     end_date = pd.Timestamp.today()
     start_date = end_date - pd.DateOffset(years=20) # 20 AÑOS
 
-    print(f"🚀 Iniciando proceso para {ticker} desde {start_date.date()} hasta {end_date.date()}...")
+    print(f" Iniciando proceso para {ticker} desde {start_date.date()} hasta {end_date.date()}...")
 
     # A. DESCARGAS
     df_yf = get_yfinance_history(ticker, start_date, end_date)
