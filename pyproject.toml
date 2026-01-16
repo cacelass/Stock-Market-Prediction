@@ -1,0 +1,31 @@
+[project]
+name = "inversion"
+version = "0.1.0"
+description = "A short description of the project."
+authors = [
+  { name = "Alejandro Cancelas Chapela" }
+]
+readme = "README.md"
+requires-python = ">= 3.12"
+license = {text = "MIT"}
+dependencies = [
+  "black",
+  "invoke",
+  "jupyter",
+  "jupyterlab",
+  "matplotlib",
+  "nbdime",
+  "numpy",
+  "pandas",
+  "plotly",
+  "pyjanitor",
+  "pyprojroot",
+  "seaborn",
+  ]
+
+[tool.setuptools]
+packages = ["inversion"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
