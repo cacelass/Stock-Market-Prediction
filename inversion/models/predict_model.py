@@ -1,54 +1,49 @@
-# src/models/predict_model.py
 import joblib
 import pandas as pd
 from inversion.utils import paths
-from inversion.features.build_features import calculate_technical_indicators
+from inversion.features.build_features import add_derived_features
 
-def predict_next_price(last_row_features, scaler_name=None, model_name=None):
+# Features que deben estar presentes (deben coincidir con main.py)
+FEATURE_COLS = [
+    "return", "volatility", "rsi",
+    "ma_50", "ma_200",
+    "hl_range", "oc_range", "log_volume",
+    "vwap_ratio",
+    "lag_1", "lag_5", "lag_20",
+]
+
+
+def predict_future(df: pd.DataFrame) -> tuple[int, float, float, float]:
     """
-    Predice el precio usando datos ya procesados (para sanity check).
-    Carga scaler y modelo guardados.
-    last_row_features: DataFrame con una sola fila de features ya calculadas.
-    Retorna la predicción del precio.
+    Predice la dirección del precio para los próximos días a partir
+    de los datos crudos más recientes.
+
+    Args:
+        df : DataFrame con columnas OHLCV y 'timestamp'.
+
+    Returns:
+        (clase, prob_baja, prob_sube, ultimo_close)
+        clase     : 0 (baja) o 1 (sube)
+        prob_baja : probabilidad clase 0
+        prob_sube : probabilidad clase 1
+        ultimo_close : último precio de cierre conocido
     """
     try:
         scaler = joblib.load(paths.SCALER_FILE)
-        model = joblib.load(paths.MODEL_FILE)
-        
-        # Escalar
-        features_scaled = scaler.transform(last_row_features)
-        
-        # Predecir
-        prediction = model.predict(features_scaled)
-        return prediction[0]
-        
+        model  = joblib.load(paths.MODEL_FILE)
     except FileNotFoundError:
-        print("Error: No se encontraron los archivos del modelo o scaler.")
-        return None
+        print("Error: Modelo o scaler no encontrados. Ejecuta main.py primero.")
+        return None, None, None, None
 
-def predict_future(df, feature_names):
-    """
-    Predice el precio de MAÑANA reconstruyendo features desde los datos crudos más recientes.
-    Retorna la predicción del log return y el último precio de cierre real.
-    """
-    # 1. Recalcular indicadores en todo el dataset (incluyendo la última fila)
-    df_full = calculate_technical_indicators(df)
-    
-    # 2. Extraer última fila (HOY)
-    # Importante: Como calculate_technical_indicators devuelve el DF completo,
-    # la última fila contiene los datos de HOY con sus indicadores calculados.
-    future_X = df_full.iloc[[-1]][feature_names]
-    
-    # 3. Cargar artefactos y predecir
-    try:
-        scaler = joblib.load(paths.SCALER_FILE)
-        model = joblib.load(paths.MODEL_FILE)
-        
-        future_X_scaled = scaler.transform(future_X)
-        prediction = model.predict(future_X_scaled)[0]
-        
-        return prediction, df.iloc[-1]['close'] # Devuelve predicción y último cierre real
-        
-    except FileNotFoundError:
-        print("Error: Modelos no entrenados.")
-        return None, None
+    # Calcular features sobre todo el dataset
+    df_feat = add_derived_features(df.copy())
+
+    # Coger la última fila que no tenga NaN en las features
+    last = df_feat.dropna(subset=FEATURE_COLS).iloc[[-1]][FEATURE_COLS]
+
+    last_scaled  = scaler.transform(last)
+    pred_class   = model.predict(last_scaled)[0]
+    pred_probas  = model.predict_proba(last_scaled)[0]
+    ultimo_close = df.iloc[-1]["close"]
+
+    return int(pred_class), float(pred_probas[0]), float(pred_probas[1]), float(ultimo_close)

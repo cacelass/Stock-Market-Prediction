@@ -1,240 +1,202 @@
+"""
+Stock Market Prediction — Pipeline principal
+============================================
+Ejecuta el ciclo completo:
+  1. Descarga de datos (yfinance)
+  2. Ingeniería de features
+  3. Split temporal + escalado
+  4. Entrenamiento Random Forest (clasificación binaria)
+  5. Evaluación con métricas de clasificación
+  6. Predicción del próximo movimiento
+  7. Visualizaciones
+"""
+
 import sys
 import os
+
+# Añadir el directorio raíz al path ANTES de cualquier import local
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import numpy as np
 from dotenv import load_dotenv
-import nltk
-# Importaciones de tus módulos
-from inversion.data.make_dataset import load_data, get_yfinance_history
-from inversion.features.build_features import prepare_features, fit_and_save_scaler, add_derived_features
+
+from inversion.data.make_dataset import get_yfinance_history
+from inversion.features.build_features import add_derived_features, fit_and_save_scaler
 from inversion.models.train_model import train_rf_model, evaluate_model
-# Nota: predict_next_price no lo usamos en este main simplificado, hacemos la lógica aquí
-from inversion.utils import paths
-from inversion.visualization.visualize import plot_price, plot_predictions, plot_feature_importance, plot_returns_distribution
-# Descargar recursos de NLTK si no existen
-try:
-    nltk.data.find('sentiment/vader_lexicon.zip')
-except LookupError:
-    nltk.download("vader_lexicon")
-# Añadir el directorio actual al path
-sys.path.append(os.getcwd())
+from inversion.visualization.visualize import (
+    plot_price,
+    plot_predictions,
+    plot_feature_importance,
+    plot_returns_distribution,
+)
 
-# -----------------------------
-# CONFIGURACIÓN DEL PROYECTO
-# -----------------------------
-ROOT_DIR = Path.cwd()
-ENV_PATH = ROOT_DIR / ".env"
-load_dotenv(ENV_PATH)
+# ─── CONFIGURACIÓN ────────────────────────────────────────────────────────────
 
+load_dotenv(Path(__file__).parent / ".env")
 
-DATA_RAW = ROOT_DIR / "data/raw"
+TICKER            = "NVDA"
+YEARS_HISTORY     = 20
+PREDICTION_WINDOW = 5       # días hábiles hacia adelante para el target
+UPSIDE_THRESHOLD  = 0.02    # +2% para clasificar como "sube"
+TRAIN_RATIO       = 0.80
+SCALER_NAME       = f"scaler_{TICKER}.pkl"
+MODEL_NAME        = f"rf_{TICKER}.pkl"
+DATA_RAW          = Path(__file__).parent / "data" / "raw"
 DATA_RAW.mkdir(parents=True, exist_ok=True)
-# --- CONFIGURACIÓN ---
-TICKER = "NVDA" 
-TARGET_COL = "close"
-SCALER_NAME = f"scaler_{TICKER}.pkl"
-MODEL_NAME = f"rf_{TICKER}.pkl"
-# -----------------------------
-   
-def main():
-    ticker = "NVDA"
-    end_date = pd.Timestamp.today()
-    start_date = end_date - pd.DateOffset(years=20) # 20 AÑOS
 
-    print(f" Iniciando proceso para {ticker} desde {start_date.date()} hasta {end_date.date()}...")
+# Features usadas en entrenamiento y predicción (deben coincidir con build_features.py)
+FEATURE_COLS = [
+    "return", "volatility", "rsi",
+    "ma_50", "ma_200",
+    "hl_range", "oc_range", "log_volume",
+    "vwap_ratio",
+    "lag_1", "lag_5", "lag_20",
+]
 
-    # A. DESCARGAS
-    df_yf = get_yfinance_history(ticker, start_date, end_date)
-    # B. MERGE (FUSIÓN)
-    # Usamos YFinance como esqueleto base (fechas completas)
-    df_final = df_yf.copy()
+# ─── PASO 1: DESCARGA ─────────────────────────────────────────────────────────
 
-    # 1. Unir Polygon (Solo nos interesa VWAP y Num_Trades si existen, el precio OHLC ya lo tenemos de YF)
-    df_final["vwap"] = df_final["close"] # Fallback
-    df_final["num_trades"] = 0
+def download_data(ticker: str, years: int) -> pd.DataFrame:
+    """Descarga histórico de yfinance y garantiza columna 'timestamp'."""
+    end_date   = pd.Timestamp.today()
+    start_date = end_date - pd.DateOffset(years=years)
+    print(f"[1/5] Descargando {ticker} ({start_date.date()} → {end_date.date()})...")
 
-    # 2. Unir Earnings
-    df_final["surprisePercent"] = np.nan
+    df = get_yfinance_history(ticker, start_date, end_date)
 
-    # C. TRATAMIENTO Y LIMPIEZA DE DATOS (Data Cleaning)
-    print(" Tratando y limpiando datos...")
-
-    # 1. Relleno de Earnings (Forward Fill)
-    # Las ganancias se reportan cada 3 meses. El impacto dura hasta el siguiente reporte.
-    df_final["surprisePercent"] = df_final["surprisePercent"].ffill().fillna(0)
-
-    # 2. Relleno de datos técnicos faltantes (VWAP/Trades de Polygon pueden tener huecos)
-    # Si falta VWAP, usamos Close. Si faltan trades, ponemos 0 o media.
-    df_final["vwap"] = df_final["vwap"].fillna(df_final["close"])
-    df_final["num_trades"] = df_final["num_trades"].fillna(0)
-
-    # 3. Calcular Indicadores (Features)
-    # Hacemos esto DESPUÉS de asegurar que no hay huecos en OHLC
-    df_final = add_derived_features(df_final)
-
-    # 4. Limpieza de Nulos generados por indicadores (ej. MA_200 genera 200 NaNs al inicio)
-    # Eliminamos las filas que no tengan suficientes datos históricos para calcular los indicadores
-    df_final.dropna(subset=["ma_200", "rsi"], inplace=True)
-
-    # 5. Creación del TARGET (Objetivo para ML)
-    # Target: 1 si el precio sube > 2% en los próximos 5 días
-    prediction_window = 5
-    df_final["target_price"] = df_final["close"].shift(-prediction_window)
-    df_final["target"] = (df_final["target_price"] > df_final["close"] * 1.02).astype(int)
-
-    # Eliminamos las ultimas filas donde no hay target (porque hicimos shift negativo)
-    df_final = df_final.iloc[:-prediction_window]
-
-    # D. SELECCIÓN FINAL DE COLUMNAS
-    cols_finales = [
-        "timestamp", "open", "high", "low", "close", "volume", 
-        "vwap", "num_trades",                   # De Polygon
-        "return", "volatility", "rsi", "ma_50", "ma_200", # Técnicos
-        "hl_range", "oc_range", "log_volume", 
-        "surprisePercent",                      # Fundamental
-        "target"                                # Target
-    ]
-
-    # Filtrar solo columnas existentes
-    cols_existentes = [c for c in cols_finales if c in df_final.columns]
-    df_final = df_final[cols_existentes]
-
-    # E. GUARDADO
-    output_file = DATA_RAW / f"{ticker}_ml_ready.csv"
-    df_final.to_csv(output_file, index=False)
-
-    print(f"✔ Proceso completado.")
-    print(f"✔ Datos guardados en: {output_file}")
-    print(f"✔ Dimensiones finales: {df_final.shape}")
-    print(df_final.tail())
-
-    # -----------------------------
-    # SAVE
-    # -----------------------------
-    output_file = DATA_RAW / f"data.csv"
-    df_final.to_csv(output_file, index=False)
-
-    print(f"✔ Archivo listo: {output_file}")
-    print(df_final.tail())
-
-    print(f"\n --- INICIANDO PIPELINE PARA {TICKER} ---")
-
-    # 1. CARGA DE DATOS
-    print("\n[1/5]  Cargando datos...")
-    df = load_data(TICKER)
-    
-    if df is None or df.empty:
-        print("❌ Error: No se pudieron cargar los datos.")
-        return
-    print(f"      Datos cargados: {df.shape[0]} filas.")
-
-    # Asegurar timestamp
-    if "timestamp" not in df.columns:
-        if "Date" in df.columns:
-            df = df.rename(columns={"Date": "timestamp"})
-        else:
-            # Si el índice era la fecha
-            df = df.reset_index()
-            if "index" in df.columns:
-                df = df.rename(columns={"index": "timestamp"})
-
-    # Convertir a datetime
     df["timestamp"] = pd.to_datetime(df["timestamp"])
-    df = df.sort_values("timestamp")
-    # 2. INGENIERÍA DE CARACTERÍSTICAS
-    print("\n[2/5]   Preparando features...")
-    # prepare_features devuelve features y target (log return)
-    X, y, feature_names = prepare_features(df, target_col=TARGET_COL)
-    print(f"      Features usadas: {len(feature_names)}")
+    df = df.sort_values("timestamp").reset_index(drop=True)
 
-    # 3. SPLIT Y ESCALADO
-    print("\n[3/5]   Dividiendo y escalando datos...")
-    split_idx = int(len(X) * 0.8)
-    
-    X_train_raw = X.iloc[:split_idx]
-    X_test_raw = X.iloc[split_idx:]
-    y_train = y.iloc[:split_idx]
-    y_test = y.iloc[split_idx:]
+    print(f"      ✔ {len(df)} filas descargadas.")
+    return df
 
-    scaler = fit_and_save_scaler(X_train_raw, filename=SCALER_NAME)
-    
-    X_train_scaled = scaler.transform(X_train_raw)
-    X_test_scaled = scaler.transform(X_test_raw)
+# ─── PASO 2: FEATURES + TARGET ───────────────────────────────────────────────
 
-    # 4. ENTRENAMIENTO
-    print("\n[4/5]  Entrenando modelo Random Forest...")
-    rf_model = train_rf_model(X_train_scaled, y_train, filename=MODEL_NAME)
-    
-    mse, r2 = evaluate_model(rf_model, X_test_scaled, y_test)
-    print(f"       Resultados Test -> MSE: {mse:.5f}, R²: {r2:.4f}")
+def build_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aplica ingeniería de variables (add_derived_features) y crea el target
+    de clasificación binaria:
+      1  →  el precio sube más de UPSIDE_THRESHOLD en PREDICTION_WINDOW días
+      0  →  el precio no lo hace
+    """
+    print(f"[2/5] Construyendo features (ventana: {PREDICTION_WINDOW}d, umbral: {UPSIDE_THRESHOLD:.0%})...")
 
-    # 5. PREDICCIÓN FUTURA
-    print("\n[5/5]  Generando predicción para mañana...")
-    
-    # Reconstruimos features para la última fila (HOY)
-    df_predict = df.copy()
-    
-    # Calcular indicadores técnicos manualmente para asegurar que tenemos la última fila
-    df_predict['return'] = df_predict['close'].pct_change()
-    df_predict['log_volume'] = np.log1p(df_predict['volume'])
-    df_predict['hl_range'] = (df_predict['high'] - df_predict['low']) / df_predict['close']
-    df_predict['oc_range'] = (df_predict['open'] - df_predict['close']) / df_predict['close']
-    df_predict['ma_5'] = df_predict['close'].rolling(5).mean()
-    df_predict['ma_10'] = df_predict['close'].rolling(10).mean()
-    df_predict['volatility'] = df_predict['return'].rolling(20).std()
-    
-    if 'vwap' not in df_predict.columns:
-        df_predict['vwap'] = (df_predict['high'] + df_predict['low'] + df_predict['close']) / 3
+    df = add_derived_features(df)
 
-    delta = df_predict['close'].diff()
-    gain = delta.where(delta > 0, 0).rolling(14).mean()
-    loss = -delta.where(delta < 0, 0).rolling(14).mean()
-    rs = gain / loss
-    df_predict['rsi'] = 100 - (100 / (1 + rs))
+    future_close = df["close"].shift(-PREDICTION_WINDOW)
+    df["target"] = (future_close > df["close"] * (1 + UPSIDE_THRESHOLD)).astype(int)
 
-    # Seleccionar la última fila disponible (Datos de HOY)
-    last_day_features = df_predict.iloc[[-1]][feature_names]
-    
-    # Escalar
-    last_day_scaled = scaler.transform(last_day_features)
-    
-    # Predecir (El modelo devuelve Log Return)
-    pred_log_return = rf_model.predict(last_day_scaled)[0]
-    
-    # Convertir a Precio
-    last_close = df.iloc[-1]['close']
-    predicted_price = last_close * np.exp(pred_log_return)
-    pct_change = (np.exp(pred_log_return) - 1) * 100
-    
-    direction = "🟢 SUBE" if pred_log_return > 0 else "🔴 BAJA"
+    # Eliminar filas sin indicadores suficientes y sin target
+    df.dropna(subset=FEATURE_COLS + ["target"], inplace=True)
+    df = df.iloc[:-PREDICTION_WINDOW]  # últimas filas donde no hay target real
 
-    print("\n" + "="*40)
-    print(f" PRECIO CIERRE HOY:    ${last_close:.2f}")
-    print(f" RETORNO PREDICHO:     {pct_change:+.2f}%")
-    print(f" PRECIO ESTIMADO:      ${predicted_price:.2f}")
-    print(f" SEÑAL:                {direction}")
-    print("="*40 + "\n")
+    pos_rate = df["target"].mean() * 100
+    print(f"      ✔ {len(df)} filas limpias. Positivos (sube): {pos_rate:.1f}%")
+    return df
 
-    # --- VISUALIZACIONES ---
-    # Grafica precios y medias móviles
-    plot_price(df, ticker=TICKER)
+# ─── PASO 3: SPLIT + ESCALADO ────────────────────────────────────────────────
 
-    # Grafica distribución de retornos
-    plot_returns_distribution(df)
+def split_and_scale(df: pd.DataFrame):
+    """Split temporal estricto (sin shuffle) + StandardScaler."""
+    print("[3/5] Dividiendo y escalando...")
 
-    # Si tienes predicciones de test
-    y_pred = rf_model.predict(X_test_scaled)
-    plot_predictions(df, y_test, y_pred)
+    X = df[FEATURE_COLS]
+    y = df["target"]
 
-    # Importancia de features del modelo Random Forest
-    plot_feature_importance(rf_model, feature_names)
+    split_idx = int(len(X) * TRAIN_RATIO)
+    X_train_raw, X_test_raw = X.iloc[:split_idx], X.iloc[split_idx:]
+    y_train,     y_test     = y.iloc[:split_idx], y.iloc[split_idx:]
+
+    scaler  = fit_and_save_scaler(X_train_raw, filename=SCALER_NAME)
+    X_train = scaler.transform(X_train_raw)
+    X_test  = scaler.transform(X_test_raw)
+
+    print(f"      ✔ Train: {len(X_train)} muestras | Test: {len(X_test)} muestras.")
+    return X_train, X_test, y_train, y_test, scaler
+
+# ─── PASO 4: ENTRENAMIENTO ───────────────────────────────────────────────────
+
+def train(X_train, y_train):
+    print("[4/5] Entrenando modelo...")
+    return train_rf_model(X_train, y_train, filename=MODEL_NAME)
+
+# ─── PASO 5: EVALUACIÓN ──────────────────────────────────────────────────────
+
+def evaluate(model, X_test, y_test) -> np.ndarray:
+    """Imprime métricas de clasificación y devuelve las predicciones."""
+    print("[5/5] Evaluando modelo...\n")
+
+    metrics = evaluate_model(model, X_test, y_test)
+    naive   = max(y_test.mean(), 1 - y_test.mean())
+
+    print(f"  Accuracy : {metrics['accuracy']:.2%}  (baseline: {naive:.2%})")
+    print(f"  AUC-ROC  : {metrics['auc']:.4f}")
+    print(f"\n{metrics['report']}")
+
+    if metrics["accuracy"] > naive:
+        print("  ✔ Supera el baseline de clase mayoritaria.")
+    else:
+        print("  ⚠ Sin ventaja sobre el baseline — el modelo necesita revisión.")
+
+    return model.predict(X_test)
+
+# ─── PREDICCIÓN FUTURA ───────────────────────────────────────────────────────
+
+def predict_next(df_raw: pd.DataFrame, df_features: pd.DataFrame, model, scaler):
+    """Predice la dirección del precio para los próximos PREDICTION_WINDOW días."""
+    last = df_features.dropna(subset=FEATURE_COLS).iloc[[-1]][FEATURE_COLS]
+    last_scaled = scaler.transform(last)
+
+    pred_class  = model.predict(last_scaled)[0]
+    pred_probas = model.predict_proba(last_scaled)[0]
+    last_close  = df_raw.iloc[-1]["close"]
+
+    direction  = "🟢 SUBE" if pred_class == 1 else "🔴 BAJA"
+    confidence = pred_probas[pred_class] * 100
+
+    print("=" * 42)
+    print(f"  PRECIO CIERRE HOY    : ${last_close:.2f}")
+    print(f"  SEÑAL ({PREDICTION_WINDOW}d)          : {direction}")
+    print(f"  CONFIANZA            : {confidence:.1f}%")
+    print(f"  Prob. sube: {pred_probas[1]:.1%}  |  Prob. baja: {pred_probas[0]:.1%}")
+    print("=" * 42)
+    print("\n⚠  Esto es un experimento académico, NO asesoramiento financiero.\n")
+
+# ─── GUARDADO ────────────────────────────────────────────────────────────────
+
+def save_data(df: pd.DataFrame, ticker: str):
+    output = DATA_RAW / f"{ticker}_ml_ready.csv"
+    df.to_csv(output, index=False)
+    print(f"  ✔ Dataset guardado: {output}  ({df.shape[0]}f × {df.shape[1]}c)")
+
+# ─── MAIN ────────────────────────────────────────────────────────────────────
+
+def main():
+    print(f"\n{'─' * 42}")
+    print(f"  PIPELINE: {TICKER}")
+    print(f"{'─' * 42}\n")
+
+    df_raw  = download_data(TICKER, YEARS_HISTORY)
+    df_feat = build_features(df_raw.copy())
+
+    X_train, X_test, y_train, y_test, scaler = split_and_scale(df_feat)
+    model  = train(X_train, y_train)
+    y_pred = evaluate(model, X_test, y_test)
+
+    predict_next(df_raw, df_feat, model, scaler)
+    save_data(df_feat, TICKER)
+
+    plot_price(df_raw, ticker=TICKER)
+    plot_returns_distribution(df_raw)
+    plot_predictions(df_feat, y_test, y_pred)
+    plot_feature_importance(model, FEATURE_COLS)
+
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n🛑 Cancelado.")
+        print("\n Cancelado.")
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n Error: {e}")
