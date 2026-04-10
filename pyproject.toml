@@ -25,7 +25,7 @@ dependencies = [
   "nltk",
   "yfinance",
   "scikit-learn",
-  ]
+]
 
 [tool.setuptools]
 packages = ["inversion"]
