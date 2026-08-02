@@ -1,0 +1,296 @@
+{
+  "$comment": "Backlog del arnés. Fuente de verdad de QUÉ hay que hacer. Los agentes leen la primera feature pendiente, la marcan in_progress y no la marcan done hasta que ./init.sh pasa en verde. Tras cerrar (harness finish), el líder propone el commit del cierre con git commit_feature --dry-run y espera confirmación del usuario. Estados válidos: pending | in_progress | done | blocked.",
+  "version": 1,
+  "project": "Stock Market Prediction",
+  "features": [
+    {
+      "id": "DATA-001",
+      "title": "EDA del dataset principal",
+      "description": "Cargar el dataset en data/raw/, generar un informe exploratorio y documentar los hallazgos: tipos, nulos, cardinalidad, distribuciones y correlaciones. Detectar fugas de información antes de construir features.",
+      "acceptance_criteria": [
+        "make data se ejecuta sin errores y deja los datos en data/processed/",
+        "uv run python -m agents run data eda_report --filename <dataset> devuelve success=true",
+        "El informe de fugas no reporta correlaciones sospechosas con el target sin justificar",
+        "Los hallazgos quedan escritos en progress/ y en la documentación del proyecto"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "FEAT-001",
+      "title": "Pipeline de features reproducible",
+      "description": "Implementar la construcción de features en inversion/features/ de forma determinista: mismo input, mismo output. Sin fugas del conjunto de test.",
+      "acceptance_criteria": [
+        "make features se ejecuta sin errores",
+        "Ejecutar make features dos veces produce artefactos idénticos",
+        "Existe un test que verifica el shape y las columnas del output",
+        "El escalado/encoding se ajusta solo con datos de train"
+      ],
+      "status": "done",
+      "depends_on": [
+        "DATA-001"
+      ],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "MODEL-001",
+      "title": "Baseline entrenado y evaluado",
+      "description": "Entrenar el modelo baseline con validación honesta (split o CV sin fugas) y registrar las métricas de clasificacion. No optimizar nada hasta tener este número de referencia.",
+      "acceptance_criteria": [
+        "make train se ejecuta sin errores y guarda el modelo en models/",
+        "Las métricas de validación quedan registradas y son reproducibles con seed fija",
+        "uv run python -m agents run ml check_overfitting no reporta sobreajuste sin explicar",
+        "make test pasa y la cobertura no baja"
+      ],
+      "status": "done",
+      "depends_on": [
+        "FEAT-001"
+      ],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "QA-001",
+      "title": "Batería de calidad en verde",
+      "description": "Dejar make check (lint + typecheck + test) pasando de punta a punta. Es la condición que ./init.sh verifica antes de dejar trabajar a cualquier agente.",
+      "acceptance_criteria": [
+        "make lint pasa sin errores",
+        "make typecheck pasa con mypy --strict",
+        "make test pasa con cobertura >= 80%",
+        "./init.sh termina con ENTORNO LISTO"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "QA-002",
+      "title": "Entorno reproducible: ./init.sh termina en ENTORNO LISTO",
+      "description": "La puerta está en rojo: init.sh usa el python3 del sistema (3.13, sin pytest) en vez del .venv (3.12, con pytest 9.1.1). Instalar uv o hacer que init.sh priorice .venv/bin/python, y verificar que la suite pasa.",
+      "acceptance_criteria": [
+        "./init.sh termina con ENTORNO LISTO",
+        "make test pasa con cobertura >= 80%",
+        "La suite es ejecutable sin uv global"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-01",
+      "review_rounds": 0,
+      "closed": "2026-08-01"
+    },
+    {
+      "id": "DATA-002",
+      "title": "Descarga multi-ticker parametrizada",
+      "description": "Generalizar make_dataset para que descargue una lista configurable de tickers (AAPL, MSFT, GOOGL, AMZN, META, TSLA, NVDA) con yfinance. El catálogo vive en un fichero de configuración; cada ticker genera su dataset raw y un informe de validación (nulos, rango de fechas, tamaño).",
+      "acceptance_criteria": [
+        "make data descarga los tickers del catálogo y deja data/raw/<TICKER>_ml_ready.csv",
+        "Un fichero de config (config/tickers.yaml o similar) define el catálogo y el rango de fechas",
+        "make data sin internet falla limpio con un mensaje claro",
+        "El agente data eda_report devuelve success=true para al menos un ticker nuevo"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "SENT-001",
+      "title": "Recolección de noticias financieras por ticker",
+      "description": "Módulo inversion/sentiment/fetch.py que descarga noticias por ticker (RSS/NewsAPI) y guarda data/raw/news_<TICKER>.csv con columnas fecha, titulo, cuerpo, fuente. Incluye un dataset de muestra offline para que la suite de tests no dependa de internet.",
+      "acceptance_criteria": [
+        "El fetch funciona con una fuente RSS real y deja data/raw/news_<TICKER>.csv",
+        "Existe un fixture/sample offline de noticias que usan los tests",
+        "Sin red, el módulo devuelve un error claro, no cuelga",
+        "Los tests de fetch pasan con el sample offline"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "SENT-002",
+      "title": "Analizador de sentimiento financiero (VADER)",
+      "description": "inversion/sentiment/analyzer.py: clasifica titulares/cuerpos con VADER (nltk) y produce scores compuestos por noticia y agregados por día y ticker. Incluye un léxico financiero ligero sobre el VADER base (jerga de mercados).",
+      "acceptance_criteria": [
+        "uv run python -m agents run sentiment analyze --ticker NVDA devuelve success=true con scores por día",
+        "El agregado diario es reproducible (seed fija / sin aleatoriedad)",
+        "Hay un test de humo con el sample offline de SENT-001",
+        "Los scores están acotados en [-1, 1] y la agregación es verificable a mano"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "SENT-003",
+      "title": "Fusión de sentimiento en el pipeline de features",
+      "description": "Añadir columnas de sentimiento (score diario, media móvil 5/20 días, volatilidad del sentimiento) a build_features para cualquier ticker, alineadas por fecha con los precios. Sin fuga: solo sentimiento conocido en el día t, nunca futuro.",
+      "acceptance_criteria": [
+        "make features produce un dataset con columnas sentiment_* para cada ticker",
+        "El test de shape/columnas incluye las nuevas columnas",
+        "Se verifica que no hay fuga (el score del día t no usa noticias del día t+k)",
+        "make features dos veces produce artefactos idénticos"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "MODEL-002",
+      "title": "Modelo multi-ticker con sentimiento y evaluación por activo",
+      "description": "Entrenar RandomForest por activo con las features ampliadas (precios + sentimiento). Registrar métricas por ticker (precisión, recall, F1, AUC) y comparar con el baseline sin sentimiento para cuantificar el aporte.",
+      "acceptance_criteria": [
+        "make train genera models/rf_<TICKER>.pkl para cada ticker del catálogo",
+        "Existe un informe con métricas por activo y la comparación baseline vs. con-sentimiento",
+        "uv run python -m agents run ml check_overfitting no reporta sobreajuste sin explicar",
+        "Los resultados son reproducibles con seed fija"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "API-001",
+      "title": "CLI predict --ticker para cualquier activo del catálogo",
+      "description": "Interfaz de línea de comandos que, dado un ticker, carga modelo+scaler, construye features con el sentimiento más reciente y devuelve la predicción con su probabilidad. Cierre del bucle: del dato a la predicción sin tocar código.",
+      "acceptance_criteria": [
+        "make predict TICKER=AAPL devuelve la predicción y probabilidad",
+        "Un ticker sin modelo da un error claro con instrucciones de entrenar",
+        "El módulo predict_model acepta ticker como argumento",
+        "make test pasa"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "AGENT-001",
+      "title": "Agente Python sentiment en el catálogo",
+      "description": "Añadir un agente determinista 'sentiment' al sistema de 27 agentes (patrón de data/ml): acciones analyze y fetch, contrato formal, y que responda al routing por lenguaje natural. Es la pieza que permite delegar sentimiento a un agente dedicado.",
+      "acceptance_criteria": [
+        ".venv/bin/python -m agents list muestra el agente sentiment",
+        "uv run python -m agents run sentiment analyze --ticker NVDA devuelve success=true",
+        "El contrato del agente queda documentado en la referencia",
+        "Los tests del sistema de agentes pasan"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-02",
+      "review_rounds": 0,
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "QA-003",
+      "title": "Batería de calidad en verde con el nuevo código",
+      "description": "Cerrar el círculo: make lint + typecheck + test + ./init.sh en verde con todo el código nuevo (multi-ticker, sentimiento, API). Es la condición final antes de considerar el repo 'súper completo'.",
+      "acceptance_criteria": [
+        "make lint pasa",
+        "make typecheck pasa con mypy --strict",
+        "make test pasa con cobertura >= 80%",
+        "./init.sh termina con ENTORNO LISTO"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "TMPL-001",
+      "title": "Sincronizar con dskit vía copier y recuperar ficheros de repo",
+      "description": "El proyecto se generó con una versión anterior de dskit y le faltan ficheros del template: .github/ (CI), .pre-commit-config.yaml, .editorconfig, SECURITY.md, CONTRIBUTING.md y models/artifacts/. Plan: instalar copier, commitear el estado actual, copier update --trust, resolver conflictos <<<<<<< y pasar la puerta.",
+      "acceptance_criteria": [
+        "copier queda instalado y 'copier update --trust' termina sin errores",
+        "El repo tiene .github/, .pre-commit-config.yaml, .editorconfig, SECURITY.md y CONTRIBUTING.md",
+        "No quedan marcadores de conflicto <<<<<<< en el repo",
+        "./init.sh termina en ENTORNO LISTO después de actualizar"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "TMPL-002",
+      "title": "API REST FastAPI para el modelo multi-ticker (use_api)",
+      "description": "Activar el módulo api/ del template: FastAPI con /health, /info y /predict, esquemas Pydantic V2, lifespan que carga modelo+scaler, y process_input() en features para inferencia. Complementa la CLI de API-001: el modelo servido como servicio.",
+      "acceptance_criteria": [
+        "make serve arranca la API en localhost:8000",
+        "GET /health y /info devuelven 200",
+        "POST /predict con un ticker del catálogo devuelve predicción y probabilidad",
+        "Los tests de api/ pasan y process_input() funciona para inferencia"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "TMPL-003",
+      "title": "Calidad de modelo: SHAP + conformal + Optuna",
+      "description": "Activar módulos de calidad del template: SHAP values sobre el mejor modelo (interpretabilidad), conformal prediction (sets con garantía de cobertura) y Optuna (HPO por modelo). Convierte la predicción de 'un número' a 'una decisión con incertidumbre'. Los agentes ml/refactor revisan la integración.",
+      "acceptance_criteria": [
+        "make train con use_optuna hace HPO y guarda los mejores parámetros en models/artifacts/",
+        "El informe SHAP del mejor modelo se genera en reports/figures/",
+        "Conformal devuelve intervalos con cobertura medida >= nivel pedido en validación",
+        "make check pasa con el código nuevo"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "TMPL-004",
+      "title": "Monitoring de drift y rendimiento (use_monitoring)",
+      "description": "Activar monitoring/ del template: Evidently para drift KS/chi² de features y comparación de rendimiento vs baseline. Relevante en este repo porque el sentimiento y los datos de mercado cambian de distribución: detectar cuando el modelo deja de ser fiable.",
+      "acceptance_criteria": [
+        "make monitor genera el reporte de drift en reports/monitoring/",
+        "Se detecta drift sintético inyectado en los tests",
+        "El rendimiento se compara contra el baseline registrado",
+        "make check pasa"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "TMPL-005",
+      "title": "RAG local + vault Obsidian (use_rag + graphify)",
+      "description": "Activar el RAG híbrido local (ChromaDB + BM25) para consultar el proyecto en lenguaje natural, y el vault Obsidian (graphify_mode) como memoria de conocimiento estable: 00_META..07_REFERENCIAS con guía de modelos y notas por dominio. La capa de conocimiento del repo.",
+      "acceptance_criteria": [
+        "make index-rag indexa el proyecto y una consulta devuelve resultados con score",
+        "El vault/ se genera con estructura de dominios y guia_modelos.md",
+        "make prompts-check y make skills pasan",
+        "El agente doc/rag responde con el índice"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-02",
+      "review_rounds": 0,
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "CI-001",
+      "title": "CI de GitHub Actions con la puerta del arnés",
+      "description": "Crear .github/workflows/ci.yml: instalar uv, uv sync --frozen con todos los extras, make check (lint + typecheck + test + arnés) y ./init.sh --quick como paso bloqueante. El CI valida también que prompts-check no se desincronice.",
+      "acceptance_criteria": [
+        "El workflow existe y es válido YAML (uv run python -m agents run cicd validate lo aprueba)",
+        "Los pasos reproducen make check y ./init.sh --quick",
+        "El agente cicd cruza las referencias con el Makefile real sin errores",
+        "El README documenta el badge de CI"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "RESEARCH-001",
+      "title": "Papers de referencia sobre activos, inversión y sentimiento financiero",
+      "description": "El agente research busca papers académicos (arXiv, OpenAlex) sobre predicción de activos, análisis de sentimiento financiero y ML en mercados. Guardar los resultados en reports/ o vault/07_REFERENCIAS para informar el diseño de features y modelos.",
+      "acceptance_criteria": [
+        "uv run python -m agents run research busca papers rankeados por relevancia",
+        "Los resultados quedan en un fichero de informe en reports/ o vault/",
+        "El informe distingue papers de sentimiento, de features y de modelos",
+        "El informe se referencia en la documentación del proyecto"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-02"
+    }
+  ]
+}

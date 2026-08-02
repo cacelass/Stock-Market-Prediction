@@ -1,0 +1,443 @@
+.PHONY: setup install-deps \
+        data features train predict pipeline \
+        test smoke lint format typecheck security audit check lock \
+        lab notebook tb \
+        docs \
+        profile \
+        mlflow \
+        monitor tune serve query \
+\
+        agents-list agents-run agents-doctor agents-memory agents-eval \
+        init harness-check backlog prompts-sync prompts-check assistants-sync \
+        skills opencode-init opencode-check \
+        index-rag index-rag-rebuild \
+        recommended-tools recommended-all \
+        clean clean-models clean-figures clean-all \
+        run info help
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Variables
+# ─────────────────────────────────────────────────────────────────────────────
+MODULE   = inversion
+ML_TYPE  = supervisado
+PYTHON   = python
+# QA-002: el intérprete del .venv es el canónico; el pipeline y la batería de
+# calidad no dependen de uv global (no instalado en este entorno).
+PY       = .venv/bin/python
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  help  →  target por defecto
+# ─────────────────────────────────────────────────────────────────────────────
+.DEFAULT_GOAL := help
+
+help:
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Stock Market Prediction  ·  ML: $(ML_TYPE)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "  Entorno"
+	@echo "    make setup          instala core + dev + extras del tipo ML"
+	@echo "    make install-deps   solo dependencias del tipo ML (sin dev)"
+	@echo "    make info           versiones y paquetes instalados"
+	@echo ""
+	@echo "  Pipeline de datos y modelos"
+	@echo "    make data           descarga/preprocesa datos crudos"
+	@echo "    make features       construye features desde datos procesados"
+	@echo "    make train          entrena el modelo"
+	@echo "    make predict        genera predicciones con el modelo entrenado"
+	@echo "    make pipeline       data → features → train → predict (todo)"
+	@echo ""
+	@echo "  Calidad"
+	@echo "    make check          lint + typecheck + test (batería completa)"
+	@echo "    make test           pytest -v - cov≥80% (todos los tests)"
+	@echo "    make smoke          test de humo — verifica que el pipeline arranca"
+	@echo "    make lint           ruff check (solo lectura, sin modificar)"
+	@echo "    make format         ruff format (aplica cambios en sitio)"
+	@echo "    make typecheck      mypy --strict (tipado estático)"
+	@echo "    make security       bandit + pip-audit (vulnerabilidades)"
+	@echo "    make audit          radon cc + agents audit (complejidad + equipo)"
+	@echo ""
+	@echo "  Jupyter"
+	@echo "    make lab            JupyterLab  (puerto 8888)"
+	@echo "    make notebook       Jupyter Notebook (puerto 8888)"
+	@echo ""
+	@echo "  Ejecución directa"
+	@echo "    make run            ejecuta main.py"
+	@echo "    make profile        cProfile de main.py → reports/profile.prof"
+	@echo ""
+
+
+
+
+
+	@echo "  Documentación"
+	@echo "    make docs           sphinx-apidoc + html"
+	@echo ""
+	@echo "  Arnés (harness)"
+	@echo "    make init            puerta de entrada: ¿se puede trabajar? (init.sh)"
+	@echo "    make harness-check   valida la estructura del arnés sin correr tests"
+	@echo "    make backlog         muestra el estado de featureslist.json"
+	@echo ""
+	@echo "  Agentes"
+	@echo "    make agents-list     listar agentes disponibles"
+	@echo "    make agents-run      ejecutar un agente"
+	@echo "    make agents-doctor   diagnóstico completo con agentes"
+	@echo "    make agents-memory   estado de la memoria de agentes"
+	@echo "    make agents-eval     smoke + routing + contracts (eval de agentes)"
+	@echo "    make prompts-sync    regenera los prompts desde el codigo y contracts.py"
+	@echo "    make prompts-check   falla si un prompt se ha desincronizado"
+	@echo "    make assistants-sync espeja los subagentes a .claude/agents/"
+	@echo ""
+	@echo "  Skills del asistente"
+	@echo "    make skills          instalar skills locales en .opencode/skills/"
+	@echo "    make opencode-init   configurar subagentes opencode (orquestador)"
+	@echo "    make opencode-check  validar consistencia de la configuración"
+	@echo ""
+	@echo "  Ecosistema"
+	@echo "    make recommended-tools  mostrar herramientas recomendadas"
+	@echo ""
+	@echo "  Limpieza"
+	@echo "    make clean          cachés y __pycache__"
+	@echo "    make clean-models   borra .joblib y .pt de models/"
+	@echo "    make clean-figures  borra figuras de reports/figures/"
+	@echo "    make clean-all      todo lo anterior"
+	@echo ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Entorno
+# ─────────────────────────────────────────────────────────────────────────────
+setup:
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Instalando dependencias para ML tipo: $(ML_TYPE)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	uv sync --extra dev --extra $(ML_TYPE) \
+		&& echo "  Extras instalados."
+	@uv run pre-commit install 2>/dev/null || echo "  (pre-commit no disponible)"
+	@echo ""
+	@echo "  Listo. Activa el entorno con:  source .venv/bin/activate"
+	@echo ""
+
+install-deps:
+	uv sync --extra $(ML_TYPE)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Pipeline  data → features → train → predict
+#
+#  Cada step llama al script correspondiente dentro del módulo.
+TICKER ?= NVDA
+
+#  Estructura esperada:
+#    $(MODULE)/data/make_dataset.py        → lee data/raw/, escribe data/processed/
+#    $(MODULE)/features/build_features.py  → lee data/processed/, escribe data/interim/
+#    $(MODULE)/models/train_model.py       → lee data/interim/, escribe models/
+#    $(MODULE)/models/predict_model.py     → lee models/ + data/interim/, escribe reports/
+# ─────────────────────────────────────────────────────────────────────────────
+data:
+	@echo "▶  Descargando catálogo multi-ticker → data/raw/ y procesando → data/processed/"
+	$(PY) $(MODULE)/data/make_dataset.py
+
+features: data
+	@echo "▶  Construyendo features → data/interim/"
+	$(PY) $(MODULE)/features/build_features.py
+
+train: features
+	@echo "▶  Entrenando modelo → models/"
+	$(PY) $(MODULE)/models/train_model.py
+
+predict: train
+	@echo "▶  Generando predicciones → reports/"
+	$(PY) $(MODULE)/models/predict_model.py --ticker $(TICKER)
+
+serve:
+	@echo "▶  API REST en http://localhost:8000 (TMPL-002)"
+	uvicorn inversion.api.main:app --reload --port 8000
+
+tune: features
+	@echo "▶  Optimización de hiperparámetros con Optuna → models/artifacts/"
+	$(PY) $(MODULE)/tuning/tune_model.py
+
+shap: train
+	@echo "▶  Informes SHAP → reports/figures/"
+	$(PY) $(MODULE)/models/explain_shap.py
+
+monitor: features
+	@echo "▶  Monitoring de drift y rendimiento → reports/monitoring/"
+	$(PY) $(MODULE)/monitoring/drift.py
+
+pipeline: predict
+	@echo ""
+	@echo "  Pipeline completo finalizado."
+	@echo ""
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Ejecución directa
+# ─────────────────────────────────────────────────────────────────────────────
+run:
+	uv run $(PYTHON) main.py
+
+
+
+
+
+profile:
+	@echo "▶  Profiling main.py → reports/profile.prof"
+	uv run $(PYTHON) -m cProfile -o reports/profile.prof main.py
+	@echo "   Visualiza con: uv run snakeviz reports/profile.prof"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Calidad de código
+# ─────────────────────────────────────────────────────────────────────────────
+test:
+	$(PY) -m pytest tests/ -v --cov=inversion --cov-report=term-missing --cov-fail-under=80
+
+smoke:
+	@echo "▶  Test de humo — pipeline con datos sintéticos"
+	$(PY) -m pytest tests/ -v -m smoke --tb=short
+
+check: lint typecheck test harness-check
+	@echo ""
+	@echo "  ✅ check pasado: lint + typecheck + test + arnés OK"
+
+lint:
+	$(PY) -m ruff check $(MODULE)/ tests/
+	$(PY) -m ruff format --check $(MODULE)/ tests/
+
+format:
+	$(PY) -m ruff format $(MODULE)/ tests/
+
+typecheck:
+	$(PY) -m mypy --strict $(MODULE)/ tests/
+	@echo "  ✅ typecheck OK"
+
+security:
+	uv run bandit -r $(MODULE)/ -f txt -x tests
+	uv run pip-audit 2>/dev/null || echo "  (pip-audit requiere paquetes instalados — ejecuta make setup primero)"
+	@echo "  ✅ security check OK"
+
+audit:
+	@echo "▶  Complejidad ciclomática (radon)"
+	@uv run radon cc $(MODULE)/ -s --min C 2>/dev/null || echo "  (sin radon)"
+	@echo ""
+	uv run python -m agents audit suggest 2>/dev/null || echo "  (agente 'audit' no disponible — ejecuta make setup)"
+	@echo "  ✅ audit OK"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Jupyter
+# ─────────────────────────────────────────────────────────────────────────────
+lab:
+	uv run jupyter lab --ip=* --port=8888 --no-browser
+
+notebook:
+	uv run jupyter notebook --ip=* --port=8888 --no-browser
+
+
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Documentación
+# ─────────────────────────────────────────────────────────────────────────────
+docs:
+	uv run sphinx-apidoc -o docs/source/ $(MODULE)/
+	$(MAKE) html -C docs
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Arnés (harness) — ver el protocolo en AGENTS.md
+# ─────────────────────────────────────────────────────────────────────────────
+init:
+	@chmod +x init.sh 2>/dev/null || true
+	@./init.sh
+
+harness-check:
+	@chmod +x init.sh 2>/dev/null || true
+	@./init.sh --quick
+
+backlog:
+	@uv run $(PYTHON) -c "import json; d=json.load(open('featureslist.json')); \
+	print(); print('  Backlog de Stock Market Prediction'); print(); \
+	[print('  [%-11s] %-10s %s' % (f['status'], f['id'], f['title'])) for f in d['features']]; \
+	print()"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Sistema de agentes
+# ─────────────────────────────────────────────────────────────────────────────
+agents-list:
+	$(PY) -m agents list
+
+agents-run:
+	$(PY) -m agents run $(filter-out $@,$(MAKECMDGOALS))
+
+agents-doctor:
+	$(PY) -m agents doctor
+
+agents-memory:
+	@echo "▶  Estado de la memoria de agentes"
+	$(PY) -m agents run memory status
+
+agents-eval:
+	@echo "▶  Evaluación del sistema de agentes (smoke + routing + contracts)"
+	$(PY) -m agents.evals.runner
+
+prompts-sync assistants-sync:
+	@echo "▶  Regenerando prompts y subagentes desde el código y los contratos..."
+	$(PY) -m agents.prompts_sync --write
+
+prompts-check:
+	@$(PY) -m agents.prompts_sync
+
+index-rag:
+	@echo "▶  Indexando código y documentación del proyecto en ChromaDB..."
+	@echo "   (incremental: solo se reindexa lo que cambió)"
+	$(PY) -m agents run rag index
+
+# Necesario al cambiar DSKIT_RAG_EMBEDDER: los vectores del embedder anterior
+# no son comparables con los del nuevo, y mezclarlos no da error — da basura.
+index-rag-rebuild:
+	@echo "▶  Reconstruyendo el índice RAG desde cero..."
+	$(PY) -m agents run rag index --rebuild
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Skills — configuración del asistente de IA
+# ─────────────────────────────────────────────────────────────────────────────
+skills:
+	@echo "▶  Instalando skills del proyecto..."
+	@mkdir -p .opencode/skills
+	@for skill in agents/prompts/*.md; do \
+		name=$$(basename "$$skill" .md); \
+		cp "$$skill" ".opencode/skills/$$name.md"; \
+		echo "   skill: $$name"; \
+	done
+	@echo "   Skills instaladas en .opencode/skills/ (disponibles para el asistente)."
+	@echo ""
+	@echo "   Para soporte multi-asistente, también se pueden instalar como:"
+	@echo "     npx autoskills -y    (si usas Node.js, instala skills de skills.sh)"
+
+opencode-init: skills
+	@echo "▶  Configurando subagentes de opencode..."
+	@mkdir -p .opencode/agents
+	@if [ ! -f .opencode/agents/orquestador.md ]; then \
+		echo "  ERROR: falta .opencode/agents/orquestador.md — copia desde template/"; \
+		exit 1; \
+	fi
+	@echo "   opencode configurado. Agente 'orquestador' disponible."
+	@echo "   Usa Tab en opencode para cambiar al agente orquestador."
+	@echo ""
+
+opencode-check:
+	@echo "▶  Verificando configuración opencode..."
+	@errors=0
+	@if [ ! -f opencode.json ]; then \
+		echo "  ✘ falta opencode.json"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ opencode.json"; \
+	fi
+	@if [ ! -f .opencode/agents/orquestador.md ]; then \
+		echo "  ✘ falta .opencode/agents/orquestador.md"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ .opencode/agents/orquestador.md"; \
+	fi
+	@for a in lider implementer reviewer explorer; do \
+		if [ ! -f ".opencode/agents/$$a.md" ]; then \
+			echo "  ✘ falta .opencode/agents/$$a.md (agente del arnés)"; \
+		else \
+			echo "  ✔ .opencode/agents/$$a.md"; \
+		fi; \
+	done
+	@count=$$(ls .opencode/skills/*.md 2>/dev/null | wc -l); \
+	if [ "$$count" -lt 20 ]; then \
+		echo "  ✘ skills insuficientes ($$count/29+ esperados) — ejecuta make skills"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ $$count skills instaladas"; \
+	fi
+	@count2=$$(ls agents/prompts/*.md 2>/dev/null | wc -l); \
+	echo "  ✔ $$count2 prompts fuente disponibles."
+	@if [ "$$errors" -eq 0 ]; then \
+		echo "  ✔ Todo correcto."; \
+	else \
+		echo "  ✘ $$errors error(es) encontrados."; \
+		exit 1; \
+	fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Recomendados — instala herramientas del ecosistema (agents/README.md)
+# ─────────────────────────────────────────────────────────────────────────────
+recommended-tools:
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Herramientas recomendadas del ecosistema"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "  Skills (skills.sh):"
+	@echo "    npx skills add obra/superpowers"
+	@echo "    npx skills add mattpocock/skills"
+	@echo "    npx skills add anthropics/skills/skill-creator"
+	@echo ""
+	@echo "  Frameworks de memoria (pip):"
+	@echo "    uv pip install cognee"
+	@echo "    uv pip install supermemory"
+	@echo ""
+	@echo "  Agentes de investigación (pip):"
+	@echo "    uv pip install langchain-community langgraph"
+	@echo "    git clone https://github.com/langchain-ai/local-deep-researcher"
+	@echo ""
+	@echo "  Fairness / bias (pip):"
+	@echo "    uv pip install eticas-audit"
+	@echo ""
+	@echo "  Otros:"
+	@echo "    npx autoskills -y           # skills automáticas por stack"
+	@echo "    npm install -g @synsci/openscience  # AI workbench científico"
+	@echo ""
+
+recommended-all: recommended-tools
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Limpieza
+# ─────────────────────────────────────────────────────────────────────────────
+clean:
+	rm -rf .pytest_cache docs/build
+	find $(MODULE) tests -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -name "*.pyc" -delete
+	@echo "  Cachés y __pycache__ eliminados."
+
+clean-models:
+	rm -f models/*.joblib models/*.pkl models/*.pt models/checkpoint-*.pt
+	@echo "  Modelos eliminados."
+
+clean-figures:
+	rm -f reports/figures/*.png reports/figures/*.svg reports/figures/*.html
+	@echo "  Figuras eliminadas."
+
+clean-all: clean clean-models clean-figures
+	rm -f reports/*.csv
+	rm -rf agents/workspace/
+	@echo "  Limpieza completa."
+
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Dependencias
+# ─────────────────────────────────────────────────────────────────────────────
+lock:
+	uv lock
+	@echo "  uv.lock actualizado."
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Info del entorno
+# ─────────────────────────────────────────────────────────────────────────────
+info:
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Proyecto  : Stock Market Prediction"
+	@echo "  Módulo    : $(MODULE)"
+	@echo "  ML tipo   : $(ML_TYPE)"
+	@echo "  Python    : $(shell uv run python --version 2>/dev/null || python --version)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@uv pip list 2>/dev/null | head -40 || pip list | head -40
+	@echo ""
