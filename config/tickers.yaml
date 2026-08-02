@@ -1,0 +1,20 @@
+# config/tickers.yaml — catálogo multi-ticker para `make data`
+#
+# Cada ticker del catálogo genera data/raw/<TICKER>_ml_ready.csv con el mismo
+# esquema que NVDA_ml_ready.csv (20 columnas: OHLCV + features + target) y un
+# informe de validación en reports/data_validation/<TICKER>_validation.json.
+#
+# start/end definen el rango de fechas de la descarga (serie diaria, rango
+# cerrado). Edita este fichero para añadir tickers o cambiar el rango; los
+# datos se vuelven a descargar con la próxima ejecución de `make data`.
+start: "2007-01-01"
+end: "2026-04-02"
+
+tickers:
+  - AAPL
+  - MSFT
+  - GOOGL
+  - AMZN
+  - META
+  - TSLA
+  - NVDA

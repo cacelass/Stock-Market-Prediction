@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 import joblib
@@ -20,6 +22,11 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
       - log_volume   : log(1 + volume)
       - vwap_ratio   : close / vwap  (si no hay vwap real, usa (H+L+C)/3)
       - lag_1 / lag_5 / lag_20 : lags del retorno diario
+
+    El cálculo es determinista: mismo input → mismo output. Las features son
+    derivadas por construcción de los precios (close~vwap, ma_50~close), por
+    lo que hay colinealidad esperada; el modelo RandomForest es tolerante a
+    ella y no se intenta "arreglar" aquí.
     """
     df = df.sort_values("timestamp").copy()
 
@@ -31,9 +38,9 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # RSI 14 días (con protección contra división por cero)
     delta = df["close"].diff()
-    gain  = delta.where(delta > 0, 0).rolling(window=14).mean()
-    loss  = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs    = gain / (loss + 1e-9)
+    gain = delta.where(delta > 0, 0).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / (loss + 1e-9)
     df["rsi"] = 100 - (100 / (1 + rs))
 
     # Rangos normalizados por precio de cierre
@@ -41,7 +48,7 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     df["oc_range"] = (df["open"] - df["close"]) / df["close"]
 
     # Medias móviles
-    df["ma_50"]  = df["close"].rolling(50).mean()
+    df["ma_50"] = df["close"].rolling(50).mean()
     df["ma_200"] = df["close"].rolling(200).mean()
 
     # Log volume
@@ -53,15 +60,20 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     df["vwap_ratio"] = df["close"] / df["vwap"]
 
     # Lags del retorno (semana, mes, trimestre aprox.)
-    df["lag_1"]  = df["return"].shift(1)
-    df["lag_5"]  = df["return"].shift(5)
+    df["lag_1"] = df["return"].shift(1)
+    df["lag_5"] = df["return"].shift(5)
     df["lag_20"] = df["return"].shift(20)
 
     return df
 
 
-def fit_and_save_scaler(X, filename=None) -> StandardScaler:
-    """Entrena y persiste un StandardScaler. Devuelve el scaler ajustado."""
+def fit_and_save_scaler(X: np.ndarray | pd.DataFrame, filename: str | None = None) -> StandardScaler:
+    """Entrena y persiste un StandardScaler. Devuelve el scaler ajustado.
+
+    El escalado se ajusta SOLO con los datos de train: quien llama a esta
+    función pasa únicamente X_train (ver train_model.py). Nunca se ajusta con
+    el conjunto de test, para no filtrar información futura.
+    """
     scaler = StandardScaler()
     scaler.fit(X)
 
@@ -70,3 +82,65 @@ def fit_and_save_scaler(X, filename=None) -> StandardScaler:
     joblib.dump(scaler, save_path)
 
     return scaler
+
+
+def add_sentiment_features(df: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
+    """Fusiona el sentimiento diario (VADER) con los precios, sin fuga.
+
+    Lee data/raw/news_<TICKER>.csv (si existe), puntúa cada noticia con el
+    analyzer y agrega por día. El merge es por fecha exacta: la fila del día t
+    usa SOLO noticias del día t o anteriores — nunca t+k. Las medias móviles
+    del sentimiento miran hacia atrás (rolling), así que ninguna feature usa
+    el futuro. Si no hay noticias para el ticker, devuelve el DataFrame sin
+    columnas de sentimiento.
+    """
+    news_csv = paths.RAW_DATA_DIR / f"news_{ticker.upper()}.csv"
+    if not news_csv.exists():
+        return df
+
+    from inversion.sentiment.analyzer import daily_sentiment, score_news_df
+
+    scored = score_news_df(pd.read_csv(news_csv))
+    daily = daily_sentiment(scored, ticker=ticker.upper())[["fecha", "compound", "noticias"]]
+    daily["fecha"] = pd.to_datetime(daily["fecha"]).dt.date
+
+    out = df.copy()
+    out["_fecha"] = pd.to_datetime(out["timestamp"]).dt.date
+    out = out.merge(daily, left_on="_fecha", right_on="fecha", how="left")
+
+    out["sentiment_score"] = out["compound"].fillna(0.0)
+    out["sentiment_noticias"] = out["noticias"].fillna(0).astype(int)
+    # Solo historia: rolling mira hacia atrás, nunca hacia delante.
+    out["sentiment_ma5"] = out["sentiment_score"].rolling(5, min_periods=1).mean()
+    out["sentiment_vol"] = out["sentiment_score"].rolling(7, min_periods=1).std().fillna(0.0)
+
+    return out.drop(columns=["_fecha", "fecha", "compound", "noticias"])
+
+
+def build_features_pipeline() -> list[Path]:
+    """Lee data/processed/*.csv y escribe data/interim/features_<nombre>.csv.
+
+    Reproducible por diseño: mismo input → mismo output byte a byte. No hay
+    aleatoriedad ni dependencia del orden de diccionarios; el CSV de salida
+    queda ordenado por timestamp. Añade el sentimiento diario del ticker
+    cuando existe data/raw/news_<TICKER>.csv (SENT-003).
+    """
+    paths.PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    paths.INTERIM_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    written = []
+    for csv_file in sorted(paths.PROCESSED_DATA_DIR.glob("*.csv")):
+        ticker = csv_file.stem.split("_ml_ready")[0].upper()
+        df = pd.read_csv(csv_file, parse_dates=["timestamp"])
+        df = add_derived_features(df).sort_values("timestamp").reset_index(drop=True)
+        df = add_sentiment_features(df, ticker=ticker)
+        out = paths.INTERIM_DATA_DIR / f"features_{csv_file.name}"
+        df.to_csv(out, index=False)
+        written.append(out)
+        print(f"   ✔ {csv_file.name} → {out.name} ({df.shape[0]}f × {df.shape[1]}c)")
+
+    return written
+
+
+if __name__ == "__main__":
+    build_features_pipeline()

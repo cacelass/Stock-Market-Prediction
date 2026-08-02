@@ -1,12 +1,15 @@
 import matplotlib
-matplotlib.use("Agg")  
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
 
-def plot_price(df: pd.DataFrame, ticker: str = "", output_dir: str = "./data/processed"):
+def plot_price(df: pd.DataFrame, ticker: str = "", output_dir: str = "./data/processed") -> None:
     """Grafica el precio de cierre con medias móviles (MA50 y MA200)."""
     if "timestamp" not in df.columns:
         df = df.reset_index()
@@ -31,9 +34,7 @@ def plot_price(df: pd.DataFrame, ticker: str = "", output_dir: str = "./data/pro
     print(f"✔ Gráfico de precio guardado en {filename}")
 
 
-def plot_predictions(df: pd.DataFrame, y_true, y_pred,
-                     title: str = "Señales: Real vs Predicción",
-                     output_dir: str = "./data/processed"):
+def plot_predictions(df: pd.DataFrame, y_true: Any, y_pred: Any, title: str = "Señales: Real vs Predicción", output_dir: str = "./data/processed") -> None:
     """
     Compara la clase real (0/1) con la predicha en el periodo de test.
     Muestra aciertos en verde y errores en rojo.
@@ -41,15 +42,15 @@ def plot_predictions(df: pd.DataFrame, y_true, y_pred,
     if "timestamp" not in df.columns:
         df = df.reset_index()
 
-    y_true  = np.asarray(y_true)
-    y_pred  = np.asarray(y_pred)
-    n       = len(y_true)
-    dates   = df["timestamp"].values[-n:]
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    n = len(y_true)
+    dates = df["timestamp"].values[-n:]
     correct = y_true == y_pred
 
     plt.figure(figsize=(14, 4))
-    plt.scatter(dates[correct],  y_true[correct],  c="green", s=8, label="Acierto", alpha=0.6)
-    plt.scatter(dates[~correct], y_true[~correct], c="red",   s=8, label="Error",   alpha=0.6)
+    plt.scatter(dates[correct], y_true[correct], c="green", s=8, label="Acierto", alpha=0.6)
+    plt.scatter(dates[~correct], y_true[~correct], c="red", s=8, label="Error", alpha=0.6)
     plt.yticks([0, 1], ["Baja (0)", "Sube (1)"])
     plt.title(title)
     plt.xlabel("Fecha")
@@ -63,16 +64,13 @@ def plot_predictions(df: pd.DataFrame, y_true, y_pred,
     print(f"✔ Gráfico de predicciones guardado en {filename}")
 
 
-def plot_feature_importance(model, feature_names: list,
-                            top_n: int = 15,
-                            output_dir: str = "./data/processed"):
+def plot_feature_importance(model: Any, feature_names: list[str], top_n: int = 15, output_dir: str = "./data/processed") -> None:
     """Visualiza las features más importantes del modelo."""
     importances = model.feature_importances_
-    sorted_idx  = np.argsort(importances)[-top_n:]
+    sorted_idx = np.argsort(importances)[-top_n:]
 
     plt.figure(figsize=(10, 6))
-    sns.barplot(x=importances[sorted_idx], y=np.array(feature_names)[sorted_idx],
-                palette="viridis")
+    sns.barplot(x=importances[sorted_idx], y=np.array(feature_names)[sorted_idx], palette="viridis")
     plt.title(f"Top {top_n} features por importancia")
     plt.xlabel("Importancia")
     plt.ylabel("Feature")
@@ -84,8 +82,7 @@ def plot_feature_importance(model, feature_names: list,
     print(f"✔ Gráfico de importancia de features guardado en {filename}")
 
 
-def plot_returns_distribution(df: pd.DataFrame,
-                              output_dir: str = "./data/processed"):
+def plot_returns_distribution(df: pd.DataFrame, output_dir: str = "./data/processed") -> None:
     """
     Grafica la distribución del retorno diario para detectar sesgos u outliers.
     Usa la columna 'return' (continua), no el target binario.
