@@ -1,0 +1,49 @@
+# Changes made to the configuration of the project
+# are documented in the .copier-answers.yml file
+#
+# Este archivo se regeneró sintéticamente a partir del proyecto existente
+# (generación antigua de dskit) para permitir `copier update`, y se actualizó
+# a mano para reflejar los módulos opcionales que el proyecto fue incorporando
+# (API, monitoring, tuning/Optuna, SHAP, conformal, RAG y vault Obsidian).
+# Si un módulo no aparece activado aquí, `copier update` lo borraría del repo.
+#
+# Valores deducidos de lo que el proyecto ya tiene:
+#   - slug: inversion            (pyproject.toml -> name)
+#   - ml_type: supervisado        (RandomForestClassifier)
+#   - task_type: clasificacion    (target binario "sube > 2% en 5 días")
+#   - model_type: RandomForest    (train_model.py)
+#   - python 3.12 / MIT / v0.1.0  (pyproject.toml)
+
+project_name: Stock Market Prediction
+project_slug: inversion
+project_author_name: Alejandro Cancelas Chapela
+project_author_email: cancelasalex3@gmail.com
+project_description: Predicción de tendencia bursátil (sube >2% en 5 días) con RandomForest + sentimiento VADER, multi-ticker.
+project_version: 0.1.2
+python_version: 3.12
+project_open_source_license: MIT
+dskit_version: 1.14.0
+
+# --- Tipo de ML ---
+ml_type: supervisado
+task_type: clasificacion
+model_type: RandomForest
+
+# --- Módulos opcionales (activados los que el proyecto ya incorpora) ---
+use_mlflow: false
+use_monitoring: true
+use_optuna: true
+use_duckdb: false
+use_api: true
+use_docker: false
+use_rag: true
+use_conformal: true
+use_shap: true
+use_xgboost: false
+use_lightgbm: false
+use_catboost: false
+graphify_mode: "graphify + obsidian vault"
+
+# --- Metadatos de copier (requeridos por `copier update`) ---
+_src_path: gh:cacelass/dskit
+_commit: 76a2146524f132e45eab49cbe304c2da5cc4d3a6
