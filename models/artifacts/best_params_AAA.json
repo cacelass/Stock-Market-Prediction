@@ -1,0 +1,10 @@
+{
+  "ticker": "AAA",
+  "best_value": 0.9,
+  "params": {
+    "n_estimators": 50,
+    "max_depth": 18,
+    "min_samples_leaf": 13,
+    "max_features": null
+  }
+}

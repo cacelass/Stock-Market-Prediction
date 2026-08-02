@@ -1,0 +1,10 @@
+{
+  "ticker": "AAPL",
+  "best_value": 0.6745689655172413,
+  "params": {
+    "n_estimators": 50,
+    "max_depth": 18,
+    "min_samples_leaf": 13,
+    "max_features": null
+  }
+}
