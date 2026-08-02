@@ -1,0 +1,2 @@
+accuracy,auc,ticker,n_train,n_test,train_accuracy,with_sentiment
+0.5078828828828829,0.49749294811958367,NVDA,3551,888,0.6186989580399888,True

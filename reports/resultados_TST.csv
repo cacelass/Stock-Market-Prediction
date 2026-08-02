@@ -1,0 +1,2 @@
+accuracy,auc,ticker,n_train,n_test,train_accuracy,with_sentiment
+0.5238095238095238,0.5,TST,80,21,0.55,True

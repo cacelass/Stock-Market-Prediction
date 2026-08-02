@@ -1,0 +1,2 @@
+accuracy,auc,ticker,n_train,n_test,train_accuracy,with_sentiment
+0.5948136142625607,0.5423625804708955,META,2467,617,0.6509931090393191,True

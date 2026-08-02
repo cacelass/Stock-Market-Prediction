@@ -1,0 +1,2 @@
+accuracy,auc,ticker,n_train,n_test,train_accuracy,with_sentiment
+0.6632882882882883,0.5382931022465907,AAPL,3551,888,0.658124471979724,True

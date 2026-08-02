@@ -1,0 +1,2 @@
+accuracy,auc,ticker,n_train,n_test,train_accuracy,with_sentiment
+0.5101351351351351,0.5402743753062225,MSFT,3551,888,0.6679808504646578,True
