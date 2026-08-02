@@ -1,6 +1,6 @@
 [project]
 name = "inversion"
-version = "0.1.0"
+version = "0.1.2"
 description = "A short description of the project."
 authors = [
   { name = "Alejandro Cancelas Chapela" }
@@ -25,6 +25,39 @@ dependencies = [
   "nltk",
   "yfinance",
   "scikit-learn",
+  "joblib",
+  "scipy",
+  "tqdm",
+]
+
+[project.optional-dependencies]
+supervisado = []
+
+# RAG: búsqueda híbrida local (vector + BM25) con ChromaDB
+# Modelo all-MiniLM-L6-v2 vía ONNX (descarga única ~80MB, sin GPU ni API key).
+rag = [
+    "chromadb>=0.5.0,<2.0",
+]
+
+# Embeddings multilingües de verdad: all-MiniLM-L6-v2 está entrenado en inglés
+# y este proyecto se documenta en español. Cuesta arrastrar torch, así que es
+# opt-in: instala este extra y exporta DSKIT_RAG_EMBEDDER=multilingual.
+# Al cambiar de embedder hay que reconstruir: `rag index --rebuild`.
+rag_multilingual = [
+    "chromadb>=0.5.0,<2.0",
+    "sentence-transformers>=2.2",
+]
+
+dev = [
+  "bandit",
+  "hypothesis",
+  "isort",
+  "mypy",
+  "pip-audit",
+  "pytest",
+  "pytest-cov",
+  "radon",
+  "ruff",
 ]
 
 [tool.setuptools]
@@ -33,3 +66,59 @@ packages = ["inversion"]
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-v --tb=short"
+markers   = [
+    "smoke: test de humo — verifica que el pipeline arranca sin errores con datos sintéticos",
+]
+
+[tool.ruff]
+line-length = 165
+target-version = "py312"
+exclude = [
+    "notebooks/",
+    ".venv",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "I001",   # import sorting — templates can't guarantee alphabetical order
+    "F401",   # imported but unused — template imports are intentionally broad
+    "F811",   # redefinition of unused — happens in generated multi-cell notebooks
+    "F541",   # f-string without placeholders — happens after Jinja substitution
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*"  = ["F401", "F811", "E402", "F841"]
+
+[tool.isort]
+profile = "black"
+line_length = 165
+skip = ["notebooks", ".venv", "dist"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+exclude = ["notebooks/", ".venv"]
+
+# Los tests se comprueban, pero no en modo estricto: el valor de mypy está en
+# el código que se despliega, no en los asserts de los tests.
+[[tool.mypy.overrides]]
+module = ["tests.*", "conftest"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_any_generics = false
+warn_return_any = false
+
+[tool.bandit]
+exclude_dirs = ["notebooks", ".venv", "tests", "docs"]
+skips = ["B101", "B404", "B603", "B113"]
+
+[tool.radon]
+max_cc = 10
+exclude = ["notebooks/", ".venv", "tests/", "docs/"]

@@ -65,3 +65,32 @@ target/
 
 # ipynb checkpoints
 .ipynb_checkpoints
+# --- Artefactos regenerables de conocimiento (NO se versionan) ---
+# El índice vectorial ChromaDB se reconstruye con `make index-rag`.
+.rag-index/
+# La exportación cruda de graphify se regenera con `knowledge build`.
+graphify-out/
+# knowledge/ es la exportación por defecto de `knowledge build`; la bóveda
+# canónica del repo es vault/ (se versiona: es la capa de conocimiento estable).
+knowledge/
+# Skills de asistente generadas por `make skills` (los fuentes son agents/prompts/).
+.opencode/skills/
+
+# --- Configuración local ---
+.env
+.env.*
+!.env.example
+
+# --- Notas del vault autogeneradas por `knowledge build` (regenerables) ---
+# Se versiona la ESTRUCTURA de dominios (vault/00_META/..07_REFERENCIAS/ y su
+# guia_modelos.md), no las 2000+ notas que el agente knowledge exporta a la
+# raíz y a code/docs/media/papers/references: eso se regenera con:
+#   .venv/bin/python -m agents run knowledge build --vault_dir vault
+vault/*.md
+vault/graph.canvas
+vault/00-index/
+vault/code/
+vault/docs/
+vault/media/
+vault/papers/
+vault/references/
