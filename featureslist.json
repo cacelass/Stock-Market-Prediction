@@ -291,6 +291,56 @@
       "status": "done",
       "depends_on": [],
       "closed": "2026-08-02"
+    },
+    {
+      "id": "TRADE-001",
+      "title": "Señales de trading y backtesting con métricas de riesgo",
+      "description": "Señales de trading y backtesting con métricas de riesgo",
+      "acceptance_criteria": [
+        "inversion/trading/ contiene signals.py, backtest.py y risk.py",
+        "las señales pasan de probabilidad a decisión con umbral configurable",
+        "el backtest produce métricas (retorno total, CAGR, Sharpe, max drawdown, win rate) y compara vs buy&hold",
+        "hay tests que verifican las métricas a mano"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-02",
+      "review_rounds": 0,
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "TRADE-002",
+      "title": "Cartera multi-activo y paper trading",
+      "description": "Cartera multi-activo y paper trading",
+      "acceptance_criteria": [
+        "inversion/trading/portfolio.py asigna capital entre los tickers del catálogo (pesos, rebalanceo)",
+        "inversion/trading/paper.py simula una cartera en papel con señales diarias y registra operaciones",
+        "make backtest genera un informe en reports/backtest/ con la comparativa por ticker y de la cartera",
+        "make paper-trading imprime las señales de hoy",
+        "hay tests de humo"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-02",
+      "review_rounds": 0,
+      "closed": "2026-08-02"
+    },
+    {
+      "id": "TRADE-003",
+      "title": "Evaluación honesta de viabilidad: informe de riesgo y límites",
+      "description": "Evaluación honesta de viabilidad: informe de riesgo y límites",
+      "acceptance_criteria": [
+        "reports/backtest/VIABILIDAD.md documenta si la estrategia supera a buy&hold con datos reales",
+        "incluye métricas por ticker y de cartera",
+        "lista limitaciones (costes, slippage, overfitting, forward-looking bias)",
+        "make viabilidad genera/actualiza el informe",
+        "el informe se enlaza desde README"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-02",
+      "review_rounds": 0,
+      "closed": "2026-08-02"
     }
   ]
 }

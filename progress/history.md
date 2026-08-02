@@ -340,3 +340,51 @@ CRITERIO 1 — rag index: 'Índice actualizado: 8857 fragmentos de 2411 fuente(s
 ```
 
 </details>
+
+## TRADE-001 — Señales de trading y backtesting con métricas de riesgo
+
+- **Cerrada:** 2026-08-02
+- **Verificación:** ./init.sh en verde · 118 passed, 24 warnings in 25.75s
+- **Cambios:** inversion/trading/{__init__,signals,backtest,risk}.py; tests/test_{signals,backtest,risk}.py
+- **Decisiones:** backtest in-sample (sin costes ni slippage) — evaluación out-of-sample es TRADE-003; señales por umbral (0.6); win rate = % de días con señal que subieron
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+pytest: 118 passed, 24 warnings in 24.79s (incluye 23 de TRADE-001); ./init.sh: ENTORNO LISTO EXIT_CODE=0; ruff: All checks passed; mypy --strict: Success
+```
+
+</details>
+
+## TRADE-002 — Cartera multi-activo y paper trading
+
+- **Cerrada:** 2026-08-02
+- **Verificación:** ./init.sh en verde · 142 passed, 24 warnings in 26.33s
+- **Cambios:** inversion/trading/{portfolio,paper,report_backtest}.py; tests/test_{portfolio,paper}.py; Makefile (backtest, paper-trading); README.md
+- **Decisiones:** cartera = presupuesto por ticker + long/out; retorno de cartera media ponderada; fracciones de acción sin redondear (paper trading); make no está en el entorno — targets verificados por receta real
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+pytest: 142 passed, 24 warnings; ./init.sh: ENTORNO LISTO EXIT_CODE=0; backtest receta real: informe reports/backtest/ con 7 tickers + CARTERA; paper-trading receta real: 7 señales SELL/BUY/HOLD; ruff: All checks passed; cobertura 84.52%
+```
+
+</details>
+
+## TRADE-003 — Evaluación honesta de viabilidad: informe de riesgo y límites
+
+- **Cerrada:** 2026-08-02
+- **Verificación:** ./init.sh en verde · 145 passed, 24 warnings in 27.54s
+- **Cambios:** inversion/trading/viabilidad.py; tests/test_viabilidad.py; Makefile (viabilidad); README.md; reports/backtest/VIABILIDAD.md
+- **Decisiones:** split temporal 70/30 (no walk-forward: coste alto, poco aporte); buy&hold en el mismo segmento test; conclusión honesta: la estrategia no supera a buy&hold out-of-sample
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+pytest: 145 passed, 24 warnings; ./init.sh: ENTORNO LISTO EXIT_CODE=0; viabilidad receta real regenera VIABILIDAD.md con conclusión honesta: cartera 124.69% vs buy&hold 281.70%, 2/7 tickers superan, NO invertir capital real; ruff: All checks passed
+```
+
+</details>

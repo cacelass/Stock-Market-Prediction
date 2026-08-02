@@ -1,5 +1,6 @@
 .PHONY: setup install-deps \
         data features train predict pipeline \
+        backtest paper-trading viabilidad \
         test smoke lint format typecheck security audit check lock \
         lab notebook tb \
         docs \
@@ -47,6 +48,11 @@ help:
 	@echo "    make train          entrena el modelo"
 	@echo "    make predict        genera predicciones con el modelo entrenado"
 	@echo "    make pipeline       data → features → train → predict (todo)"
+	@echo ""
+	@echo "  Trading"
+	@echo "    make backtest       backtest multi-ticker + cartera → reports/backtest/"
+	@echo "    make paper-trading  señales de hoy (filtro con TICKERS=\"AAPL MSFT\")"
+	@echo "    make viabilidad     evaluación honesta out-of-sample → reports/backtest/VIABILIDAD.md"
 	@echo ""
 	@echo "  Calidad"
 	@echo "    make check          lint + typecheck + test (batería completa)"
@@ -129,6 +135,9 @@ install-deps:
 #  Cada step llama al script correspondiente dentro del módulo.
 TICKER ?= NVDA
 
+# TRADE-002: filtro para backtest/paper-trading (vacío → todo el catálogo).
+TICKERS ?=
+
 #  Estructura esperada:
 #    $(MODULE)/data/make_dataset.py        → lee data/raw/, escribe data/processed/
 #    $(MODULE)/features/build_features.py  → lee data/processed/, escribe data/interim/
@@ -150,6 +159,25 @@ train: features
 predict: train
 	@echo "▶  Generando predicciones → reports/"
 	$(PY) $(MODULE)/models/predict_model.py --ticker $(TICKER)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Trading (TRADE-002): backtest multi-ticker + paper trading
+#
+#  backtest        → informe por ticker + cartera en reports/backtest/
+#  paper-trading   → imprime las señales de hoy
+#  Ambos usan todo el catálogo salvo que se pase TICKERS="AAPL MSFT".
+# ─────────────────────────────────────────────────────────────────────────────
+backtest:
+	@echo "▶  Backtest multi-ticker + cartera → reports/backtest/"
+	$(PY) $(MODULE)/trading/report_backtest.py --ticker $(TICKERS)
+
+paper-trading:
+	@echo "▶  Señales de hoy (paper trading)"
+	$(PY) $(MODULE)/trading/paper.py --ticker $(TICKERS)
+
+viabilidad:
+	@echo "▶  Viabilidad: backtest out-of-sample + conclusión honesta → reports/backtest/VIABILIDAD.md"
+	$(PY) $(MODULE)/trading/viabilidad.py
 
 serve:
 	@echo "▶  API REST en http://localhost:8000 (TMPL-002)"

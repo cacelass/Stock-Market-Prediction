@@ -113,6 +113,44 @@ Recolección y análisis de sentimiento de noticias por ticker:
 
 ---
 
+## Trading: señales, backtest y paper trading (módulo `inversion/trading`)
+
+Estrategia long/out por ticker a partir de las probabilidades del modelo:
+
+```bash
+# Señales de hoy para todos los tickers del catálogo
+make paper-trading                 # o filtra: make paper-trading TICKERS="AAPL MSFT"
+
+# Backtest multi-ticker + cartera → reports/backtest/backtest_report.md
+make backtest                      # o filtra: make backtest TICKERS=NVDA
+```
+
+- `signals.py` (TRADE-001): probabilidad de subida → `BUY`/`HOLD`/`SELL`
+  (umbral por defecto 0.6).
+- `backtest.py` (TRADE-001): simula la estrategia sobre el histórico y calcula
+  retorno total, CAGR, Sharpe, max drawdown y win rate, comparando con buy&hold.
+- `portfolio.py` (TRADE-002): reparte capital entre los tickers del catálogo
+  (`allocate_capital`, pesos configurables) y calcula el rebalanceo
+  (`rebalance`, acciones objetivo o delta a operar; fracciones, sin lotes reales).
+- `paper.py` (TRADE-002): cartera en papel que aplica las señales diarias con
+  presupuesto por ticker y registra cada operación (fecha, ticker, señal,
+  precio, cantidad, capital).
+
+El retorno de la cartera en el informe es la media ponderada de los retornos
+por ticker (presupuestos iguales por defecto, long/out independiente). Es una
+simulación sin costes, slippage ni redondeo a acciones enteras.
+
+**Viabilidad (TRADE-003):** el informe
+[`reports/backtest/VIABILIDAD.md`](reports/backtest/VIABILIDAD.md) (generado
+con `make viabilidad`) evalúa la estrategia con un backtest **out-of-sample** —
+split temporal 70/30: re-entrena cada modelo con el primer 70% del histórico y
+simula solo sobre el último 30%, nunca visto — y documenta con números si la
+estrategia supera a buy&hold y sus limitaciones (costes, slippage, sobreajuste,
+forward-looking bias). El backtest de `make backtest` es in-sample: sus retornos
+espectaculares son sobreajuste y no deben usarse para decidir nada.
+
+---
+
 ## Resultados Honestos
 
 El modelo supera de forma consistente el baseline de clase mayoritaria, pero con margen modesto. Esto es esperado dado el ruido inherente a los mercados.
