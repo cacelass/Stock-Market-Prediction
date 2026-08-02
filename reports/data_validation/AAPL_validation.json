@@ -1,0 +1,31 @@
+{
+  "ticker": "AAPL",
+  "rows": 4638,
+  "columns": 20,
+  "nulls": 0,
+  "nulls_by_column": {
+    "timestamp": 0,
+    "close": 0,
+    "high": 0,
+    "low": 0,
+    "open": 0,
+    "volume": 0,
+    "return": 0,
+    "volatility": 0,
+    "rsi": 0,
+    "hl_range": 0,
+    "oc_range": 0,
+    "ma_50": 0,
+    "ma_200": 0,
+    "log_volume": 0,
+    "vwap": 0,
+    "vwap_ratio": 0,
+    "lag_1": 0,
+    "lag_5": 0,
+    "lag_20": 0,
+    "target": 0
+  },
+  "date_min": "2007-10-17",
+  "date_max": "2026-03-25",
+  "target_mean": 0.3478
+}
