@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -69,6 +70,7 @@ def run_backtest(
     risk_free_rate: float = 0.0,
     cost_per_trade: float = 0.0,
     slippage: float = 0.0,
+    signal_fn: Callable[[int, float, float], Signal] | None = None,
 ) -> BacktestResult:
     """Simula la estrategia long/out sobre un histórico.
 
@@ -82,6 +84,11 @@ def run_backtest(
             pagada al comprar y al vender. Por defecto 0 (sin costes).
         slippage : degradación fraccional de ejecución por operación (p.ej.
             0.0005 = 0.05%), aplicada en el mismo sentido que el coste.
+        signal_fn : función de señal opcional con contrato
+            (i, p, threshold) -> Signal, donde i es la posición del día en
+            prices/probs. Por defecto usa signal_from_probability; permite
+            inyectar señales que dependen de más datos por día (p.ej. la
+            híbrida modelo+sentimiento de TRADE-006).
 
     Reglas de la simulación:
         - BUY  → entrar en largo al cierre del día si no hay posición.
@@ -99,7 +106,10 @@ def run_backtest(
     if len(probs) != n:
         raise ValueError("prices y probs deben tener la misma longitud")
 
-    signals = [signal_from_probability(float(p), threshold) for p in probs]
+    if signal_fn is None:
+        signals = [signal_from_probability(float(p), threshold) for p in probs]
+    else:
+        signals = [signal_fn(i, float(p), threshold) for i, p in enumerate(probs)]
     equity = np.empty(n, dtype=float)
     cash = float(initial_capital)
     entry_price: float | None = None

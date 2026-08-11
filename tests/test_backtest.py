@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from inversion.trading.backtest import BacktestResult, backtest_ticker, run_backtest
+from inversion.trading.signals import Signal, signal_from_probability_sentiment
 
 
 def test_always_buy_rising_price_returns_price_gain():
@@ -134,3 +135,23 @@ def test_backtest_ticker_end_to_end(patch_paths, sample_df):
     assert result.initial_capital == 10_000.0
     assert np.isfinite(result.total_return)
     assert np.isfinite(result.sharpe)
+
+
+def test_run_backtest_accepts_custom_signal_fn():
+    # signal_fn permite inyectar la señal por día (i, p, threshold): aquí la
+    # híbrida modelo+sentimiento de TRADE-006 veta la compra del día 1.
+    prices = pd.Series([100.0, 110.0, 121.0])
+    probs = pd.Series([0.9, 0.5, 0.5])
+    sentiment = pd.Series([-0.5, 0.0, 0.0])
+
+    def hybrid(i, p, threshold):
+        return signal_from_probability_sentiment(p, sentiment.iloc[i], threshold)
+
+    result = run_backtest(prices, probs, signal_fn=hybrid)
+    # Solo-modelo habría comprado (p=0.9); la híbrida se queda en cash → 0%.
+    assert result.total_return == pytest.approx(0.0)
+    assert result.n_trades == 0
+
+    result_buy = run_backtest(prices, probs, signal_fn=lambda i, p, t: Signal.BUY)
+    assert result_buy.total_return == pytest.approx(0.21)
+    assert result_buy.n_trades == 1

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,7 +42,7 @@ from sklearn.preprocessing import StandardScaler
 from inversion.models.predict_model import FEATURE_COLS, SENTIMENT_COLS, _load_ticker_data
 from inversion.trading.backtest import run_backtest
 from inversion.trading.portfolio import load_catalog
-from inversion.trading.signals import DEFAULT_THRESHOLD
+from inversion.trading.signals import DEFAULT_THRESHOLD, Signal, signal_from_probability_sentiment
 from inversion.utils import paths
 
 TEST_FRACTION = 0.3  # último 30% cronológico = segmento test out-of-sample
@@ -90,6 +91,9 @@ LIMITATIONS = [
     "- **Sesgo de supervivencia**: el catálogo (AAPL, MSFT, GOOGL, AMZN, META, TSLA, NVDA) son "
     "ganadores conocidos de los últimos 20 años. Elegir activos que ya se sabe que subieron "
     "sobreestima lo que habría hecho la estrategia en tiempo real.",
+    "- **Umbral de sentimiento fijo en la señal híbrida**: la señal híbrida (TRADE-006) usa "
+    "sentiment_threshold = 0.0 fijo; a diferencia del umbral de probabilidad, no se calibra por "
+    "ticker. Un umbral de sentimiento calibrado podría cambiar el resultado de la comparativa.",
 ]
 
 
@@ -110,6 +114,25 @@ class OOSResult:
     n_test_days: int
     test_start: str
     test_end: str
+    # Señal híbrida modelo+sentimiento (TRADE-006) sobre el MISMO segmento test.
+    # None si el dataset no trae columnas de sentimiento.
+    hybrid_return: float | None = None
+    hybrid_sharpe: float | None = None
+    hybrid_n_trades: int | None = None
+
+
+def _hybrid_signal_fn(sentiment: pd.Series) -> Callable[[int, float, float], Signal]:
+    """Señal híbrida por posición: alinea el sentimiento del día i con su probs.
+
+    run_backtest inyecta la señal como (i, p, threshold); aquí se usa i para
+    leer el sentimiento del MISMO día (misma posición en el segmento test),
+    sin tocar el futuro. El sentimiento del día t se conoce el día t.
+    """
+
+    def fn(i: int, p: float, threshold: float) -> Signal:
+        return signal_from_probability_sentiment(p, float(sentiment.iloc[i]), threshold)
+
+    return fn
 
 
 def _feature_cols(df: pd.DataFrame) -> list[str]:
@@ -221,6 +244,24 @@ def backtest_oos_ticker(
     )
     # Mismo umbral sin costes: aísla el impacto de los costes para el informe.
     result_no_costs = run_backtest(prices, probs, initial_capital, best_threshold)
+
+    # Señal híbrida modelo+sentimiento (TRADE-006): misma ventana test, mismo
+    # umbral calibrado, pero exigiendo que el sentimiento del día apoye a la
+    # probabilidad. Solo si el dataset trae sentimiento.
+    hybrid_return = hybrid_sharpe = None
+    hybrid_n_trades: int | None = None
+    if "sentiment_score" in test.columns:
+        hybrid = run_backtest(
+            prices,
+            probs,
+            initial_capital,
+            best_threshold,
+            cost_per_trade=cost_per_trade,
+            slippage=slippage,
+            signal_fn=_hybrid_signal_fn(test["sentiment_score"]),
+        )
+        hybrid_return, hybrid_sharpe, hybrid_n_trades = hybrid.total_return, hybrid.sharpe, hybrid.n_trades
+
     return OOSResult(
         ticker=ticker.upper(),
         total_return=result.total_return,
@@ -235,6 +276,9 @@ def backtest_oos_ticker(
         n_test_days=len(test),
         test_start=str(test["timestamp"].iloc[0].date()),
         test_end=str(test["timestamp"].iloc[-1].date()),
+        hybrid_return=hybrid_return,
+        hybrid_sharpe=hybrid_sharpe,
+        hybrid_n_trades=hybrid_n_trades,
     )
 
 
@@ -266,6 +310,9 @@ def build_report(
                 "n_test_days": result.n_test_days,
                 "test_start": result.test_start,
                 "test_end": result.test_end,
+                "hybrid_return": result.hybrid_return,
+                "hybrid_sharpe": result.hybrid_sharpe,
+                "hybrid_n_trades": result.hybrid_n_trades,
             }
         )
     return pd.DataFrame(rows)
@@ -295,6 +342,10 @@ def _portfolio_row(df: pd.DataFrame) -> dict[str, float | int | str]:
         "n_test_days": int(df["n_test_days"].sum()),
         "test_start": str(df["test_start"].min()),
         "test_end": str(df["test_end"].max()),
+        # Media de las métricas híbridas; NaN si ningún ticker trae sentimiento.
+        "hybrid_return": float(df["hybrid_return"].mean()),
+        "hybrid_sharpe": float(df["hybrid_sharpe"].mean()),
+        "hybrid_n_trades": int(df["hybrid_n_trades"].sum()),
     }
 
 
@@ -342,6 +393,73 @@ def _conclusion_lines(df: pd.DataFrame) -> list[str]:
         f"slippage por operación) y el umbral calibrado por ticker, el retorno de "
         f"la cartera baja de {cartera_ret_no_costs:.2%} a {cartera_ret:.2%}.",
     ]
+    if pd.notna(cartera["hybrid_return"]):
+        lines += [
+            "",
+            f"**Señal híbrida (modelo + sentimiento, TRADE-006):** exigir que el "
+            f"sentimiento del día apoye a la probabilidad del modelo reduce las "
+            f"operaciones; en esta ventana la cartera híbrida rinde "
+            f"{float(cartera['hybrid_return']):.2%} frente a "
+            f"{cartera_ret:.2%} de solo-modelo (detalle en la sección "
+            f"'Señal híbrida vs solo-modelo').",
+        ]
+    return lines
+
+
+def _hybrid_section_lines(df: pd.DataFrame) -> list[str]:
+    """Sección 'Señal híbrida vs solo-modelo': misma ventana test, mismo umbral."""
+    per_ticker = df[df["ticker"] != "CARTERA"]
+    cartera = df[df["ticker"] == "CARTERA"].iloc[0]
+    solo = float(cartera["total_return"])
+    hib = float(cartera["hybrid_return"])
+    n = len(per_ticker)
+    n_beat = int((per_ticker["hybrid_return"] > per_ticker["total_return"]).sum())
+
+    lines = [
+        "## Señal híbrida vs solo-modelo",
+        "",
+        "La señal híbrida (`signal_from_probability_sentiment`, TRADE-006) exige "
+        "que la probabilidad del modelo y el sentimiento del día t estén "
+        "**alineados**: BUY si p >= umbral Y sentiment > 0, SELL si p <= 1-umbral "
+        "Y sentiment < 0. Se evalúa sobre el **mismo segmento test** y con el "
+        "**mismo umbral calibrado** por ticker que la estrategia solo-modelo. El "
+        "sentimiento del día t se conoce el día t (sin fuga).",
+        "",
+        "| ticker | solo-modelo | híbrida | Δ híbrida | operaciones híbrida |",
+        "|---|---|---|---|---|",
+    ]
+    for _, row in per_ticker.iterrows():
+        delta = float(row["hybrid_return"]) - float(row["total_return"])
+        lines.append(f"| {row['ticker']} | {row['total_return']:.2%} | {row['hybrid_return']:.2%} | {delta:+.2%} | {int(row['hybrid_n_trades'])} |")
+    delta = hib - solo
+    lines.append(f"| **CARTERA** | **{solo:.2%}** | **{hib:.2%}** | **{delta:+.2%}** | **{int(cartera['hybrid_n_trades'])}** |")
+    lines += [""]
+    if hib > solo:
+        lines.append(
+            f"**La híbrida mejora a solo-modelo en esta ventana:** la cartera rinde "
+            f"{hib:.2%} frente a {solo:.2%} de solo-modelo, y {n_beat} de {n} tickers "
+            f"mejoran. Filtrar por sentimiento descarta operaciones que habrían sido "
+            f"perdedoras."
+        )
+    else:
+        lines.append(
+            f"**La híbrida empeora a solo-modelo en esta ventana:** la cartera rinde "
+            f"{hib:.2%} frente a {solo:.2%} de solo-modelo, y solo {n_beat} de {n} "
+            f"tickers mejoran. Filtrar por sentimiento descarta operaciones; en este "
+            f"segmento, las descartadas habrían aportado retorno."
+        )
+    if (per_ticker["hybrid_n_trades"] == 0).all():
+        lines += [
+            "",
+            "**Nota sobre los datos de sentimiento:** en este dataset `sentiment_score` "
+            "es 0.0 en todo el histórico (las noticias crudas de `data/raw/news_*.csv` "
+            "solo cubren jul-ago 2026, fuera de la ventana de precios). Con la regla "
+            "estricta (BUY exige sentiment > 0, SELL exige sentiment < 0) la señal "
+            "híbrida nunca dispara: 0 operaciones en todos los tickers. La comparativa "
+            "es degenerada — no hay sentimiento real con el que alinear el modelo — y "
+            "debe re-evaluarse cuando exista cobertura de noticias solapada con los "
+            "precios.",
+        ]
     return lines
 
 
@@ -385,6 +503,8 @@ def write_report(df: pd.DataFrame, out_dir: Path) -> Path:
             f"| {row['max_drawdown']:.2%} | {row['win_rate']:.2%} | {row['n_trades']} "
             f"| {row['test_start']} → {row['test_end']} |"
         )
+    if df["hybrid_return"].notna().any():
+        lines += ["", *_hybrid_section_lines(df)]
     lines += ["", "## Limitaciones", ""]
     lines += LIMITATIONS
 
