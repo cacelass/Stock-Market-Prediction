@@ -182,9 +182,9 @@ revisión de código, tests, RAG y despliegue:
 .venv/bin/python -m agents run audit suggest_improvements
 ```
 
-Las tres memorias del proyecto no se pisan: `progress/` (feature en curso,
-dueño `harness`), `agents/workspace/memory/` (trayectorias de agentes, dueño
-`memory`) y `vault/` (conocimiento estable, dueño `knowledge`).
+Las tres memorias del proyecto no se pisan: `harness/progress/` (feature en
+curso, dueño `harness`), `agents/workspace/memory/` (trayectorias de agentes,
+dueño `memory`) y `docs/vault/` (conocimiento estable, dueño `knowledge`).
 
 ---
 
@@ -220,7 +220,7 @@ dueño `harness`), `agents/workspace/memory/` (trayectorias de agentes, dueño
 │
 ├── agents/                   ← Sistema de agentes (27+): doctor, data, review, rag, knowledge...
 ├── models/                   ← Modelos .pkl + best_params (gitignored)
-├── vault/                    ← Bóveda Obsidian: conocimiento estable por dominios
+├── docs/vault/                ← Bóveda Obsidian: conocimiento estable por dominios
 ├── notebooks/                ← EDA
 └── reports/                  ← Informes: papers, monitoring, figuras
 ```
