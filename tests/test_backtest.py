@@ -90,6 +90,28 @@ def test_sharpe_hand_computed():
     assert result.sharpe == pytest.approx(9.591, abs=1e-2)
 
 
+def test_costs_reduce_final_return():
+    # Varias operaciones: con costes, el retorno final es menor o igual.
+    prices = pd.Series([100.0, 110.0, 90.0, 100.0, 120.0])
+    probs = pd.Series([0.9, 0.1, 0.9, 0.5, 0.1])
+    result_no_costs = run_backtest(prices, probs)
+    result_costs = run_backtest(prices, probs, cost_per_trade=0.01, slippage=0.005)
+    assert result_costs.n_trades == result_no_costs.n_trades == 2
+    assert result_costs.total_return <= result_no_costs.total_return
+    assert result_costs.final_equity <= result_no_costs.final_equity
+
+
+def test_cost_applied_on_buy_and_sell():
+    # Compra en 100 (paga 0.1% comisión + 0.1% slippage) y vende en 110
+    # (cobra 0.998 del equity): cash = 10000 * 110/100.2 * 0.998.
+    prices = pd.Series([100.0, 110.0])
+    probs = pd.Series([0.9, 0.1])
+    result = run_backtest(prices, probs, cost_per_trade=0.001, slippage=0.001)
+    expected = 10_000.0 * (110.0 / 100.2) * 0.998
+    assert result.final_equity == pytest.approx(expected)
+    assert result.n_trades == 1
+
+
 def test_backtest_ticker_end_to_end(patch_paths, sample_df):
     """Con modelo+scaler guardados (patrón de test_predict_model), el backtest corre."""
     from inversion.features.build_features import add_derived_features, fit_and_save_scaler

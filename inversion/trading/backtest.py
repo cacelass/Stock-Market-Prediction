@@ -67,6 +67,8 @@ def run_backtest(
     initial_capital: float = 10_000.0,
     threshold: float = DEFAULT_THRESHOLD,
     risk_free_rate: float = 0.0,
+    cost_per_trade: float = 0.0,
+    slippage: float = 0.0,
 ) -> BacktestResult:
     """Simula la estrategia long/out sobre un histórico.
 
@@ -76,13 +78,18 @@ def run_backtest(
         initial_capital : capital inicial de la cuenta.
         threshold : umbral de señal (ver signals.DEFAULT_THRESHOLD).
         risk_free_rate : tasa libre de riesgo anual (por defecto 0).
+        cost_per_trade : comisión fraccional por operación (p.ej. 0.001 = 0.1%),
+            pagada al comprar y al vender. Por defecto 0 (sin costes).
+        slippage : degradación fraccional de ejecución por operación (p.ej.
+            0.0005 = 0.05%), aplicada en el mismo sentido que el coste.
 
     Reglas de la simulación:
         - BUY  → entrar en largo al cierre del día si no hay posición.
         - SELL → cerrar la posición al cierre del día.
         - HOLD → mantener la posición actual (o seguir en cash).
     La equity se valora al cierre de cada día; cuando hay posición es
-    cash * precio_dia / precio_entrada.
+    cash * precio_dia / precio_entrada. Con costes, comprar ejecuta a
+    close * (1 + cost + slippage) y vender cobra equity * (1 - cost - slippage).
 
     win_rate: % de días con señal (BUY o SELL) en los que el precio subió.
     """
@@ -102,15 +109,16 @@ def run_backtest(
         sig = signals[t]
         close = float(prices.iloc[t])
         if sig is Signal.BUY and entry_price is None:
-            entry_price = close
+            entry_price = close * (1.0 + cost_per_trade + slippage)
             n_trades += 1
-        if entry_price is not None:
+        if sig is Signal.SELL and entry_price is not None:
+            equity[t] = cash * close * (1.0 - cost_per_trade - slippage) / entry_price
+            cash = equity[t]
+            entry_price = None
+        elif entry_price is not None:
             equity[t] = cash * close / entry_price
         else:
             equity[t] = cash
-        if sig is Signal.SELL and entry_price is not None:
-            cash = equity[t]
-            entry_price = None
 
     equity_series = pd.Series(equity, index=prices.index)
     final_equity = float(equity_series.iloc[-1])

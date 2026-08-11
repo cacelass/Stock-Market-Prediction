@@ -11,6 +11,12 @@ test nunca lo vio el modelo. Con esos números escribe
 reports/backtest/VIABILIDAD.md: ¿supera la estrategia a buy&hold con una
 evaluación honesta?
 
+Costes y calibración (TRADE-004): la simulación aplica 0.1% de comisión +
+0.05% de slippage por operación, y el umbral de señal se calibra por ticker
+en un segmento de validación (último 20% del train): se prueba la rejilla
+0.51-0.70 y se elige el umbral con mejor Sharpe. El test nunca participa en
+la calibración.
+
 Se eligió un split simple 70/30 en vez de walk-forward por simplicidad y
 coste: un solo retrain por ticker (segundos) y un test de ~30% del histórico
 (~5 años). El walk-forward re-entrenaría en cada ventana y añade poco a la
@@ -27,6 +33,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
@@ -38,17 +45,26 @@ from inversion.trading.signals import DEFAULT_THRESHOLD
 from inversion.utils import paths
 
 TEST_FRACTION = 0.3  # último 30% cronológico = segmento test out-of-sample
+VALIDATION_FRACTION = 0.2  # último 20% del train = segmento de validación (calibración)
 DEFAULT_CAPITAL = 10_000.0
 RANDOM_STATE = 42
 
+# Costes realistas por operación (entrada y salida), broker retail típico.
+COST_PER_TRADE = 0.001  # 0.1% comisión
+SLIPPAGE = 0.0005  # 0.05% degradación de ejecución
+
+# Umbrales candidatos para calibrar por ticker (señal BUY con p >= umbral).
+THRESHOLD_GRID = np.arange(0.51, 0.71, 0.01)
+
 LIMITATIONS = [
-    "- **Costes de transacción (comisiones y spread)**: la simulación entra y sale sin pagar "
-    "comisiones ni spread. Con un coste de 0.1-0.3% por operación (típico en brokers retail), "
-    "una estrategia con muchas operaciones pierde gran parte de su ventaja; la columna "
-    "'operaciones' permite estimar el impacto.",
-    "- **Slippage**: el backtest opera al precio de cierre exacto. En la práctica la ejecución "
-    "se desplaza contra el operador, más cuanto menos líquido sea el activo y mayor el tamaño "
-    "de la orden.",
+    "- **Costes de transacción (comisiones y spread)**: la simulación aplica un coste "
+    "fijo del 0.1% de comisión + 0.05% de slippage por operación (entrada y salida). "
+    "Es representativo de brokers retail, pero no modela comisiones fijas por orden "
+    "ni spreads que varían con la liquidez: un activo poco líquido o un capital "
+    "pequeño cambiarían materialmente el resultado.",
+    "- **Slippage**: el backtest aplica un slippage fijo del 0.05% por operación. En la "
+    "práctica el slippage se desplaza contra el operador y crece cuanto menos líquido sea "
+    "el activo y mayor el tamaño de la orden; un único valor fijo no captura esa variación.",
     "- **Sobreajuste (overfitting)**: aunque este backtest es out-of-sample, el modelo y las "
     "features se eligieron mirando el histórico completo (incluido este segmento test en "
     "iteraciones previas). El proceso de selección no es a prueba de sobreajuste: cualquier "
@@ -83,11 +99,13 @@ class OOSResult:
 
     ticker: str
     total_return: float
+    total_return_no_costs: float
     cagr: float
     sharpe: float
     max_drawdown: float
     win_rate: float
     buy_hold_return: float
+    threshold: float
     n_trades: int
     n_test_days: int
     test_start: str
@@ -117,17 +135,50 @@ def _train_oos_model(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestC
     return model
 
 
+def _calibrate_threshold(
+    prices: pd.Series,
+    probs: pd.Series,
+    initial_capital: float,
+    cost_per_trade: float,
+    slippage: float,
+) -> float:
+    """Elige el umbral que maximiza Sharpe en el segmento de validación.
+
+    Recorre THRESHOLD_GRID con run_backtest y se queda con el umbral de mayor
+    Sharpe (empate → el más alto, menos operaciones y menos costes). El
+    segmento test nunca se usa aquí: solo validación.
+    """
+    best = DEFAULT_THRESHOLD
+    best_score = -np.inf
+    for threshold in THRESHOLD_GRID:
+        result = run_backtest(
+            prices,
+            probs,
+            initial_capital,
+            threshold,
+            cost_per_trade=cost_per_trade,
+            slippage=slippage,
+        )
+        if (result.sharpe, threshold) > (best_score, best):
+            best_score, best = result.sharpe, threshold
+    return float(best)
+
+
 def backtest_oos_ticker(
     ticker: str,
     test_fraction: float = TEST_FRACTION,
     initial_capital: float = DEFAULT_CAPITAL,
     threshold: float = DEFAULT_THRESHOLD,
+    cost_per_trade: float = COST_PER_TRADE,
+    slippage: float = SLIPPAGE,
 ) -> OOSResult | None:
     """Backtest out-of-sample de un ticker.
 
     Entrena con el primer (1 - test_fraction) del histórico y simula SOLO
-    sobre el último test_fraction (segmento test temporal). Reutiliza
-    run_backtest (TRADE-001) para la simulación y las métricas.
+    sobre el último test_fraction (segmento test temporal). El umbral de
+    señal se calibra por ticker en el último VALIDATION_FRACTION del train
+    (maximizando Sharpe) y nunca toca el test. Reutiliza run_backtest
+    (TRADE-001) para la simulación y las métricas.
     """
     try:
         df = _load_ticker_data(ticker)
@@ -149,19 +200,37 @@ def backtest_oos_ticker(
     X_train = scaler.fit_transform(train[feature_cols])
     model = _train_oos_model(X_train, train["target"])
 
+    # Segmento de validación: último VALIDATION_FRACTION del train.
+    val_start = int(len(train) * (1.0 - VALIDATION_FRACTION))
+    val = train.iloc[val_start:]
+    X_val = scaler.transform(val[feature_cols])
+    val_probs = pd.Series(model.predict_proba(X_val)[:, 1], index=val.index)
+    best_threshold = _calibrate_threshold(val["close"], val_probs, initial_capital, cost_per_trade, slippage)
+
     X_test = scaler.transform(test[feature_cols])
     probs = pd.Series(model.predict_proba(X_test)[:, 1], index=test.index)
     prices = test["close"]
 
-    result = run_backtest(prices, probs, initial_capital, threshold)
+    result = run_backtest(
+        prices,
+        probs,
+        initial_capital,
+        best_threshold,
+        cost_per_trade=cost_per_trade,
+        slippage=slippage,
+    )
+    # Mismo umbral sin costes: aísla el impacto de los costes para el informe.
+    result_no_costs = run_backtest(prices, probs, initial_capital, best_threshold)
     return OOSResult(
         ticker=ticker.upper(),
         total_return=result.total_return,
+        total_return_no_costs=result_no_costs.total_return,
         cagr=result.cagr,
         sharpe=result.sharpe,
         max_drawdown=result.max_drawdown,
         win_rate=result.win_rate,
         buy_hold_return=result.buy_hold_return,
+        threshold=best_threshold,
         n_trades=result.n_trades,
         n_test_days=len(test),
         test_start=str(test["timestamp"].iloc[0].date()),
@@ -186,11 +255,13 @@ def build_report(
             {
                 "ticker": result.ticker,
                 "total_return": result.total_return,
+                "total_return_no_costs": result.total_return_no_costs,
                 "cagr": result.cagr,
                 "sharpe": result.sharpe,
                 "max_drawdown": result.max_drawdown,
                 "win_rate": result.win_rate,
                 "buy_hold_return": result.buy_hold_return,
+                "threshold": result.threshold,
                 "n_trades": result.n_trades,
                 "n_test_days": result.n_test_days,
                 "test_start": result.test_start,
@@ -198,6 +269,11 @@ def build_report(
             }
         )
     return pd.DataFrame(rows)
+
+
+def _fmt_threshold(value: float | str) -> str:
+    """Umbral formateado a 2 decimales ('' para la fila CARTERA)."""
+    return "" if isinstance(value, str) else f"{value:.2f}"
 
 
 def _portfolio_row(df: pd.DataFrame) -> dict[str, float | int | str]:
@@ -208,11 +284,13 @@ def _portfolio_row(df: pd.DataFrame) -> dict[str, float | int | str]:
     return {
         "ticker": "CARTERA",
         "total_return": float(df["total_return"].mean()),
+        "total_return_no_costs": float(df["total_return_no_costs"].mean()),
         "cagr": float(df["cagr"].mean()),
         "sharpe": float(df["sharpe"].mean()),
         "max_drawdown": float(df["max_drawdown"].mean()),
         "win_rate": float(df["win_rate"].mean()),
         "buy_hold_return": float(df["buy_hold_return"].mean()),
+        "threshold": "",
         "n_trades": int(df["n_trades"].sum()),
         "n_test_days": int(df["n_test_days"].sum()),
         "test_start": str(df["test_start"].min()),
@@ -239,9 +317,9 @@ def _conclusion_lines(df: pd.DataFrame) -> list[str]:
             f"buy&hold, y {n_beat} de {n} tickers superan a su buy&hold.",
             "",
             "La ventaja es real en esta ventana concreta, pero el backtest no modela "
-            "costes, slippage ni cambios de régimen (ver Limitaciones), y el modelo se "
-            "eligió mirando el histórico. Recomendación prudente: seguir solo en paper "
-            "trading hasta que la ventaja se reproduzca en datos realmente nuevos.",
+            "cambios de régimen (ver Limitaciones), y el modelo se eligió mirando el "
+            "histórico. Recomendación prudente: seguir solo en paper trading hasta "
+            "que la ventaja se reproduzca en datos realmente nuevos.",
         ]
     else:
         lines += [
@@ -257,6 +335,13 @@ def _conclusion_lines(df: pd.DataFrame) -> list[str]:
             "como ejercicio académico y, como mucho, paper trading para seguir "
             "aprendiendo.",
         ]
+    cartera_ret_no_costs = float(cartera["total_return_no_costs"])
+    lines += [
+        "",
+        f"**Impacto de los costes:** con costes realistas (0.1% comisión + 0.05% "
+        f"slippage por operación) y el umbral calibrado por ticker, el retorno de "
+        f"la cartera baja de {cartera_ret_no_costs:.2%} a {cartera_ret:.2%}.",
+    ]
     return lines
 
 
@@ -277,20 +362,28 @@ def write_report(df: pd.DataFrame, out_dir: Path) -> Path:
         f"segmento; buy&hold se mide en el MISMO segmento test, no sobre todo el "
         f"histórico.",
         "",
+        f"La simulación aplica **{COST_PER_TRADE:.1%} de comisión + "
+        f"{SLIPPAGE:.2%} de slippage** por operación (entrada y salida), y el "
+        f"umbral de señal se **calibra por ticker** en el último "
+        f"{100.0 * VALIDATION_FRACTION:.0f}% del train (rejilla "
+        f"{THRESHOLD_GRID[0]:.2f}-{THRESHOLD_GRID[-1]:.2f}, se elige el de mayor "
+        f"Sharpe). El segmento test nunca participa en la calibración.",
+        "",
     ]
     lines += _conclusion_lines(df)
     lines += [
         "",
         "## Resultados por ticker (segmento test)",
         "",
-        "| ticker | retorno estrategia | retorno buy&hold | CAGR | Sharpe | maxDD | win rate | operaciones | ventana test |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| ticker | retorno estrategia | retorno buy&hold | umbral | CAGR | Sharpe | maxDD | win rate | operaciones | ventana test |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for _, row in df.iterrows():
         lines.append(
             f"| {row['ticker']} | {row['total_return']:.2%} | {row['buy_hold_return']:.2%} "
-            f"| {row['cagr']:.2%} | {row['sharpe']:.2f} | {row['max_drawdown']:.2%} "
-            f"| {row['win_rate']:.2%} | {row['n_trades']} | {row['test_start']} → {row['test_end']} |"
+            f"| {_fmt_threshold(row['threshold'])} | {row['cagr']:.2%} | {row['sharpe']:.2f} "
+            f"| {row['max_drawdown']:.2%} | {row['win_rate']:.2%} | {row['n_trades']} "
+            f"| {row['test_start']} → {row['test_end']} |"
         )
     lines += ["", "## Limitaciones", ""]
     lines += LIMITATIONS
@@ -323,8 +416,9 @@ def main(argv: list[str] | None = None) -> int:
     for _, row in df.iterrows():
         print(
             f"   {row['ticker']:<8} retorno={row['total_return']:>8.2%}  "
-            f"buy&hold={row['buy_hold_return']:>8.2%}  Sharpe={row['sharpe']:>6.2f}  "
-            f"maxDD={row['max_drawdown']:>8.2%}  win={row['win_rate']:>7.2%}"
+            f"buy&hold={row['buy_hold_return']:>8.2%}  umbral={_fmt_threshold(row['threshold']):<5}  "
+            f"Sharpe={row['sharpe']:>6.2f}  maxDD={row['max_drawdown']:>8.2%}  "
+            f"win={row['win_rate']:>7.2%}"
         )
     return 0
 

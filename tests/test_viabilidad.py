@@ -2,10 +2,13 @@
 
 El foco no son métricas complejas sino que el script genera VIABILIDAD.md con
 las secciones clave y que se puede re-ejecutar (make viabilidad regenera el
-informe).
+informe). TRADE-004 añade costes realistas y calibración de umbral por ticker.
 """
 
-from inversion.trading.viabilidad import main
+import pandas as pd
+import pytest
+
+from inversion.trading.viabilidad import THRESHOLD_GRID, _calibrate_threshold, main
 
 
 def _write_sample_ticker(patch_paths, df_with_target) -> None:
@@ -32,6 +35,19 @@ def test_viabilidad_genera_informe_con_secciones_clave(patch_paths, df_with_targ
     assert "AAPL" in content
     assert "buy&hold" in content
     assert "out-of-sample" in content
+    assert "comisión" in content
+    assert "slippage" in content
+    assert "umbral" in content
+    assert "Impacto de los costes" in content
+
+
+def test_calibrate_threshold_chooses_highest_when_all_sharpe_zero():
+    # Precios constantes → Sharpe 0 para cualquier umbral; el desempate elige
+    # el umbral más alto de la rejilla (menos operaciones, menos costes).
+    prices = pd.Series([100.0] * 10)
+    probs = pd.Series([0.9] * 10)
+    best = _calibrate_threshold(prices, probs, 10_000.0, 0.001, 0.0005)
+    assert best == pytest.approx(THRESHOLD_GRID[-1])
 
 
 def test_viabilidad_se_regenera_al_reejecutar(patch_paths, df_with_target, tmp_path):
