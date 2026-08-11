@@ -420,3 +420,19 @@ pytest: 151 passed, 24 warnings; ./init.sh: ENTORNO LISTO EXIT_CODE=0; ruff chec
 ```
 
 </details>
+
+## TRADE-006 — Señales híbridas modelo+sentimiento
+
+- **Cerrada:** 2026-08-11
+- **Verificación:** ./init.sh en verde · 162 passed, 24 warnings in 17.60s
+- **Cambios:** inversion/trading/signals.py (signal_from_probability_sentiment); inversion/trading/backtest.py (signal_fn opcional retrocompatible); inversion/trading/viabilidad.py (evaluación híbrida OOS); tests/test_signals.py, test_backtest.py, test_viabilidad.py; reports/backtest/VIABILIDAD.md
+- **Decisiones:** señal híbrida: BUY si p>=thr Y sent>0; SELL si p<=1-thr Y sent<0; comparación justa (mismo test, mismo umbral, mismos costes); hallazgo: sentimiento 0.0 en todo el histórico por falta de solapamiento noticias-precios — re-evaluar cuando haya datos alineados
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+pytest: 162 passed, 24 warnings; ./init.sh: ENTORNO LISTO EXIT_CODE=0; ruff: All checks passed; viabilidad receta real: solo-modelo 77.50% vs buy&hold 281.70%; híbrida 0.00% por falta de solapamiento noticias-precios (documentado honestamente); 34 tests de la feature
+```
+
+</details>
