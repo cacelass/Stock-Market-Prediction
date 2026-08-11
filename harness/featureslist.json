@@ -391,6 +391,21 @@
       "started": "2026-08-11",
       "review_rounds": 0,
       "closed": "2026-08-11"
+    },
+    {
+      "id": "TMPL-006",
+      "title": "Sincronizar con dskit 1.16.0: corpus de conocimiento ML y mejoras del arnés",
+      "description": "Sincronizar con dskit 1.16.0: corpus de conocimiento ML y mejoras del arnés",
+      "acceptance_criteria": [
+        "copier update --trust termina sin errores (dskit 1.14→1.16)",
+        "NO se pierden personalizaciones del proyecto (sentiment_agent.py, featureslist.json con 26 features, progress/, vault/)",
+        "el corpus de conocimiento ML nuevo (reinforcement-learning, metaheuristica, modelos-fundacionales, guardarrailes, gestion-riesgo, series-temporales) queda indexado en el vault",
+        "las mejoras del arnés (certeza, commits atómicos, review severidad) están activas",
+        "./init.sh termina en ENTORNO LISTO"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "closed": "2026-08-11"
     }
   ]
 }

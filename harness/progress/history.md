@@ -436,3 +436,19 @@ pytest: 162 passed, 24 warnings; ./init.sh: ENTORNO LISTO EXIT_CODE=0; ruff: All
 ```
 
 </details>
+
+## TMPL-006 — Sincronizar con dskit 1.16.0: corpus de conocimiento ML y mejoras del arnés
+
+- **Cerrada:** 2026-08-11
+- **Verificación:** ./init.sh en verde · 162 passed, 24 warnings in 18.51s
+- **Cambios:** copier update dskit 1.14→1.16 (162 M + 92 D movidos a harness/ + 22 nuevos); harness/ (featureslist, progress, memory); docs/vault/ (vault fusionado); docs/knowledge/ (corpus ML nuevo); agents/ (arnés 1.16, formateado); .copier-answers.yml (1.16.0); README.md (layout corregido)
+- **Decisiones:** layout nuevo del template 1.16: featureslist/progress/memory → harness/, vault → docs/vault/; personalizaciones conservadas (sentiment_agent, 27 features, historial, vault, tickers, trading); corpus ML indexado en vault; agents/ formateado (deuda del template)
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+pytest producto: 162 passed, 24 warnings; pytest arnés: 638 passed, 1 skipped; ./init.sh: ENTORNO LISTO EXIT_CODE=0; ruff check+format: All checks passed, 240 files formatted; harness gate: success=true; corpus 6 ficheros en docs/knowledge/ml y docs/vault/07_REFERENCIAS; personalizaciones: sentiment_agent, 27 features, historial, vault fusionado
+```
+
+</details>
