@@ -388,3 +388,35 @@ pytest: 145 passed, 24 warnings; ./init.sh: ENTORNO LISTO EXIT_CODE=0; viabilida
 ```
 
 </details>
+
+## TRADE-004 — Backtest realista: costes, slippage y umbral calibrado
+
+- **Cerrada:** 2026-08-02
+- **Verificación:** ./init.sh en verde · 148 passed, 24 warnings in 28.84s
+- **Cambios:** inversion/trading/backtest.py (costes+slippage); inversion/trading/viabilidad.py (calibración umbral); tests/test_backtest.py, tests/test_viabilidad.py; reports/backtest/VIABILIDAD.md
+- **Decisiones:** umbral por ticker calibrado en validación (último 20% del train), nunca en test; costes 0.1% comisión + 0.05% slippage por defecto; sigue sin superar a buy&hold — informe honesto
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+pytest: 148 passed, 24 warnings; ./init.sh: ENTORNO LISTO EXIT_CODE=0; viabilidad receta real regenera VIABILIDAD.md: cartera 53.59% vs buy&hold 281.70% con costes 0.1%+0.05%, impacto documentado (63.86%→53.59%); ruff: All checks passed
+```
+
+</details>
+
+## TRADE-005 — Features adicionales: momentum, volatilidad y estacionalidad
+
+- **Cerrada:** 2026-08-11
+- **Verificación:** ./init.sh en verde · 151 passed, 24 warnings in 20.05s
+- **Cambios:** inversion/features/build_features.py (momentum_10/21/63, volatility_21, RSI14, day_of_week, quarter); inversion/models/train_model.py y predict_model.py (FEATURE_COLS); tests/test_build_features.py, test_monitoring.py, test_tuning.py; reports/backtest/VIABILIDAD.md; data/interim/*.csv regenerados
+- **Decisiones:** RSI aproximación simple (media móvil) documentada, no Wilder; sin fuga: momentum/volatilidad/RSI solo ventanas pasadas, calendario del día t; fixtures de monitoring/tuning actualizados al esquema nuevo; viabilidad mejora (53.59%→77.50%) pero sigue sin superar a buy&hold
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+pytest: 151 passed, 24 warnings; ./init.sh: ENTORNO LISTO EXIT_CODE=0; ruff check+format: All checks passed, 53 files formatted; viabilidad receta real: cartera 77.50% vs buy&hold 281.70% (antes 53.59% sin features nuevas); features regeneradas 7 datasets × 30 columnas; retrain 7 tickers completado
+```
+
+</details>
