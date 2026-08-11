@@ -44,12 +44,17 @@ class MLflowAgent(BaseAgent):
 
         if runs is None:
             return AgentResult(
-                True, self.name, "list_runs",
+                True,
+                self.name,
+                "list_runs",
                 f"No existe el experimento '{name}' todavía (¿se ha ejecutado 'make train' con use_mlflow=true?).",
                 data=[],
             )
         return AgentResult(
-            True, self.name, "list_runs", f"{len(runs)} run(s) encontrado(s) en el experimento '{name}'.",
+            True,
+            self.name,
+            "list_runs",
+            f"{len(runs)} run(s) encontrado(s) en el experimento '{name}'.",
             data=[r.__dict__ for r in runs],
         )
 
@@ -68,7 +73,9 @@ class MLflowAgent(BaseAgent):
         best = MLflowTool.best_run(runs, metric, higher_is_better=higher_is_better)
         if best is None:
             return AgentResult(
-                False, self.name, "best_run",
+                False,
+                self.name,
+                "best_run",
                 f"Ningún run de '{name}' registra la métrica '{metric}' — revisa el nombre exacto.",
             )
         return AgentResult(True, self.name, "best_run", f"Mejor run por '{metric}': {best.run_id[:8]}.", data=best.__dict__)
@@ -86,7 +93,9 @@ class MLflowAgent(BaseAgent):
 
         if not runs or len(runs) < 2:
             return AgentResult(
-                True, self.name, "compare_latest",
+                True,
+                self.name,
+                "compare_latest",
                 f"Se necesitan al menos 2 runs para comparar — '{name}' tiene {len(runs) if runs else 0}.",
                 data=None,
             )
@@ -94,7 +103,9 @@ class MLflowAgent(BaseAgent):
         latest, previous = runs[0], runs[1]
         if metric not in latest.metrics or metric not in previous.metrics:
             return AgentResult(
-                False, self.name, "compare_latest",
+                False,
+                self.name,
+                "compare_latest",
                 f"'{metric}' no está presente en ambos runs a comparar (últimos: {latest.run_id[:8]}, {previous.run_id[:8]}).",
             )
 
@@ -103,7 +114,9 @@ class MLflowAgent(BaseAgent):
         warnings = [f"El run más reciente empeora '{metric}' en {abs(delta):.4g} respecto al anterior."] if regressed else []
 
         return AgentResult(
-            True, self.name, "compare_latest",
+            True,
+            self.name,
+            "compare_latest",
             f"'{metric}': {previous.metrics[metric]:.4g} -> {latest.metrics[metric]:.4g} ({'peor' if regressed else 'igual o mejor'}).",
             data={"latest": latest.__dict__, "previous": previous.__dict__, "delta": delta, "regressed": regressed},
             warnings=warnings,

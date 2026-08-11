@@ -2,11 +2,12 @@
 agents.evals.runner — Eval runner: ejecuta baterías de pruebas contra el sistema de agentes.
 
 Uso:
-    uv run python -m agents.evals.runner              # harness + smoke + routing + contracts
+    uv run python -m agents.evals.runner              # harness + rag + smoke + routing + contracts
     uv run python -m agents.evals.runner --smoke       # solo smoke
     uv run python -m agents.evals.runner --routing     # solo routing
     uv run python -m agents.evals.runner --contracts   # solo contracts
     uv run python -m agents.evals.runner --harness     # solo piezas del arnés
+    uv run python -m agents.evals.runner --rag         # solo recuperación del RAG
     uv run python -m agents.evals.runner --json        # reporte JSON
 """
 
@@ -48,34 +49,40 @@ def _smoke(orchestrator: Orchestrator) -> list[dict]:
             None,
         )
         if primary is None:
-            results.append({
-                "agent": name,
-                "action": "(ninguna)",
-                "success": True,
-                "duration_ms": 0,
-                "message": "sin acciones ejecutables sin argumentos — nada que probar en smoke",
-            })
+            results.append(
+                {
+                    "agent": name,
+                    "action": "(ninguna)",
+                    "success": True,
+                    "duration_ms": 0,
+                    "message": "sin acciones ejecutables sin argumentos — nada que probar en smoke",
+                }
+            )
             continue
         start = time.monotonic()
         try:
             result = agent.run(primary)
             duration = time.monotonic() - start
-            results.append({
-                "agent": name,
-                "action": primary,
-                "success": result.success,
-                "duration_ms": round(duration * 1000),
-                "message": result.message[:200],
-            })
+            results.append(
+                {
+                    "agent": name,
+                    "action": primary,
+                    "success": result.success,
+                    "duration_ms": round(duration * 1000),
+                    "message": result.message[:200],
+                }
+            )
         except Exception as exc:
             duration = time.monotonic() - start
-            results.append({
-                "agent": name,
-                "action": primary,
-                "success": False,
-                "duration_ms": round(duration * 1000),
-                "message": f"EXCEPTION: {exc}",
-            })
+            results.append(
+                {
+                    "agent": name,
+                    "action": primary,
+                    "success": False,
+                    "duration_ms": round(duration * 1000),
+                    "message": f"EXCEPTION: {exc}",
+                }
+            )
     return results
 
 
@@ -83,6 +90,9 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
     ("haz commit de los cambios", "git"),
     ("sugiere un mensaje de commit", "git"),
     ("ejecuta los tests", "test"),
+    ("haz mutation testing al módulo de features", "mutation"),
+    ("ejecuta el mutation testing", "mutation"),
+    ("calcula la métrica CRAP de utils.py", "mutation"),
     ("revisa el Dockerfile", "docker"),
     ("diagnóstico del proyecto", "doctor"),
     ("actualiza el changelog", "documentation"),
@@ -120,21 +130,33 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
 def _routing(orchestrator: Orchestrator) -> list[dict]:
     """
     Routing test: frases conocidas deben rutear al agente correcto.
+
+    Se saltan los benchmarks cuyo agente esperado no está registrado: el
+    proyecto puede haberse generado sin extras (perfil minimo/estandar), y un
+    agente ausente no es un fallo de ruteo — es un agente que no existe. El
+    número de benchmarks ejecutados queda en `data["total"]` para no confundir
+    "todo rutea bien" con "no probé nada".
     """
+    agent_registry.discover()
+    presentes = set(agent_registry.all())
     results = []
     for query, expected_agent in ROUTING_BENCHMARKS:
+        if expected_agent not in presentes:
+            continue
         start = time.monotonic()
         decision = orchestrator.select_agent(query)
         duration = time.monotonic() - start
         correct = decision.agent_name == expected_agent
-        results.append({
-            "query": query,
-            "expected": expected_agent,
-            "got": decision.agent_name,
-            "confidence": round(decision.confidence, 3),
-            "correct": correct,
-            "duration_ms": round(duration * 1000),
-        })
+        results.append(
+            {
+                "query": query,
+                "expected": expected_agent,
+                "got": decision.agent_name,
+                "confidence": round(decision.confidence, 3),
+                "correct": correct,
+                "duration_ms": round(duration * 1000),
+            }
+        )
     return results
 
 
@@ -144,17 +166,16 @@ def _contracts() -> list[dict]:
     y no hay colisiones de recursos.
     """
     from agents.contracts import CONTRACTS, validate_contracts
+
     agent_registry.discover()
     problems = validate_contracts(set(agent_registry.all()))
     return [
-        {"agent": c.role, "can": list(c.can), "cannot": list(c.cannot),
-         "owns": list(c.owns), "collaborates": list(c.collaborates)}
-        for c in CONTRACTS.values()
+        {"agent": c.role, "can": list(c.can), "cannot": list(c.cannot), "owns": list(c.owns), "collaborates": list(c.collaborates)} for c in CONTRACTS.values()
     ] + ([{"warning": p} for p in problems] if problems else [])
 
 
 HARNESS_AGENTS = ("lider", "implementer", "reviewer", "explorer")
-HARNESS_STATUS = ("pending", "in_progress", "done", "blocked")
+HARNESS_STATUS = ("pending", "spec_ready", "in_progress", "done", "blocked")
 HARNESS_REQUIRED = ("id", "title", "description", "acceptance_criteria", "status")
 
 
@@ -168,10 +189,9 @@ def _check_ficheros(root, check) -> None:
     else:
         check("init.sh", True, "presente")
         ejecutable = os.access(gate, os.X_OK)
-        check("init.sh:+x", ejecutable,
-              "ejecutable" if ejecutable else "sin bit de ejecución (chmod +x init.sh)")
+        check("init.sh:+x", ejecutable, "ejecutable" if ejecutable else "sin bit de ejecución (chmod +x init.sh)")
 
-    for rel in ("AGENTS.md", "progress/current.md", "progress/history.md", "progress/README.md"):
+    for rel in ("AGENTS.md", "harness/progress/current.md", "harness/progress/history.md", "harness/progress/README.md"):
         check(rel, (root / rel).is_file(), "presente" if (root / rel).is_file() else "FALTA")
 
 
@@ -179,20 +199,17 @@ def _check_agentes(root, check) -> None:
     """Los cuatro agentes que razonan y los skills que los documentan."""
     for nombre in HARNESS_AGENTS:
         ruta = root / ".opencode" / "agents" / f"{nombre}.md"
-        check(f"agente:{nombre}", ruta.is_file(),
-              "definido" if ruta.is_file() else "FALTA su definición")
+        check(f"agente:{nombre}", ruta.is_file(), "definido" if ruta.is_file() else "FALTA su definición")
 
     for skill in ("harness_workflow", "agents_reference"):
         ruta = root / "agents" / "prompts" / f"{skill}.md"
-        check(skill, ruta.is_file(),
-              "skill presente" if ruta.is_file() else f"FALTA agents/prompts/{skill}.md")
+        check(skill, ruta.is_file(), "skill presente" if ruta.is_file() else f"FALTA agents/prompts/{skill}.md")
 
     agents_md = root / "AGENTS.md"
     if agents_md.is_file():
         texto = agents_md.read_text(encoding="utf-8", errors="replace")
         ok = "Protocolo del arnés" in texto and "init.sh" in texto
-        check("AGENTS.md:protocolo", ok,
-              "protocolo documentado" if ok else "no documenta el protocolo del arnés")
+        check("AGENTS.md:protocolo", ok, "protocolo documentado" if ok else "no documenta el protocolo del arnés")
 
 
 def _problemas_backlog(features: list) -> list[str]:
@@ -228,28 +245,28 @@ def _problemas_backlog(features: list) -> list[str]:
 
 
 def _check_backlog(root, check) -> None:
-    """featureslist.json: existe, es JSON y cumple el esquema."""
-    backlog = root / "featureslist.json"
+    """harness/featureslist.json: existe, es JSON y cumple el esquema."""
+    backlog = root / "harness/featureslist.json"
     if not backlog.is_file():
-        check("featureslist.json", False, "FALTA el backlog")
+        check("harness/featureslist.json", False, "FALTA el backlog")
         return
     try:
         doc = json.loads(backlog.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        check("featureslist.json", False, f"JSON inválido: {exc}")
+        check("harness/featureslist.json", False, f"JSON inválido: {exc}")
         return
 
     features = doc.get("features") if isinstance(doc, dict) else None
     if not isinstance(features, list) or not features:
-        check("featureslist.json", False, "falta la clave 'features' con una lista no vacía")
+        check("harness/featureslist.json", False, "falta la clave 'features' con una lista no vacía")
         return
 
     problemas = _problemas_backlog(features)
     if problemas:
         for problema in problemas:
-            check("featureslist.json", False, problema)
+            check("harness/featureslist.json", False, problema)
     else:
-        check("featureslist.json", True, f"{len(features)} features, esquema válido")
+        check("harness/featureslist.json", True, f"{len(features)} features, esquema válido")
 
 
 def _harness() -> list[dict]:
@@ -269,6 +286,29 @@ def _harness() -> list[dict]:
     return resultados
 
 
+def _rag() -> dict:
+    """
+    Rag test: mide la recuperación contra el juego de pruebas del proyecto.
+
+    Trae la suite ya resumida (su veredicto va por umbral, no por pleno — ver
+    `agents.evals.rag_eval.suite`). El import es perezoso y tolerante a que no
+    exista: `agents/evals/rag_eval.py` solo se genera si el proyecto se creó
+    con el extra `rag`, y una suite que revienta el runner entero por no estar
+    instalada no sirve de nada.
+    """
+    try:
+        from agents.evals.rag_eval import suite
+    except ImportError:
+        return {
+            "suite": "rag",
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "avg_duration_ms": 0,
+            "results": [{"agent": "rag", "success": True, "message": "no evaluado — el proyecto no incluye el módulo RAG"}],
+        }
+    return suite(get_context().root)
+
 
 def _summarize(results: list[dict], label: str) -> dict:
     total = len(results)
@@ -284,14 +324,15 @@ def _summarize(results: list[dict], label: str) -> dict:
     }
 
 
-def run_evals(smoke: bool = True, routing: bool = True, contracts: bool = True,
-              harness: bool = True, json_output: bool = False) -> EvalReport:
+def run_evals(smoke: bool = True, routing: bool = True, contracts: bool = True, harness: bool = True, rag: bool = True, json_output: bool = False) -> EvalReport:
     orchestrator = Orchestrator(context=get_context())
     agent_registry.discover()
 
     suites = {}
     if harness:
         suites["harness"] = _summarize(_harness(), "harness")
+    if rag:
+        suites["rag"] = _rag()
     if smoke:
         suites["smoke"] = _summarize(_smoke(orchestrator), "smoke")
     if routing:
@@ -308,16 +349,11 @@ def run_evals(smoke: bool = True, routing: bool = True, contracts: bool = True,
             "results": contract_results,
         }
 
-    overall_pass = all(
-        s.get("failed", 0) == 0 and s.get("warnings", 0) == 0
-        for s in suites.values()
-    )
+    overall_pass = all(s.get("failed", 0) == 0 and s.get("warnings", 0) == 0 for s in suites.values())
 
     report: EvalReport = {
         "success": overall_pass,
-        "timestamp": __import__("datetime").datetime.now(
-            __import__("datetime").timezone.utc
-        ).isoformat(),
+        "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
         "suites": suites,
     }
 
@@ -330,23 +366,21 @@ def run_evals(smoke: bool = True, routing: bool = True, contracts: bool = True,
 
 
 def _print_report(report: EvalReport) -> None:
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"  EVAL REPORT  {'✔' if report['success'] else '✘'}")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
     for name, suite in report["suites"].items():
         status = "✔" if suite.get("failed", 0) == 0 else "✘"
         print(f"\n  {status} {name.upper()}")
-        print(f"     {suite.get('passed', 0)}/{suite['total']} passed"
-              f"  |  avg {suite.get('avg_duration_ms', 0)}ms")
+        print(f"     {suite.get('passed', 0)}/{suite['total']} passed  |  avg {suite.get('avg_duration_ms', 0)}ms")
         for r in suite.get("results", []):
             if not r.get("success", r.get("correct", True)):
-                print(f"     ✘ {r.get('agent', r.get('expected', '?'))}: "
-                      f"{r.get('message', r.get('query', ''))[:120]}")
+                print(f"     ✘ {r.get('agent', r.get('expected', '?'))}: {r.get('message', r.get('query', ''))[:120]}")
             if "warning" in r:
                 print(f"     ⚠ {r['warning']}")
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"  {'PASS' if report['success'] else 'FAIL'}")
-    print(f"{'='*50}\n")
+    print(f"{'=' * 50}\n")
 
 
 def main() -> int:
@@ -355,16 +389,18 @@ def main() -> int:
     parser.add_argument("--routing", action="store_true", help="Solo routing tests")
     parser.add_argument("--contracts", action="store_true", help="Solo contracts")
     parser.add_argument("--harness", action="store_true", help="Solo harness (piezas del arnés)")
+    parser.add_argument("--rag", action="store_true", help="Solo recuperación del RAG")
     parser.add_argument("--json", "-j", action="store_true", help="Salida JSON")
     args = parser.parse_args()
 
-    selected = args.smoke or args.routing or args.contracts or args.harness
+    selected = args.smoke or args.routing or args.contracts or args.harness or args.rag
 
     report = run_evals(
         smoke=args.smoke or not selected,
         routing=args.routing or not selected,
         contracts=args.contracts or not selected,
         harness=args.harness or not selected,
+        rag=args.rag or not selected,
         json_output=args.json,
     )
     return 0 if report["success"] else 1

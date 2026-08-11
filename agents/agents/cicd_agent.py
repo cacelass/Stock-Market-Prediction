@@ -27,9 +27,18 @@ class CICDAgent(BaseAgent):
     # Absorbidas de `schedule`, que era redundante: validate_cron ya devolvia
     # todo lo que hacian sus tres acciones.
     capabilities = [
-        "ci", "cd", "cicd", "github actions", "workflow",
+        "ci",
+        "cd",
+        "cicd",
+        "github actions",
+        "workflow",
         "pipeline de integracion continua",
-        "cron", "schedule", "programar", "temporizador", "scheduler", "calendarizar",
+        "cron",
+        "schedule",
+        "programar",
+        "temporizador",
+        "scheduler",
+        "calendarizar",
     ]
 
     def action_aliases(self) -> dict:
@@ -70,15 +79,16 @@ class CICDAgent(BaseAgent):
                 real_targets = set(re.findall(r"^([a-zA-Z_-]+):", makefile_text, re.MULTILINE))
                 missing = [t for t in referenced_targets if t not in real_targets]
                 if missing:
-                    warnings.append(
-                        f"El workflow invoca make {', '.join(missing)} pero ese/esos target(s) no existen en el Makefile actual."
-                    )
+                    warnings.append(f"El workflow invoca make {', '.join(missing)} pero ese/esos target(s) no existen en el Makefile actual.")
 
         success = not problems and not any("no existen en el Makefile" in w for w in warnings)
         return AgentResult(
-            success, self.name, "validate_workflow",
+            success,
+            self.name,
+            "validate_workflow",
             f"{len(problems)} problema(s) encontrado(s) en '{filename}'." if problems else f"'{filename}' parece correcto.",
-            data={"problems": problems, "referenced_make_targets": referenced_targets}, warnings=warnings,
+            data={"problems": problems, "referenced_make_targets": referenced_targets},
+            warnings=warnings,
         )
 
     def validate_cron(self, *, expression: str) -> AgentResult:
@@ -90,7 +100,9 @@ class CICDAgent(BaseAgent):
         summary = ScheduleTool.summary(expression)
         next_runs = ScheduleTool.next_run(expression)
         return AgentResult(
-            True, self.name, "validate_cron",
+            True,
+            self.name,
+            "validate_cron",
             f"Expresión válida: {human}",
             data={"expression": expression, "human": human, **summary, "next_runs": next_runs},
         )
@@ -99,7 +111,9 @@ class CICDAgent(BaseAgent):
         destination = self.ctx.root / WORKFLOWS_DIR / filename
         if destination.exists() and not overwrite:
             return AgentResult(
-                False, self.name, "generate_workflow",
+                False,
+                self.name,
+                "generate_workflow",
                 f"Ya existe '{destination.relative_to(self.ctx.root)}'. Usa overwrite=True para sobreescribirlo.",
             )
 
@@ -114,7 +128,9 @@ class CICDAgent(BaseAgent):
 
         problems = CICDTool.validate(destination)
         return AgentResult(
-            True, self.name, "generate_workflow",
+            True,
+            self.name,
+            "generate_workflow",
             f"Workflow generado en '{destination.relative_to(self.ctx.root)}'.",
             data={"path": str(destination), "content": yaml_content},
             warnings=problems,

@@ -32,6 +32,7 @@ def test_generate_workflow_fails_without_project_slug(context):
     context.config.__dict__  # no-op, solo para dejar constancia de que se usa config real
     from agents.config import ProjectConfig
     from agents.context import SharedContext
+
     ctx_sin_slug = SharedContext(root=context.root, config=ProjectConfig(project_slug=""))
     _write_makefile(ctx_sin_slug.root)
     agent = CICDAgent(context=ctx_sin_slug)
@@ -54,9 +55,7 @@ def test_validate_workflow_cross_references_makefile(context):
     _write_makefile(context.root, targets=("lint",))  # sin 'test'
     workflows_dir = context.root / ".github" / "workflows"
     workflows_dir.mkdir(parents=True)
-    (workflows_dir / "ci.yml").write_text(
-        "name: CI\non:\n  push:\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make test\n"
-    )
+    (workflows_dir / "ci.yml").write_text("name: CI\non:\n  push:\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make test\n")
     agent = CICDAgent(context=context)
     result = agent.validate_workflow()
     assert any("test" in w and "Makefile" in w for w in result.warnings)
@@ -80,6 +79,7 @@ def test_list_workflows_empty_by_default(context):
 # traducir a lenguaje humano y calcular proximas ejecuciones), asi que el
 # agente entero sobraba. Estos tests vienen de test_schedule_agent.py para no
 # perder la cobertura de ScheduleTool.
+
 
 def test_validate_cron_acepta_expresion_valida(context):
     result = CICDAgent(context=context).validate_cron(expression="0 9 * * 1-5")

@@ -9,7 +9,7 @@ from agents.agents.installer_agent import InstallerAgent
 from agents.core.registry import agent_registry
 
 
-VALID_AGENT_SOURCE = '''
+VALID_AGENT_SOURCE = """
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 
@@ -24,9 +24,9 @@ class SaludoTestAgent(BaseAgent):
 
     def saludar(self):
         return AgentResult(True, self.name, "saludar", "hola")
-'''
+"""
 
-INCOMPLETE_AGENT_SOURCE = '''
+INCOMPLETE_AGENT_SOURCE = """
 from agents.core.base_agent import BaseAgent
 from agents.core.registry import register_agent
 
@@ -36,7 +36,7 @@ class IncompletoAgent(BaseAgent):
 
     def actions(self):
         return {}
-'''
+"""
 
 
 @pytest.fixture(autouse=True)
@@ -86,8 +86,13 @@ def test_install_from_git_valid_agent_end_to_end_via_cli(tmp_path):
     repo = _make_external_repo(tmp_path, VALID_AGENT_SOURCE)
 
     result = subprocess.run(
-        [sys.executable, "-m", "agents", "run", "installer", "install_from_git", "--repo_url", str(repo)],
-        cwd=project_dir, capture_output=True, text=True, timeout=60,
+        # `--yes` autoriza la puerta de permisos: instalar código de terceros
+        # es destructivo, así que sin esto la CLI se para y pregunta.
+        [sys.executable, "-m", "agents", "run", "installer", "install_from_git", "--repo_url", str(repo), "--yes"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "registrado como 'saludo_test'" in result.stdout
@@ -95,7 +100,10 @@ def test_install_from_git_valid_agent_end_to_end_via_cli(tmp_path):
 
     verify = subprocess.run(
         [sys.executable, "-m", "agents", "run", "saludo_test", "saludar"],
-        cwd=project_dir, capture_output=True, text=True, timeout=30,
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     assert verify.returncode == 0, verify.stdout + verify.stderr
     assert "hola" in verify.stdout
@@ -141,7 +149,7 @@ def test_verify_reports_unregistered_agent(context):
     assert not result.success
 
 
-AGENT_USING_CTX = '''
+AGENT_USING_CTX = """
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 
@@ -157,9 +165,9 @@ class BuenaAdaptacionAgent(BaseAgent):
     def hacer(self):
         path = self.ctx.raw_data_dir / "archivo.csv"
         return AgentResult(True, self.name, "hacer", str(path))
-'''
+"""
 
-AGENT_WITH_HARDCODED_PATH = '''
+AGENT_WITH_HARDCODED_PATH = """
 from pathlib import Path
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
@@ -176,7 +184,7 @@ class MalaAdaptacionAgent(BaseAgent):
     def hacer(self):
         path = Path("data/raw/archivo.csv")
         return AgentResult(True, self.name, "hacer", str(path))
-'''
+"""
 
 
 def test_install_warns_about_hardcoded_paths_without_self_ctx(context, tmp_path):
@@ -201,17 +209,20 @@ def test_install_no_path_warning_when_using_self_ctx(context, tmp_path):
 
 def test_normalize_github_shorthand_expands_user_repo():
     from agents.tools.agent_installer_tool import AgentInstallerTool
+
     assert AgentInstallerTool.normalize_github_shorthand("torvalds/linux") == "https://github.com/torvalds/linux.git"
 
 
 def test_normalize_github_shorthand_leaves_full_url_untouched():
     from agents.tools.agent_installer_tool import AgentInstallerTool
+
     url = "https://github.com/torvalds/linux.git"
     assert AgentInstallerTool.normalize_github_shorthand(url) == url
 
 
 def test_normalize_github_shorthand_leaves_existing_local_path_untouched(tmp_path):
     from agents.tools.agent_installer_tool import AgentInstallerTool
+
     local = tmp_path / "algo"
     local.mkdir()
     assert AgentInstallerTool.normalize_github_shorthand(str(local)) == str(local)

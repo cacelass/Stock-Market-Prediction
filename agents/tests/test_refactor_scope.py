@@ -50,9 +50,7 @@ def test_apuntar_directamente_al_venv_no_devuelve_nada(agent):
 )
 def test_directorios_prohibidos_se_ignoran(agent, forbidden):
     _plant(agent.ctx.root, f"{forbidden}/algo.py")
-    assert agent._py_files(".") == [] or not any(
-        forbidden in p.parts for p in agent._py_files(".")
-    )
+    assert agent._py_files(".") == [] or not any(forbidden in p.parts for p in agent._py_files("."))
 
 
 def test_no_sale_del_proyecto_con_rutas_relativas(agent):

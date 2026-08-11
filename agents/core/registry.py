@@ -72,15 +72,9 @@ class AgentRegistry:
     def register(self, agent_cls: type["BaseAgent"]) -> type["BaseAgent"]:
         name = getattr(agent_cls, "name", None)
         if not name or name == "base":
-            raise ValueError(
-                f"{agent_cls.__name__} debe definir un atributo de clase `name` propio "
-                f"antes de poder registrarse."
-            )
+            raise ValueError(f"{agent_cls.__name__} debe definir un atributo de clase `name` propio antes de poder registrarse.")
         if name in self._agents and self._agents[name] is not agent_cls:
-            raise ValueError(
-                f"Ya hay un agente registrado con name='{name}' "
-                f"({self._agents[name].__name__}). Los nombres deben ser únicos."
-            )
+            raise ValueError(f"Ya hay un agente registrado con name='{name}' ({self._agents[name].__name__}). Los nombres deben ser únicos.")
         self._agents[name] = agent_cls
         return agent_cls
 
@@ -89,10 +83,7 @@ class AgentRegistry:
         from agents.exceptions import AgentNotFoundError
 
         if name not in self._agents:
-            raise AgentNotFoundError(
-                f"No existe ningún agente registrado con name='{name}'. "
-                f"Disponibles: {sorted(self._agents)}"
-            )
+            raise AgentNotFoundError(f"No existe ningún agente registrado con name='{name}'. Disponibles: {sorted(self._agents)}")
         return self._agents[name]
 
     def all(self) -> dict[str, type["BaseAgent"]]:

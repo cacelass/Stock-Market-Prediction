@@ -22,7 +22,7 @@ project_description: Predicción de tendencia bursátil (sube >2% en 5 días) co
 project_version: 0.1.2
 python_version: 3.12
 project_open_source_license: MIT
-dskit_version: 1.14.0
+dskit_version: 1.16.0
 
 # --- Tipo de ML ---
 ml_type: supervisado
@@ -44,6 +44,10 @@ use_lightgbm: false
 use_catboost: false
 graphify_mode: "graphify + obsidian vault"
 
+proyecto_perfil: completo
+use_sdd: false
+use_mcp: false
+
 # --- Metadatos de copier (requeridos por `copier update`) ---
 _src_path: gh:cacelass/dskit
-_commit: 76a2146524f132e45eab49cbe304c2da5cc4d3a6
+_commit: 803349f0b7964586fc49d90a9b0a9171175dcf67

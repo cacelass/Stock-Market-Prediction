@@ -13,12 +13,13 @@ solo no la ve.
 
 ### `index` — Construye/actualiza el índice
 Escanea el paquete principal, `api/`, `chat/`, `monitoring/`, `tuning/`,
-`agents/`, los prompts, `docs/`, `vault/`, `progress/`, `featureslist.json`,
-README, AGENTS.md y CHANGELOG.md.
+`agents/`, los prompts, `docs/` (fichas raíz, `docs/source/` de Sphinx, el
+vault `docs/vault/` y el corpus `docs/knowledge/`), `harness/progress/`,
+`harness/featureslist.json`, README, AGENTS.md y CHANGELOG.md.
 
 Incremental **por fichero y por huella de contenido**: lo que no ha cambiado no
 se vuelve a embeber, lo que cambió se reemplaza y lo que se borró desaparece del
-índice. Sin eso, el índice acumulaba versiones obsoletas de `progress/` a cada
+índice. Sin eso, el índice acumulaba versiones obsoletas de `harness/progress/` a cada
 feature cerrada.
 
 ```bash
@@ -39,9 +40,15 @@ según qué rama lo encontró).
 
 ### `index_urls` — Indexa documentación externa
 El HTML se convierte a texto antes de indexar, y reindexar una URL **reemplaza**
-su contenido anterior en vez de duplicarlo.
+su contenido anterior en vez de duplicarlo. Para GitHub, Stack Overflow y arXiv
+se usa un extractor específico que devuelve markdown estructurado (título,
+secciones, bloques de código, enlaces) en vez de HTML plano — lo que el RAG
+puede citar sin perder la fuente.
 ```bash
 uv run python -m agents run rag index_urls --urls '["https://docs.pola.rs/api/python/stable/"]'
+uv run python -m agents run rag index_urls --urls '["https://github.com/cacelass/dskit"]'
+uv run python -m agents run rag index_urls --urls '["https://stackoverflow.com/questions/..."]'
+uv run python -m agents run rag index_urls --urls '["https://arxiv.org/abs/1412.6980"]'
 ```
 
 ### `status` — Estado del índice
@@ -81,21 +88,24 @@ buscar si detecta el desajuste.
 |--------|------------|
 | `run rag index` | `--rebuild` |
 | `run rag index_urls` | `--urls` (obligatorio) |
-| `run rag search` | `--query` (obligatorio) · `--top_k`, `--hybrid`, `--min_score` |
+| `run rag search` | `--query` (obligatorio) · `--top_k`, `--hybrid`, `--min_score`, `--file_type`, `--source`, `--max_per_source`, `--expand` |
 | `run rag status` | — |
+| `run rag evaluate` | `--top_k` |
+| `run rag refresh` | `--dry_run`, `--months`, `--max_new`, `--topics`, `--from_objective` |
 
 ## Límites
 
-**Rol.** RAG local: indexa código, prompts, docs, vault, la memoria del arnés y URLs externas; busca en lenguaje natural fundiendo similitud vectorial (ChromaDB) con BM25 léxico.
+**Rol.** RAG local: indexa código, prompts, docs/ (incl. vault y corpus), el corpus de conocimiento (docs/knowledge/) y la memoria del arnés; busca en lenguaje natural fundiendo similitud vectorial (ChromaDB) con BM25 léxico. Mantiene el corpus al día.
 
 **No hace:**
 - construir o modificar el grafo graphify → knowledge
-- buscar papers académicos nuevos → research
-- ejecutar código ni modificar archivos del proyecto
+- buscar papers académicos nuevos para el estado del arte → research
+- ejecutar código arbitrario ni modificar código del proyecto
+- escribir fuera de docs/knowledge/papers/, docs/knowledge/sources.json y .rag-index/
 
-**Necesita que le den:** que exista un índice (ejecutar 'rag index' primero)
+**Necesita que le den:** que exista un índice (ejecutar 'rag index' primero); red para refresh; sin ella el mantenimiento falla de forma controlada
 
-**Escribe en (nadie más toca esto):** .rag-index/ (índice vectorial ChromaDB, gitignored)
+**Escribe en (nadie más toca esto):** .rag-index/ (índice vectorial ChromaDB, gitignored); docs/knowledge/papers/ y docs/knowledge/sources.json (registro de fuentes del corpus)
 
 **Se apoya en:** knowledge, doc, plan
 

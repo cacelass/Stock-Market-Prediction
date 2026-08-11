@@ -7,9 +7,7 @@ from agents.agents.git_agent import GitAgent
 
 def _write_versioned_files(root):
     (root / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0.1.0"\n')
-    (root / "README.md").write_text(
-        "![Version](https://img.shields.io/badge/Version-0.1.0-green)\n\n**Versión:** 0.1.0\n"
-    )
+    (root / "README.md").write_text("![Version](https://img.shields.io/badge/Version-0.1.0-green)\n\n**Versión:** 0.1.0\n")
 
 
 def test_commit_feature_dry_run_no_escribe_nada_y_propone(context):
@@ -55,9 +53,7 @@ def test_commit_feature_cierra_con_bump_y_commit_sin_tag(context):
     tags = subprocess.run(["git", "tag"], cwd=context.root, capture_output=True, text=True, check=True).stdout
     assert not tags.strip(), "commit_feature no debe crear tags"
 
-    show = subprocess.run(
-        ["git", "show", "--stat", "HEAD"], cwd=context.root, capture_output=True, text=True, check=True
-    ).stdout
+    show = subprocess.run(["git", "show", "--stat", "HEAD"], cwd=context.root, capture_output=True, text=True, check=True).stdout
     assert "pyproject.toml" in show and "README.md" in show and "CHANGELOG.md" in show
 
 

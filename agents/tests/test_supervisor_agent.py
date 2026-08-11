@@ -79,6 +79,7 @@ def test_research_no_valid_backend():
 
 # -- fan-in: sintetizar perspectivas, no competir ------------------------------
 
+
 class TestSynthesize:
     """
     `compete` elige un ganador entre alternativas; `synthesize` integra ángulos
@@ -93,6 +94,7 @@ class TestSynthesize:
 
     def test_sin_perspectivas_falla(self, context):
         from agents.agents.supervisor_agent import SupervisorAgent
+
         r = SupervisorAgent(context=context).synthesize(perspectives=[])
         assert not r.success
 
@@ -104,9 +106,7 @@ class TestSynthesize:
             return AgentResult(True, agent, action, f"{agent} respondio", data={"n": 1})
 
         monkeypatch.setattr("agents.orchestrator.Orchestrator.run", fake_run)
-        r = SupervisorAgent(context=context).synthesize(
-            perspectives=self._perspectivas(), parallel=False, question="¿como esta el proyecto?"
-        )
+        r = SupervisorAgent(context=context).synthesize(perspectives=self._perspectivas(), parallel=False, question="¿como esta el proyecto?")
         assert r.success
         assert r.data["consensus"] == "unánime"
         assert set(r.data["findings"]) == {"calidad", "entorno"}
@@ -122,9 +122,7 @@ class TestSynthesize:
             return AgentResult(True, agent, action, "ok")
 
         monkeypatch.setattr("agents.orchestrator.Orchestrator.run", fake_run)
-        r = SupervisorAgent(context=context).synthesize(
-            perspectives=self._perspectivas(), parallel=False
-        )
+        r = SupervisorAgent(context=context).synthesize(perspectives=self._perspectivas(), parallel=False)
         assert r.success, "con una perspectiva viva sigue habiendo sintesis"
         assert r.data["failed"] == ["entorno"]
         assert "parcial" in r.data["consensus"]
@@ -137,9 +135,7 @@ class TestSynthesize:
             return AgentResult(False, agent, action, "no pude", needs=["dame el dataset"])
 
         monkeypatch.setattr("agents.orchestrator.Orchestrator.run", fake_run)
-        r = SupervisorAgent(context=context).synthesize(
-            perspectives=self._perspectivas(), parallel=False
-        )
+        r = SupervisorAgent(context=context).synthesize(perspectives=self._perspectivas(), parallel=False)
         assert not r.success
         assert r.needs, "las preguntas de cada perspectiva deben subir, no perderse"
 
@@ -151,8 +147,6 @@ class TestSynthesize:
             return AgentResult(True, agent, action, "ok", warnings=[f"ojo con {agent}"])
 
         monkeypatch.setattr("agents.orchestrator.Orchestrator.run", fake_run)
-        r = SupervisorAgent(context=context).synthesize(
-            perspectives=self._perspectivas(), parallel=False
-        )
+        r = SupervisorAgent(context=context).synthesize(perspectives=self._perspectivas(), parallel=False)
         assert len(r.warnings) == 2
         assert any("calidad:" in w for w in r.warnings)

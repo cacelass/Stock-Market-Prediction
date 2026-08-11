@@ -78,7 +78,9 @@ class TestAgent(BaseAgent):
         if not junit_path.exists():
             # pytest puede fallar antes de escribir el XML (error de colección, sintaxis rota, etc.)
             return AgentResult(
-                False, self.name, "run_tests",
+                False,
+                self.name,
+                "run_tests",
                 "pytest no llegó a generar el reporte JUnit — probablemente un error de colección.",
                 data={"stdout": process.stdout[-2000:], "stderr": process.stderr[-2000:]},
             )
@@ -87,10 +89,13 @@ class TestAgent(BaseAgent):
         warnings = [f"{f.classname}::{f.name}: {f.message}" for f in summary.failed_tests]
 
         return AgentResult(
-            summary.failures == 0 and summary.errors == 0, self.name, "run_tests",
+            summary.failures == 0 and summary.errors == 0,
+            self.name,
+            "run_tests",
             f"{summary.passed}/{summary.total} pasaron, {summary.failures} fallo(s), "
             f"{summary.errors} error(es), {summary.skipped} omitido(s) en {summary.duration_seconds:.1f}s.",
-            data=summary.__dict__, warnings=warnings,
+            data=summary.__dict__,
+            warnings=warnings,
         )
 
     def run_tests(self) -> AgentResult:
@@ -122,9 +127,12 @@ class TestAgent(BaseAgent):
         warnings = [f"{f}: {pct:.0f}% de cobertura" for f, pct in low_coverage.items()]
 
         return AgentResult(
-            True, self.name, "coverage_report",
+            True,
+            self.name,
+            "coverage_report",
             f"Cobertura total: {report['total_percent_covered']:.1f}%. {len(low_coverage)} archivo(s) por debajo del 60%.",
-            data=report, warnings=warnings,
+            data=report,
+            warnings=warnings,
         )
 
     def list_untested_modules(self) -> AgentResult:
@@ -140,17 +148,14 @@ class TestAgent(BaseAgent):
         if not package_dir.exists():
             return AgentResult(False, self.name, "list_untested_modules", f"No existe '{package_dir}'.")
 
-        module_stems = {
-            p.stem for p in package_dir.rglob("*.py")
-            if p.stem != "__init__" and "__pycache__" not in p.parts
-        }
-        test_stems = {
-            p.stem.removeprefix("test_") for p in self.ctx.tests_dir.rglob("test_*.py")
-        } if self.ctx.tests_dir.exists() else set()
+        module_stems = {p.stem for p in package_dir.rglob("*.py") if p.stem != "__init__" and "__pycache__" not in p.parts}
+        test_stems = {p.stem.removeprefix("test_") for p in self.ctx.tests_dir.rglob("test_*.py")} if self.ctx.tests_dir.exists() else set()
 
         untested = sorted(module_stems - test_stems)
         return AgentResult(
-            True, self.name, "list_untested_modules",
+            True,
+            self.name,
+            "list_untested_modules",
             f"{len(untested)} de {len(module_stems)} módulo(s) sin test homónimo aparente.",
             data=untested,
             warnings=["Heurística por nombre de archivo, no mide cobertura real — ver docstring del método."] if untested else [],
@@ -195,7 +200,9 @@ class TestAgent(BaseAgent):
 
         dry_msg = " [dry-run]" if dry_run else ""
         return AgentResult(
-            True, self.name, "generate_test_skeletons",
+            True,
+            self.name,
+            "generate_test_skeletons",
             f"{len(created)}/{len(untested)} esqueleto(s) de test creado(s).{dry_msg}",
             data={"created": created, "untested": untested, "dry_run": dry_run},
             warnings=[] if created else [f"No se creó ningún test (dry_run={dry_run}). Usa dry_run=False para generarlos."],

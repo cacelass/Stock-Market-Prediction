@@ -18,12 +18,14 @@ from agents.tools.cache_tool import CacheTool
 
 try:
     from agents.tools.graphify_tool import GraphifyTool
+
     HAS_GRAPHIFY = True
 except ImportError:
     HAS_GRAPHIFY = False
 
 try:
     from agents.tools.rag_tool import RagTool
+
     HAS_RAG = True
 except ImportError:
     HAS_RAG = False
@@ -32,21 +34,32 @@ except ImportError:
 @register_agent
 class DocAgent(BaseAgent):
     name = "doc"
-    description = (
-        "Documentación unificada del proyecto: busca en el grafo graphify "
-        "(estructura), el índice RAG (semántica) y el vault Obsidian (notas)."
-    )
+    description = "Documentación unificada del proyecto: busca en el grafo graphify (estructura), el índice RAG (semántica) y el vault Obsidian (notas)."
     # Es el punto de entrada UNIFICADO: sus palabras son las que expresan
     # "búscalo donde sea", no los nombres de las fuentes concretas — esos
     # pertenecen a rag, knowledge y docsearch (un keyword, un dueño).
     capabilities = [
-        "doc", "todas las fuentes", "busqueda unificada", "búsqueda unificada",
-        "documentacion unificada", "donde esta documentado",
-        "dónde está documentado", "que hace", "qué hace",
-        "como funciona", "cómo funciona", "explica", "informacion", "información",
+        "doc",
+        "todas las fuentes",
+        "busqueda unificada",
+        "búsqueda unificada",
+        "documentacion unificada",
+        "donde esta documentado",
+        "dónde está documentado",
+        "que hace",
+        "qué hace",
+        "como funciona",
+        "cómo funciona",
+        "explica",
+        "informacion",
+        "información",
         # Absorbidas de `docsearch`: navegacion del grafo.
-        "navegar", "navega el grafo", "busca en el grafo", "vecinos",
-        "referencias", "busca en el grafo de conocimiento",
+        "navegar",
+        "navega el grafo",
+        "busca en el grafo",
+        "vecinos",
+        "referencias",
+        "busca en el grafo de conocimiento",
     ]
 
     def action_aliases(self) -> dict:
@@ -81,10 +94,7 @@ class DocAgent(BaseAgent):
             avisos.append("error al leer el grafo graphify")
             return []
         q = query.lower()
-        encontrados = [
-            n for n in grafo.get("nodes", [])
-            if q in n.get("label", "").lower() or q in n.get("id", "").lower()
-        ]
+        encontrados = [n for n in grafo.get("nodes", []) if q in n.get("label", "").lower() or q in n.get("id", "").lower()]
         return [
             {
                 # Ojo: la clave es `source_type`, no `source`. Antes se
@@ -113,7 +123,7 @@ class DocAgent(BaseAgent):
 
     def _buscar_vault(self, query: str, avisos: list) -> list[dict]:
         """Grep literal sobre las notas del vault."""
-        vault = self.ctx.root / "vault"
+        vault = self.ctx.root / "docs" / "vault"
         if not vault.exists():
             return []
         q = query.lower()
@@ -125,12 +135,14 @@ class DocAgent(BaseAgent):
                     continue
                 for numero, linea in enumerate(texto.split("\n"), 1):
                     if q in linea.lower():
-                        encontrados.append({
-                            "source_type": "vault",
-                            "file": str(md.relative_to(self.ctx.root)),
-                            "line": numero,
-                            "text": linea.strip()[:200],
-                        })
+                        encontrados.append(
+                            {
+                                "source_type": "vault",
+                                "file": str(md.relative_to(self.ctx.root)),
+                                "line": numero,
+                                "text": linea.strip()[:200],
+                            }
+                        )
         except Exception:  # noqa: BLE001
             avisos.append("error al leer vault")
         return encontrados
@@ -141,8 +153,7 @@ class DocAgent(BaseAgent):
         if tipo == "graphify":
             return f"  [graphify] {resultado['label']} ({resultado['type']})"
         if tipo == "rag":
-            return (f"  [rag] {resultado.get('source', '?')}:{resultado.get('line', '?')}"
-                    f" — {resultado.get('text', '')[:100]}")
+            return f"  [rag] {resultado.get('source', '?')}:{resultado.get('line', '?')} — {resultado.get('text', '')[:100]}"
         return f"  [vault] {resultado['file']}:{resultado['line']} — {resultado['text']}"
 
     def search(self, *, query: str, sources: str = "all") -> AgentResult:
@@ -163,21 +174,26 @@ class DocAgent(BaseAgent):
 
         if not combinados:
             return AgentResult(
-                True, self.name, "search",
+                True,
+                self.name,
+                "search",
                 "No se encontraron resultados en ninguna fuente.",
-                data=[], warnings=avisos,
+                data=[],
+                warnings=avisos,
             )
 
         fuentes = len({r.get("source_type", "") for r in combinados})
         lineas = [self._formatear(r) for r in combinados[:10]]
         return AgentResult(
-            True, self.name, "search",
+            True,
+            self.name,
+            "search",
             f"{len(combinados)} resultado(s) de {fuentes} fuente(s).\n" + "\n".join(lineas),
-            data=combinados, warnings=avisos,
+            data=combinados,
+            warnings=avisos,
         )
 
-    def graph_query(self, *, question: str, budget: int | None = None,
-                    no_cache: bool = False) -> AgentResult:
+    def graph_query(self, *, question: str, budget: int | None = None, no_cache: bool = False) -> AgentResult:
         """
         Consulta el grafo graphify en lenguaje natural (cacheado).
 
@@ -190,7 +206,9 @@ class DocAgent(BaseAgent):
             return guard
         if not GraphifyTool.is_available(self.ctx.root):
             return AgentResult(
-                False, self.name, "graph_query",
+                False,
+                self.name,
+                "graph_query",
                 "graphify no está instalado — no se puede consultar. Ejecuta el skill /graphify.",
             )
         CacheTool.set_cache_dir(GraphifyTool.cache_dir(self.ctx.root))
@@ -217,7 +235,9 @@ class DocAgent(BaseAgent):
             return AgentResult(False, self.name, "graph_query", f"graphify query falló: {exc}")
 
         return AgentResult(
-            True, self.name, "graph_query",
+            True,
+            self.name,
+            "graph_query",
             answer or "graphify query no devolvió texto.",
             data={"question": question, "answer": answer},
         )
@@ -245,22 +265,23 @@ class DocAgent(BaseAgent):
                     break
         if target_id is None:
             return AgentResult(
-                False, self.name, "neighbors",
+                False,
+                self.name,
+                "neighbors",
                 f"No hay ningún nodo con id o label '{node}'.",
             )
 
         adj = GraphifyTool._adjacency(graph)
         neighbor_ids = sorted(adj.get(target_id, set()))
         neighbors = [
-            {"id": nid, "label": nodes.get(nid, {}).get("label", nid),
-             "type": nodes.get(nid, {}).get("type", "desconocido")}
-            for nid in neighbor_ids[:limit]
+            {"id": nid, "label": nodes.get(nid, {}).get("label", nid), "type": nodes.get(nid, {}).get("type", "desconocido")} for nid in neighbor_ids[:limit]
         ]
         return AgentResult(
-            True, self.name, "neighbors",
+            True,
+            self.name,
+            "neighbors",
             f"'{nodes.get(target_id, {}).get('label', target_id)}' tiene "
-            f"{len(neighbor_ids)} vecino(s)"
-            + (f" (mostrando {limit})" if len(neighbor_ids) > limit else "") + ".",
+            f"{len(neighbor_ids)} vecino(s)" + (f" (mostrando {limit})" if len(neighbor_ids) > limit else "") + ".",
             data={"node": target_id, "neighbors": neighbors, "total": len(neighbor_ids)},
         )
 
@@ -280,7 +301,9 @@ class DocAgent(BaseAgent):
             if str(n.get("type", "")).lower() in {"reference", "citation", "link", "url"}
         ]
         return AgentResult(
-            True, self.name, "list_references",
+            True,
+            self.name,
+            "list_references",
             f"{len(refs)} referencia(s) en el grafo.",
             data=refs,
         )
@@ -288,7 +311,9 @@ class DocAgent(BaseAgent):
     def _require_graph(self, action: str) -> AgentResult | None:
         if not GraphifyTool.graph_exists(self.ctx.root):
             return AgentResult(
-                False, self.name, action,
+                False,
+                self.name,
+                action,
                 "No hay grafo (graphify-out/graph.json). Ejecuta 'knowledge build' primero.",
             )
         return None
@@ -298,18 +323,24 @@ class DocAgent(BaseAgent):
         """Búsqueda semántica pura vía RAG."""
         if not HAS_RAG:
             return AgentResult(
-                False, self.name, "rag_search",
+                False,
+                self.name,
+                "rag_search",
                 "RAG no disponible (chromadb no instalado).",
             )
         if not RagTool.available():
             return AgentResult(
-                False, self.name, "rag_search",
+                False,
+                self.name,
+                "rag_search",
                 "chromadb no instalado. Ejecuta: uv sync --extra rag",
             )
         results = RagTool.search(self.ctx.root, query, top_k=top_k)
         if not results:
             return AgentResult(
-                True, self.name, "rag_search",
+                True,
+                self.name,
+                "rag_search",
                 "No hay resultados. Ejecuta 'rag index' primero.",
                 data=[],
             )
@@ -319,18 +350,22 @@ class DocAgent(BaseAgent):
         for r in results[:5]:
             lines.append(f"  [{r['score']}] {r['source']}:{r['line']} — {r['text'][:120]}")
         return AgentResult(
-            True, self.name, "rag_search",
+            True,
+            self.name,
+            "rag_search",
             f"{len(results)} resultado(s). Top:\n" + "\n".join(lines),
             data=results,
         )
 
     def vault_grep(self, *, pattern: str) -> AgentResult:
         """Busca texto directamente en el vault Obsidian."""
-        vault_path = self.ctx.root / "vault"
+        vault_path = self.ctx.root / "docs" / "vault"
         if not vault_path.exists():
             return AgentResult(
-                False, self.name, "vault_grep",
-                "No hay directorio vault/ en el proyecto.",
+                False,
+                self.name,
+                "vault_grep",
+                "No hay directorio docs/vault/ en el proyecto.",
             )
         matches = []
         for md_file in vault_path.rglob("*.md"):
@@ -338,23 +373,29 @@ class DocAgent(BaseAgent):
                 text = md_file.read_text(encoding="utf-8", errors="replace")
                 for lineno, line in enumerate(text.split("\n"), 1):
                     if pattern.lower() in line.lower():
-                        matches.append({
-                            "file": str(md_file.relative_to(self.ctx.root)),
-                            "line": lineno,
-                            "text": line.strip()[:200],
-                        })
+                        matches.append(
+                            {
+                                "file": str(md_file.relative_to(self.ctx.root)),
+                                "line": lineno,
+                                "text": line.strip()[:200],
+                            }
+                        )
             except Exception:
                 pass
         if not matches:
             return AgentResult(
-                True, self.name, "vault_grep",
-                f"No se encontró '{pattern}' en vault/.",
+                True,
+                self.name,
+                "vault_grep",
+                f"No se encontró '{pattern}' en docs/vault/.",
                 data=[],
             )
         lines = [f"  {m['file']}:{m['line']} — {m['text']}" for m in matches[:20]]
         return AgentResult(
-            True, self.name, "vault_grep",
-            f"{len(matches)} coincidencia(s) en vault/:\n" + "\n".join(lines),
+            True,
+            self.name,
+            "vault_grep",
+            f"{len(matches)} coincidencia(s) en docs/vault/:\n" + "\n".join(lines),
             data=matches[:20],
         )
 
@@ -397,9 +438,12 @@ class DocAgent(BaseAgent):
                 lines.append(f"  {src}: error")
 
         return AgentResult(
-            True, self.name, "index",
+            True,
+            self.name,
+            "index",
             "Indexación completa:\n" + "\n".join(lines),
-            data=results, warnings=warnings,
+            data=results,
+            warnings=warnings,
         )
 
     def _estado_grafo(self) -> tuple[dict, bool, str]:
@@ -431,7 +475,7 @@ class DocAgent(BaseAgent):
         return datos, True, f"{datos['chunks']} fragmentos"
 
     def _estado_vault(self) -> tuple[dict, bool, str]:
-        ruta = self.ctx.root / "vault"
+        ruta = self.ctx.root / "docs" / "vault"
         existe = ruta.exists()
         datos = {
             "exists": existe,
@@ -453,7 +497,9 @@ class DocAgent(BaseAgent):
             lineas.append(f"  {'✓' if ok else '✗'} {etiqueta} — {detalle}")
 
         return AgentResult(
-            True, self.name, "status",
+            True,
+            self.name,
+            "status",
             "Fuentes de documentación:\n" + "\n".join(lineas),
             data=fuentes,
         )

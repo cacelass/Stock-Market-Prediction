@@ -35,13 +35,64 @@ OPENALEX_API = "https://api.openalex.org/works"
 # devuelva "the", "de", "and"... No pretende ser exhaustiva.
 _STOPWORDS = {
     # inglés
-    "the", "and", "for", "with", "that", "this", "from", "are", "was", "were",
-    "has", "have", "not", "but", "our", "using", "used", "use", "can", "will",
-    "which", "based", "into", "such", "these", "than", "then", "also", "may",
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "from",
+    "are",
+    "was",
+    "were",
+    "has",
+    "have",
+    "not",
+    "but",
+    "our",
+    "using",
+    "used",
+    "use",
+    "can",
+    "will",
+    "which",
+    "based",
+    "into",
+    "such",
+    "these",
+    "than",
+    "then",
+    "also",
+    "may",
     # español
-    "los", "las", "una", "unos", "unas", "del", "que", "con", "por", "para",
-    "como", "más", "este", "esta", "estos", "estas", "sus", "sobre", "entre",
-    "cada", "según", "desde", "muy", "sin", "son", "fue", "ser", "hay",
+    "los",
+    "las",
+    "una",
+    "unos",
+    "unas",
+    "del",
+    "que",
+    "con",
+    "por",
+    "para",
+    "como",
+    "más",
+    "este",
+    "esta",
+    "estos",
+    "estas",
+    "sus",
+    "sobre",
+    "entre",
+    "cada",
+    "según",
+    "desde",
+    "muy",
+    "sin",
+    "son",
+    "fue",
+    "ser",
+    "hay",
 }
 
 
@@ -68,13 +119,15 @@ class ResearchTool:
     @staticmethod
     def search_arxiv(query: str, *, max_results: int = 10, timeout: int = 15) -> list[dict[str, Any]]:
         """Busca en arXiv y devuelve papers normalizados. Lanza si la red falla."""
-        params = urllib.parse.urlencode({
-            "search_query": f"all:{query}",
-            "start": 0,
-            "max_results": max_results,
-            "sortBy": "relevance",
-            "sortOrder": "descending",
-        })
+        params = urllib.parse.urlencode(
+            {
+                "search_query": f"all:{query}",
+                "start": 0,
+                "max_results": max_results,
+                "sortBy": "relevance",
+                "sortOrder": "descending",
+            }
+        )
         resp = RestTool.get(f"{ARXIV_API}?{params}", timeout=timeout)
         return ResearchTool._parse_arxiv(resp.text)
 
@@ -91,15 +144,20 @@ class ResearchTool:
             summary = (entry.findtext("a:summary", default="", namespaces=ns) or "").strip()
             published = entry.findtext("a:published", default="", namespaces=ns) or ""
             url = (entry.findtext("a:id", default="", namespaces=ns) or "").strip()
-            authors = [
-                (a.findtext("a:name", default="", namespaces=ns) or "").strip()
-                for a in entry.findall("a:author", ns)
-            ]
+            authors = [(a.findtext("a:name", default="", namespaces=ns) or "").strip() for a in entry.findall("a:author", ns)]
             year = int(published[:4]) if published[:4].isdigit() else None
-            papers.append(ResearchTool._normalize(
-                title=title, abstract=summary, authors=authors, year=year,
-                url=url, doi=None, citations=None, source="arxiv",
-            ))
+            papers.append(
+                ResearchTool._normalize(
+                    title=title,
+                    abstract=summary,
+                    authors=authors,
+                    year=year,
+                    url=url,
+                    doi=None,
+                    citations=None,
+                    source="arxiv",
+                )
+            )
         return papers
 
     # -- búsqueda: OpenAlex ---------------------------------------------------
@@ -118,20 +176,21 @@ class ResearchTool:
     def _parse_openalex(data: dict[str, Any]) -> list[dict[str, Any]]:
         papers: list[dict[str, Any]] = []
         for work in data.get("results", []):
-            authors = [
-                (a.get("author", {}) or {}).get("display_name", "")
-                for a in work.get("authorships", [])
-            ]
+            authors = [(a.get("author", {}) or {}).get("display_name", "") for a in work.get("authorships", [])]
             doi = work.get("doi")
             url = (work.get("primary_location", {}) or {}).get("landing_page_url") or work.get("id")
-            papers.append(ResearchTool._normalize(
-                title=work.get("display_name") or "",
-                abstract=ResearchTool._abstract_from_inverted(work.get("abstract_inverted_index")),
-                authors=[a for a in authors if a],
-                year=work.get("publication_year"),
-                url=url, doi=doi, citations=work.get("cited_by_count"),
-                source="openalex",
-            ))
+            papers.append(
+                ResearchTool._normalize(
+                    title=work.get("display_name") or "",
+                    abstract=ResearchTool._abstract_from_inverted(work.get("abstract_inverted_index")),
+                    authors=[a for a in authors if a],
+                    year=work.get("publication_year"),
+                    url=url,
+                    doi=doi,
+                    citations=work.get("cited_by_count"),
+                    source="openalex",
+                )
+            )
         return papers
 
     @staticmethod

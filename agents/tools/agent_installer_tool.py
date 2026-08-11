@@ -32,9 +32,7 @@ from agents.tools.registry import register_tool
 # prueba concluyente (un agente externo podría, legítimamente, referirse a
 # estas carpetas por otro motivo), así que se reporta como aviso, no como
 # fallo — decide tú si es un problema real revisando el código señalado.
-_SUSPICIOUS_PATH_RE = re.compile(
-    r"^(\.?/)?(data|models|reports|tests|docs|notebooks|api|monitoring|tuning)(/|$)"
-)
+_SUSPICIOUS_PATH_RE = re.compile(r"^(\.?/)?(data|models|reports|tests|docs|notebooks|api|monitoring|tuning)(/|$)")
 
 
 @dataclass
@@ -57,10 +55,7 @@ def _decorator_name(decorator: ast.expr) -> str | None:
 def _uses_shared_context(node: ast.ClassDef) -> bool:
     """True si en algún sitio del cuerpo de la clase se referencia `self.ctx`."""
     for sub in ast.walk(node):
-        if (
-            isinstance(sub, ast.Attribute) and sub.attr == "ctx"
-            and isinstance(sub.value, ast.Name) and sub.value.id == "self"
-        ):
+        if isinstance(sub, ast.Attribute) and sub.attr == "ctx" and isinstance(sub.value, ast.Name) and sub.value.id == "self":
             return True
     return False
 
@@ -92,10 +87,7 @@ def _inspect_agent_class(node: ast.ClassDef) -> tuple[str | None, list[str]]:
             warnings.append(f"La clase no define '{expected}' como atributo de clase (se esperaba, como en BaseAgent).")
     method_names = {n.name for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
     if "actions" not in method_names:
-        warnings.append(
-            "La clase no define un método 'actions()'"
-            " — no se podrá despachar ninguna acción por CLI/Orchestrator."
-        )
+        warnings.append("La clase no define un método 'actions()' — no se podrá despachar ninguna acción por CLI/Orchestrator.")
 
     if not _uses_shared_context(node):
         warnings.append(
@@ -140,7 +132,8 @@ class AgentInstallerTool:
         try:
             result = run_command(
                 ["git", "clone", "--depth", str(depth), repo_url, str(destination)],
-                timeout=120, check=True,
+                timeout=120,
+                check=True,
             )
         except MissingDependencyError:
             raise
@@ -171,10 +164,15 @@ class AgentInstallerTool:
                 if "register_agent" not in decorator_names:
                     continue
                 declared_name, warnings = _inspect_agent_class(node)
-                candidates.append(AgentCandidate(
-                    path=path, declared_name=declared_name, class_name=node.name,
-                    has_register_decorator=True, warnings=warnings,
-                ))
+                candidates.append(
+                    AgentCandidate(
+                        path=path,
+                        declared_name=declared_name,
+                        class_name=node.name,
+                        has_register_decorator=True,
+                        warnings=warnings,
+                    )
+                )
         return candidates
 
     @staticmethod

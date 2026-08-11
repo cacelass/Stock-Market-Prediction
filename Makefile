@@ -6,12 +6,12 @@
         docs \
         profile \
         mlflow \
-        monitor tune serve query \
 \
+        monitor tune serve query \
         agents-list agents-run agents-doctor agents-memory agents-eval \
         init harness-check backlog prompts-sync prompts-check assistants-sync \
         skills opencode-init opencode-check \
-        index-rag index-rag-rebuild \
+        index-rag index-rag-rebuild eval-rag \
         recommended-tools recommended-all \
         clean clean-models clean-figures clean-all \
         run info help
@@ -63,6 +63,7 @@ help:
 	@echo "    make typecheck      mypy --strict (tipado estático)"
 	@echo "    make security       bandit + pip-audit (vulnerabilidades)"
 	@echo "    make audit          radon cc + agents audit (complejidad + equipo)"
+
 	@echo ""
 	@echo "  Jupyter"
 	@echo "    make lab            JupyterLab  (puerto 8888)"
@@ -73,8 +74,24 @@ help:
 	@echo "    make profile        cProfile de main.py → reports/profile.prof"
 	@echo ""
 
+	@echo "  Monitoring"
+	@echo "    make monitor        drift detection + performance report"
+	@echo ""
 
 
+	@echo "  Optuna"
+	@echo "    make tune           optimiza hiperparámetros (n_trials en main.py)"
+	@echo ""
+
+
+	@echo "  DuckDB"
+	@echo "    make query          Shell SQL interactivo sobre data/raw/"
+	@echo ""
+
+
+	@echo "  API REST"
+	@echo "    make serve          FastAPI en localhost:8000  (docs en /docs)"
+	@echo ""
 
 
 	@echo "  Documentación"
@@ -83,14 +100,15 @@ help:
 	@echo "  Arnés (harness)"
 	@echo "    make init            puerta de entrada: ¿se puede trabajar? (init.sh)"
 	@echo "    make harness-check   valida la estructura del arnés sin correr tests"
-	@echo "    make backlog         muestra el estado de featureslist.json"
+	@echo "    make backlog         muestra el estado de harness/featureslist.json"
 	@echo ""
 	@echo "  Agentes"
 	@echo "    make agents-list     listar agentes disponibles"
 	@echo "    make agents-run      ejecutar un agente"
 	@echo "    make agents-doctor   diagnóstico completo con agentes"
 	@echo "    make agents-memory   estado de la memoria de agentes"
-	@echo "    make agents-eval     smoke + routing + contracts (eval de agentes)"
+	@echo "    make agents-eval     harness + rag + smoke + routing + contracts"
+	@echo "    make eval-rag        mide la recuperacion del RAG (hit_rate/recall/MRR)"
 	@echo "    make prompts-sync    regenera los prompts desde el codigo y contracts.py"
 	@echo "    make prompts-check   falla si un prompt se ha desincronizado"
 	@echo "    make assistants-sync espeja los subagentes a .claude/agents/"
@@ -114,12 +132,17 @@ help:
 # ─────────────────────────────────────────────────────────────────────────────
 #  Entorno
 # ─────────────────────────────────────────────────────────────────────────────
-setup:
+ setup:
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Instalando dependencias para ML tipo: $(ML_TYPE)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	uv sync --extra dev --extra $(ML_TYPE) \
+		--extra graphify \
+		--extra api \
+		--extra optuna \
+		--extra monitoring \
+		--extra rag \
 		&& echo "  Extras instalados."
 	@uv run pre-commit install 2>/dev/null || echo "  (pre-commit no disponible)"
 	@echo ""
@@ -207,7 +230,41 @@ run:
 	uv run $(PYTHON) main.py
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Monitoring — drift detection y performance tracking
+# ─────────────────────────────────────────────────────────────────────────────
+monitor:
+	@echo "▶  Ejecutando monitorización de drift y rendimiento..."
+	uv run python -m monitoring.monitor
 
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Optuna — optimizacion de hiperparametros
+# ─────────────────────────────────────────────────────────────────────────────
+tune:
+	@echo "▶  Lanzando optimizacion Optuna (OPTUNA_TRIALS en main.py)"
+	uv run python -m tuning.tune_model
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  DuckDB — exploración SQL interactiva sobre data/raw/
+# ─────────────────────────────────────────────────────────────────────────────
+query:
+	@echo "▶  DuckDB shell — escribe .quit para salir"
+	@echo "   Ejemplo: SELECT * FROM read_csv('data/raw/dataset.csv') LIMIT 10;"
+	uv run duckdb
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  API REST — servir el modelo con FastAPI
+# ─────────────────────────────────────────────────────────────────────────────
+serve:
+	@echo "▶  Lanzando API REST en http://localhost:8000"
+	@echo "   Documentación interactiva: http://localhost:8000/docs"
+	uv run uvicorn api.main:app --reload --port 8000
 
 
 profile:
@@ -252,6 +309,8 @@ audit:
 	uv run python -m agents audit suggest 2>/dev/null || echo "  (agente 'audit' no disponible — ejecuta make setup)"
 	@echo "  ✅ audit OK"
 
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Jupyter
 # ─────────────────────────────────────────────────────────────────────────────
@@ -262,6 +321,13 @@ notebook:
 	uv run jupyter notebook --ip=* --port=8888 --no-browser
 
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  MLflow UI
+# ─────────────────────────────────────────────────────────────────────────────
+mlflow:
+	@echo "Lanzando MLflow UI en http://localhost:5000"
+	uv run mlflow ui --port 5000
 
 
 
@@ -284,7 +350,7 @@ harness-check:
 	@./init.sh --quick
 
 backlog:
-	@uv run $(PYTHON) -c "import json; d=json.load(open('featureslist.json')); \
+	@uv run $(PYTHON) -c "import json; d=json.load(open('harness/featureslist.json')); \
 	print(); print('  Backlog de Stock Market Prediction'); print(); \
 	[print('  [%-11s] %-10s %s' % (f['status'], f['id'], f['title'])) for f in d['features']]; \
 	print()"
@@ -293,39 +359,46 @@ backlog:
 #  Sistema de agentes
 # ─────────────────────────────────────────────────────────────────────────────
 agents-list:
-	$(PY) -m agents list
+	uv run python -m agents list
 
 agents-run:
-	$(PY) -m agents run $(filter-out $@,$(MAKECMDGOALS))
+	uv run python -m agents run $(filter-out $@,$(MAKECMDGOALS))
 
 agents-doctor:
-	$(PY) -m agents doctor
+	uv run python -m agents doctor
 
 agents-memory:
 	@echo "▶  Estado de la memoria de agentes"
-	$(PY) -m agents run memory status
+	uv run python -m agents run memory status
 
 agents-eval:
-	@echo "▶  Evaluación del sistema de agentes (smoke + routing + contracts)"
-	$(PY) -m agents.evals.runner
+	@echo "▶  Evaluación del sistema de agentes (harness + rag + smoke + routing + contracts)"
+	uv run python -m agents.evals.runner
 
 prompts-sync assistants-sync:
 	@echo "▶  Regenerando prompts y subagentes desde el código y los contratos..."
-	$(PY) -m agents.prompts_sync --write
+	uv run python -m agents.prompts_sync --write
 
 prompts-check:
-	@$(PY) -m agents.prompts_sync
+	@uv run python -m agents.prompts_sync
 
 index-rag:
 	@echo "▶  Indexando código y documentación del proyecto en ChromaDB..."
 	@echo "   (incremental: solo se reindexa lo que cambió)"
-	$(PY) -m agents run rag index
+	uv run python -m agents run rag index
 
 # Necesario al cambiar DSKIT_RAG_EMBEDDER: los vectores del embedder anterior
 # no son comparables con los del nuevo, y mezclarlos no da error — da basura.
 index-rag-rebuild:
 	@echo "▶  Reconstruyendo el índice RAG desde cero..."
-	$(PY) -m agents run rag index --rebuild
+	uv run python -m agents run rag index --rebuild
+
+# Mide si la búsqueda encuentra lo que debería, contra
+# agents/evals/rag_golden.json. Sin esto, tocar el troceado o el embedder es
+# fe: "parece que ahora busca mejor" no es un dato.
+eval-rag:
+	@echo "▶  Evaluando la recuperación del RAG (hit_rate / recall@k / MRR)"
+	uv run python -m agents run rag evaluate
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Skills — configuración del asistente de IA
@@ -444,7 +517,6 @@ clean-all: clean clean-models clean-figures
 	rm -f reports/*.csv
 	rm -rf agents/workspace/
 	@echo "  Limpieza completa."
-
 
 
 

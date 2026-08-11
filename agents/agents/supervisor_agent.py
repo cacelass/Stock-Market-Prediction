@@ -43,10 +43,22 @@ class SupervisorAgent(BaseAgent):
         "en competición de búsqueda de papers (research) y genérico (compete)."
     )
     capabilities = [
-        "supervisor", "supervisa", "coordina", "competir", "competición",
-        "competicion", "propuesta", "arbitro", "árbitro", "elige", "compara",
-        "evalua", "evalúa", "mejor",
-        "compite", "estrategias",
+        "supervisor",
+        "supervisa",
+        "coordina",
+        "competir",
+        "competición",
+        "competicion",
+        "propuesta",
+        "arbitro",
+        "árbitro",
+        "elige",
+        "compara",
+        "evalua",
+        "evalúa",
+        "mejor",
+        "compite",
+        "estrategias",
     ]
 
     def action_aliases(self) -> dict:
@@ -63,8 +75,7 @@ class SupervisorAgent(BaseAgent):
         }
 
     # -- competición de research ---------------------------------------------
-    def research(self, *, max_results: int = 10, top_keywords: int = 8,
-                 backends: list[str] | None = None) -> AgentResult:
+    def research(self, *, max_results: int = 10, top_keywords: int = 8, backends: list[str] | None = None) -> AgentResult:
         """
         Cada backend de `research` es un worker. Corren en paralelo, cada uno
         propone su lista de papers, el supervisor las puntúa, elige la mejor y
@@ -75,7 +86,9 @@ class SupervisorAgent(BaseAgent):
         chosen = [b for b in (backends or _RESEARCH_BACKENDS) if b in _RESEARCH_BACKENDS]
         if not chosen:
             return AgentResult(
-                False, self.name, "research",
+                False,
+                self.name,
+                "research",
                 f"Ningún backend válido. Disponibles: {list(_RESEARCH_BACKENDS)}.",
             )
 
@@ -105,9 +118,10 @@ class SupervisorAgent(BaseAgent):
         ok = [p for p in proposals if p["success"]]
         if not ok:
             return AgentResult(
-                False, self.name, "research",
-                "Ningún worker devolvió resultados (¿sin red?). "
-                + "; ".join(f"{p['backend']}: {p['message']}" for p in proposals),
+                False,
+                self.name,
+                "research",
+                "Ningún worker devolvió resultados (¿sin red?). " + "; ".join(f"{p['backend']}: {p['message']}" for p in proposals),
                 data={"proposals": proposals},
             )
 
@@ -118,9 +132,10 @@ class SupervisorAgent(BaseAgent):
 
         scoreboard = ", ".join(f"{p['backend']}={p['score']}" for p in proposals)
         return AgentResult(
-            True, self.name, "research",
-            f"Ganador: '{winner['backend']}' ({scoreboard}). "
-            f"Pulido: {len(polished)} paper(s) fusionando {len(ok)} propuesta(s).",
+            True,
+            self.name,
+            "research",
+            f"Ganador: '{winner['backend']}' ({scoreboard}). Pulido: {len(polished)} paper(s) fusionando {len(ok)} propuesta(s).",
             data={
                 "winner": winner["backend"],
                 "keywords": keywords,
@@ -148,8 +163,7 @@ class SupervisorAgent(BaseAgent):
         return round(0.5 * mean_rel + 0.4 * coverage + 0.1 * volume, 4)
 
     # -- competición genérica -------------------------------------------------
-    def synthesize(self, *, perspectives: list[dict], parallel: bool = True,
-                   question: str = "") -> AgentResult:
+    def synthesize(self, *, perspectives: list[dict], parallel: bool = True, question: str = "") -> AgentResult:
         """
         Diamante (fan-out → fan-in): lanza varias perspectivas sobre lo MISMO y
         las integra en un veredicto único.
@@ -172,6 +186,7 @@ class SupervisorAgent(BaseAgent):
             return self._fail_synth("No se pasaron perspectivas.")
 
         from agents.orchestrator import Orchestrator
+
         orch = Orchestrator(context=self.ctx)
 
         def _run(p: dict) -> dict:
@@ -179,11 +194,16 @@ class SupervisorAgent(BaseAgent):
             try:
                 res = orch.run(p["agent"], p["action"], **p.get("kwargs", {}))
             except Exception as exc:  # una perspectiva rota no tumba el resto
-                return {"label": label, "agent": p.get("agent"), "success": False,
-                        "message": f"EXCEPCION: {exc}", "warnings": [], "needs": [], "data": None}
-            return {"label": label, "agent": p.get("agent"), "success": res.success,
-                    "message": res.message, "warnings": list(res.warnings),
-                    "needs": list(res.needs), "data": res.data}
+                return {"label": label, "agent": p.get("agent"), "success": False, "message": f"EXCEPCION: {exc}", "warnings": [], "needs": [], "data": None}
+            return {
+                "label": label,
+                "agent": p.get("agent"),
+                "success": res.success,
+                "message": res.message,
+                "warnings": list(res.warnings),
+                "needs": list(res.needs),
+                "data": res.data,
+            }
 
         if parallel:
             with ThreadPoolExecutor(max_workers=min(len(perspectives), 8)) as pool:
@@ -198,17 +218,21 @@ class SupervisorAgent(BaseAgent):
 
         if not ok:
             return AgentResult(
-                False, self.name, "synthesize",
+                False,
+                self.name,
+                "synthesize",
                 f"Ninguna de las {len(vistas)} perspectivas pudo responder.",
                 data={"question": question, "perspectives": vistas},
-                warnings=avisos, needs=preguntas,
+                warnings=avisos,
+                needs=preguntas,
             )
 
         consenso = "unánime" if not fallidas else f"parcial ({len(ok)}/{len(vistas)})"
         return AgentResult(
-            True, self.name, "synthesize",
-            f"{len(ok)}/{len(vistas)} perspectivas respondieron · consenso {consenso}"
-            + (f" · {len(avisos)} aviso(s)" if avisos else ""),
+            True,
+            self.name,
+            "synthesize",
+            f"{len(ok)}/{len(vistas)} perspectivas respondieron · consenso {consenso}" + (f" · {len(avisos)} aviso(s)" if avisos else ""),
             data={
                 "question": question,
                 "consensus": consenso,
@@ -238,13 +262,13 @@ class SupervisorAgent(BaseAgent):
             return AgentResult(False, self.name, "compete", "No se pasaron candidatos.")
 
         from agents.orchestrator import Orchestrator
+
         orch = Orchestrator(context=self.ctx)
 
         def _run(cand: dict) -> dict:
             label = cand.get("label") or f"{cand.get('agent')}.{cand.get('action')}"
             res = orch.run(cand["agent"], cand["action"], **cand.get("kwargs", {}))
-            return {"label": label, "success": res.success, "message": res.message,
-                    "score": self._default_score(res), "result": res}
+            return {"label": label, "success": res.success, "message": res.message, "score": self._default_score(res), "result": res}
 
         if parallel:
             with ThreadPoolExecutor(max_workers=min(len(candidates), 8)) as pool:
@@ -256,7 +280,9 @@ class SupervisorAgent(BaseAgent):
         winner = proposals[0]
         board = ", ".join(f"{p['label']}={p['score']}" for p in proposals)
         return AgentResult(
-            winner["success"], self.name, "compete",
+            winner["success"],
+            self.name,
+            "compete",
             f"Ganador: '{winner['label']}' ({board}).",
             data={
                 "winner": winner["label"],

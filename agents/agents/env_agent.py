@@ -22,13 +22,16 @@ from agents.tools.process_tool import run_command
 @register_agent
 class EnvAgent(BaseAgent):
     name = "env"
-    description = (
-        "Gestiona el entorno de desarrollo: verifica versión de Python, "
-        "sincroniza dependencias con uv, configura pre-commit hooks."
-    )
+    description = "Gestiona el entorno de desarrollo: verifica versión de Python, sincroniza dependencias con uv, configura pre-commit hooks."
     capabilities = [
-        "entorno", "environment", "uv", "python version",
-        "venv", "pre-commit", "sync", "lock",
+        "entorno",
+        "environment",
+        "uv",
+        "python version",
+        "venv",
+        "pre-commit",
+        "sync",
+        "lock",
     ]
 
     def actions(self) -> dict:
@@ -42,6 +45,7 @@ class EnvAgent(BaseAgent):
 
     def _pyproject(self) -> dict | None:
         import tomllib
+
         try:
             with open(self.ctx.pyproject_file, "rb") as f:
                 return tomllib.load(f)
@@ -56,7 +60,9 @@ class EnvAgent(BaseAgent):
         requires = pyproject.get("project", {}).get("requires-python", "")
         current = f"{sys.version_info.major}.{sys.version_info.minor}"
         return AgentResult(
-            True, self.name, "check_python_version",
+            True,
+            self.name,
+            "check_python_version",
             f"Python {current} (requiere {requires})",
             data={"current": current, "required": requires},
             warnings=[] if not requires or current in requires else [f"Python {current} no está en el rango {requires}"],
@@ -79,7 +85,9 @@ class EnvAgent(BaseAgent):
         if result.ok:
             return AgentResult(True, self.name, "check_lock_sync", "pyproject.toml y uv.lock están sincronizados.")
         return AgentResult(
-            False, self.name, "check_lock_sync",
+            False,
+            self.name,
+            "check_lock_sync",
             f"uv.lock desincronizado: {result.stderr.strip()}. Ejecuta 'uv lock' para actualizarlo.",
         )
 

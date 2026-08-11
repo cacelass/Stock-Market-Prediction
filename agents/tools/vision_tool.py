@@ -46,10 +46,7 @@ class VisionTool:
     def list_figures(figures_dir: Path) -> list[Path]:
         if not figures_dir.exists():
             return []
-        return sorted(
-            p for p in figures_dir.iterdir()
-            if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
-        )
+        return sorted(p for p in figures_dir.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS)
 
     @staticmethod
     def inspect(image_path: Path) -> FigureMetrics:
@@ -70,8 +67,12 @@ class VisionTool:
             array = mpimg.imread(image_path)
         except Exception as exc:  # noqa: BLE001 — cualquier fallo de lectura es "no se pudo inspeccionar"
             return FigureMetrics(
-                path=image_path, width=0, height=0, aspect_ratio=0.0,
-                pixel_std=0.0, mostly_blank=False,
+                path=image_path,
+                width=0,
+                height=0,
+                aspect_ratio=0.0,
+                pixel_std=0.0,
+                mostly_blank=False,
                 warnings=[f"No se pudo leer la imagen: {exc}"],
             )
 
@@ -84,18 +85,17 @@ class VisionTool:
         # suele ser una figura vacía o un fondo liso sin datos dibujados.
         mostly_blank = pixel_std < 0.02
         if mostly_blank:
-            warnings.append(
-                f"Varianza de píxeles muy baja ({pixel_std:.4f}) — la figura podría "
-                f"estar vacía o no haberse renderizado correctamente."
-            )
+            warnings.append(f"Varianza de píxeles muy baja ({pixel_std:.4f}) — la figura podría estar vacía o no haberse renderizado correctamente.")
 
         if not (0.5 <= aspect_ratio <= 3.0):
-            warnings.append(
-                f"Aspect ratio inusual ({aspect_ratio}) — revisa figsize en la "
-                f"función que generó '{image_path.name}'."
-            )
+            warnings.append(f"Aspect ratio inusual ({aspect_ratio}) — revisa figsize en la función que generó '{image_path.name}'.")
 
         return FigureMetrics(
-            path=image_path, width=width, height=height, aspect_ratio=aspect_ratio,
-            pixel_std=round(pixel_std, 5), mostly_blank=mostly_blank, warnings=warnings,
+            path=image_path,
+            width=width,
+            height=height,
+            aspect_ratio=aspect_ratio,
+            pixel_std=round(pixel_std, 5),
+            mostly_blank=mostly_blank,
+            warnings=warnings,
         )

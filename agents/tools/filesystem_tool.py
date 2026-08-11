@@ -28,9 +28,7 @@ class FilesystemTool:
         try:
             full.relative_to(self.root.resolve())
         except ValueError:
-            raise PathEscapesRootError(
-                f"'{relative_or_absolute}' queda fuera de la raíz del proyecto ({self.root})."
-            ) from None
+            raise PathEscapesRootError(f"'{relative_or_absolute}' queda fuera de la raíz del proyecto ({self.root}).") from None
         return full
 
     def read_text(self, path: str | Path, *, encoding: str = "utf-8") -> str:
@@ -56,10 +54,7 @@ class FilesystemTool:
 
     def find_files(self, *, extensions: tuple[str, ...], within: str | Path = ".") -> list[Path]:
         base = self._resolve(within)
-        return sorted(
-            p for p in base.rglob("*")
-            if p.is_file() and p.suffix.lower() in extensions and "__pycache__" not in p.parts
-        )
+        return sorted(p for p in base.rglob("*") if p.is_file() and p.suffix.lower() in extensions and "__pycache__" not in p.parts)
 
     def ensure_dir(self, path: str | Path) -> Path:
         target = self._resolve(path)

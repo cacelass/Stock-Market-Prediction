@@ -40,9 +40,7 @@ class DataIOTool:
             return pd.read_parquet(path, **kwargs)
         except ImportError as exc:
             raise MissingDependencyError(
-                "Leer Parquet requiere 'pyarrow'. Este extra se instala con "
-                "use_duckdb=true en copier.yml, o añádelo manualmente: "
-                "uv add pyarrow"
+                "Leer Parquet requiere 'pyarrow'. Este extra se instala con use_duckdb=true en copier.yml, o añádelo manualmente: uv add pyarrow"
             ) from exc
 
     @staticmethod

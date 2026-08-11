@@ -17,14 +17,14 @@
       ]
     },
     "explorer": {
-      "description": "Arnés: investiga el proyecto en solo lectura y devuelve un informe corto en progress/. No modifica nada.",
+      "description": "Arnés: investiga el proyecto en solo lectura y devuelve un informe corto en harness/progress/. No modifica nada.",
       "mode": "subagent",
       "instructions": [
         ".opencode/agents/explorer.md"
       ]
     },
     "implementer": {
-      "description": "Arnés: implementa UNA feature del backlog con tests y deja la evidencia en progress/. Lo lanza el líder, no se usa suelto.",
+      "description": "Arnés: implementa UNA feature del backlog con tests y deja la evidencia en harness/progress/. Lo lanza el líder, no se usa suelto.",
       "mode": "subagent",
       "instructions": [
         ".opencode/agents/implementer.md"

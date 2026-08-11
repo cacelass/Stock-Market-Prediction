@@ -12,7 +12,7 @@ data/raw/     data/processed/ → data/interim/
 |------|---------|----------|--------|
 | Ingesta | `make data` | `make_dataset.py`: carga raw, limpia, escribe processed | `data` (EDA, calidad) |
 | Features | `make features` | `build_features.py`: split, escala, codifica, LOGCOLS | `data` (skewness, correlaciones) |
-
+ | Exploración SQL | `make query` | DuckDB shell sobre `data/raw/` | `data` (list_datasets) |
 
 ## Paths
 - `data/raw/` — datos crudos (inmutables)

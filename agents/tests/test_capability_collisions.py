@@ -22,9 +22,6 @@ def test_every_capability_keyword_routes_to_its_own_agent(context):
         for keyword in instance.capabilities:
             decision = orchestrator.select_agent(keyword)
             if decision.agent_name != owner_name:
-                problems.append(
-                    f"'{keyword}' (de '{owner_name}') enrutó a '{decision.agent_name}' "
-                    f"en vez de a su propio agente. Candidatos: {decision.candidates}"
-                )
+                problems.append(f"'{keyword}' (de '{owner_name}') enrutó a '{decision.agent_name}' en vez de a su propio agente. Candidatos: {decision.candidates}")
 
     assert not problems, "Colisiones de capabilities encontradas:\n" + "\n".join(problems)

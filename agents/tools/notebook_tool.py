@@ -77,9 +77,7 @@ class NotebookTool:
 
                 if output_type == "error":
                     entry["errored"] = True
-                    entry["text_outputs"].append(
-                        f"[ERROR] {output.get('ename', '')}: {output.get('evalue', '')}"
-                    )
+                    entry["text_outputs"].append(f"[ERROR] {output.get('ename', '')}: {output.get('evalue', '')}")
                     continue
 
                 if output_type == "stream":
@@ -104,10 +102,7 @@ class NotebookTool:
                         entry["text_outputs"].append(_join_source(text_plain)[:MAX_TEXT_CHARS])
 
                     if "text/html" in data and not text_plain:
-                        entry["text_outputs"].append(
-                            "[salida HTML disponible (probablemente una tabla) — "
-                            "no se incluye el HTML completo aquí]"
-                        )
+                        entry["text_outputs"].append("[salida HTML disponible (probablemente una tabla) — no se incluye el HTML completo aquí]")
 
             if entry["text_outputs"] or entry["image_paths"] or entry["errored"]:
                 manifest.append(entry)

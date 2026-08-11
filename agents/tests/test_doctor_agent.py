@@ -15,9 +15,7 @@ def doctor_context(tmp_path):
     (tmp_path / "mi_paquete" / "utils" / "__init__.py").write_text("")
     (tmp_path / "tests").mkdir()
     (tmp_path / "data" / "raw").mkdir(parents=True)
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "mi_paquete"\nrequires-python = ">=3.10"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "mi_paquete"\nrequires-python = ">=3.10"\n')
     return SharedContext(root=tmp_path, config=ProjectConfig(project_slug="mi_paquete"))
 
 

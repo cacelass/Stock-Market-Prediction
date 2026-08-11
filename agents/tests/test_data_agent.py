@@ -67,6 +67,7 @@ def test_suggest_imputation_with_nulls(data_context):
 def test_detect_skewness(data_context):
     csv = data_context.root / "data" / "raw" / "skew.csv"
     import numpy as np
+
     rng = np.random.default_rng(42)
     low_skew = rng.normal(0, 1, 100)
     high_skew = rng.exponential(1, 100)

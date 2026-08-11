@@ -42,8 +42,7 @@ class MLflowTool:
             from mlflow.tracking import MlflowClient
         except ImportError as exc:
             raise MissingDependencyError(
-                "mlflow no está instalado. Si tu proyecto se generó con use_mlflow=true, "
-                "instálalo con: uv sync --extra mlflow_tracking"
+                "mlflow no está instalado. Si tu proyecto se generó con use_mlflow=true, instálalo con: uv sync --extra mlflow_tracking"
             ) from exc
         return MlflowClient()
 
@@ -55,13 +54,14 @@ class MLflowTool:
         if experiment is None:
             return None
 
-        runs = client.search_runs(
-            experiment_ids=[experiment.experiment_id], order_by=["start_time DESC"], max_results=max_results
-        )
+        runs = client.search_runs(experiment_ids=[experiment.experiment_id], order_by=["start_time DESC"], max_results=max_results)
         return [
             RunSummary(
-                run_id=run.info.run_id, status=run.info.status, start_time=run.info.start_time,
-                metrics=dict(run.data.metrics), params=dict(run.data.params),
+                run_id=run.info.run_id,
+                status=run.info.status,
+                start_time=run.info.start_time,
+                metrics=dict(run.data.metrics),
+                params=dict(run.data.params),
             )
             for run in runs
         ]
@@ -71,6 +71,4 @@ class MLflowTool:
         candidates = [r for r in runs if metric in r.metrics]
         if not candidates:
             return None
-        return max(candidates, key=lambda r: r.metrics[metric]) if higher_is_better else min(
-            candidates, key=lambda r: r.metrics[metric]
-        )
+        return max(candidates, key=lambda r: r.metrics[metric]) if higher_is_better else min(candidates, key=lambda r: r.metrics[metric])

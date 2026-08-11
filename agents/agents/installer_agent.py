@@ -25,10 +25,7 @@ from agents.tools.agent_installer_tool import AgentInstallerTool
 @register_agent
 class InstallerAgent(BaseAgent):
     name = "installer"
-    description = (
-        "Instala agentes externos (por URL de git o ruta local) en agents/external/, "
-        "valida su estructura y confirma que quedan registrados y funcionando."
-    )
+    description = "Instala agentes externos (por URL de git o ruta local) en agents/external/, valida su estructura y confirma que quedan registrados y funcionando."
     capabilities = ["instalar agente", "clonar agente", "agente externo", "añadir agente", "installer"]
 
     def actions(self) -> dict:
@@ -71,10 +68,7 @@ class InstallerAgent(BaseAgent):
         registered = candidate.declared_name in agent_registry.all() if candidate.declared_name else False
 
         warnings = list(candidate.warnings)
-        warnings.append(
-            "SEGURIDAD: este código se ejecutó al importarse para verificar el registro. "
-            "Revísalo tú mismo si el origen no es de completa confianza."
-        )
+        warnings.append("SEGURIDAD: este código se ejecutó al importarse para verificar el registro. Revísalo tú mismo si el origen no es de completa confianza.")
         if not registered:
             warnings.append(
                 "No se pudo confirmar el registro automáticamente (no se detectó 'name = \"...\"' "
@@ -83,7 +77,9 @@ class InstallerAgent(BaseAgent):
             )
 
         return AgentResult(
-            True, self.name, "install",
+            True,
+            self.name,
+            "install",
             f"Agente instalado en '{installed_path}'"
             + (f" y registrado como '{candidate.declared_name}'." if registered else " (registro sin confirmar, ver warnings)."),
             data={"installed_path": str(installed_path), "declared_name": candidate.declared_name, "registered": registered},
@@ -127,17 +123,16 @@ class InstallerAgent(BaseAgent):
 
     def list_installed(self) -> AgentResult:
         external_dir = self.ctx.root / "agents" / "external"
-        files = [
-            p.name for p in external_dir.glob("*.py")
-            if p.name not in ("__init__.py",) and not p.name.startswith("_")
-        ]
+        files = [p.name for p in external_dir.glob("*.py") if p.name not in ("__init__.py",) and not p.name.startswith("_")]
         return AgentResult(True, self.name, "list_installed", f"{len(files)} agente(s) externo(s) instalado(s).", data=files)
 
     def verify(self, *, agent_name: str) -> AgentResult:
         agent_registry.discover(force=True)
         if agent_name not in agent_registry.all():
             return AgentResult(
-                False, self.name, "verify",
+                False,
+                self.name,
+                "verify",
                 f"'{agent_name}' no está registrado. Revisa que el archivo esté en agents/external/ o agents/agents/ "
                 f"y que la clase tenga @register_agent con name='{agent_name}'.",
             )

@@ -29,12 +29,15 @@ def test_agent_result_bool_equals_success(success: bool, message: str):
     n_warnings=st.integers(min_value=0, max_value=5),
 )
 def test_agent_result_repr_roundtrip(
-    success: bool, agent: str, action: str, message: str,
-    data: Any, n_warnings: int,
+    success: bool,
+    agent: str,
+    action: str,
+    message: str,
+    data: Any,
+    n_warnings: int,
 ):
     warnings = [f"w{i}" for i in range(n_warnings)]
-    r = AgentResult(success=success, agent=agent, action=action,
-                    message=message, data=data, warnings=warnings)
+    r = AgentResult(success=success, agent=agent, action=action, message=message, data=data, warnings=warnings)
     status = "OK" if success else "FAIL"
     assert status in repr(r)
     assert agent in repr(r)
@@ -136,7 +139,9 @@ class _ActionAgent(BaseAgent):
 @given(
     action_names=st.lists(
         st.from_regex(r"[a-z]+(_[a-z]+)*", fullmatch=True).filter(lambda s: len(s) > 0),
-        min_size=1, max_size=10, unique=True,
+        min_size=1,
+        max_size=10,
+        unique=True,
     ),
     query=st.text(max_size=100),
 )
@@ -174,12 +179,14 @@ def test_best_action_finds_exact_word_match(action_name: str):
     collaborates=st.lists(st.text(min_size=1, max_size=100), min_size=0, max_size=10),
 )
 def test_contract_roundtrip_via_as_dict(
-    role: str, can: list[str], cannot: list[str],
-    needs: list[str], owns: list[str], collaborates: list[str],
+    role: str,
+    can: list[str],
+    cannot: list[str],
+    needs: list[str],
+    owns: list[str],
+    collaborates: list[str],
 ):
-    c = Contract(role=role, can=tuple(can), cannot=tuple(cannot),
-                 needs=tuple(needs), owns=tuple(owns),
-                 collaborates=tuple(collaborates))
+    c = Contract(role=role, can=tuple(can), cannot=tuple(cannot), needs=tuple(needs), owns=tuple(owns), collaborates=tuple(collaborates))
     d = c.as_dict()
     assert d["role"] == role
     assert d["can"] == list(can)
@@ -215,6 +222,5 @@ def test_agent_result_message_preserved(name: str, agent: str, action: str):
 @given(n=st.integers(min_value=0, max_value=20))
 def test_agent_result_warnings_list(n: int):
     warnings = [f"w{i}" for i in range(n)]
-    r = AgentResult(success=True, agent="a", action="b",
-                    message="m", warnings=warnings)
+    r = AgentResult(success=True, agent="a", action="b", message="m", warnings=warnings)
     assert len(r.warnings) == n

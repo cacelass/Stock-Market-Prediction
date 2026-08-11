@@ -53,11 +53,13 @@ def test_parent_summaries_respects_min_children():
 
 def test_prune_by_type_and_isolated():
     pruned, stats = GraphifyTool.prune(
-        _sample_graph(), node_types=["reference"], drop_isolated=True,
+        _sample_graph(),
+        node_types=["reference"],
+        drop_isolated=True,
     )
     remaining_ids = {n["id"] for n in pruned["nodes"]}
     assert "ref1" not in remaining_ids  # quitado por tipo
-    assert "iso" not in remaining_ids   # quitado por aislado
+    assert "iso" not in remaining_ids  # quitado por aislado
     assert stats["nodes_removed"] == 2
     assert stats["edges_removed"] == 2
     assert stats["nodes_remaining"] == 4
@@ -85,8 +87,11 @@ def test_save_graph_writes_backup(tmp_path: Path):
 
 def test_obsidian_note_has_frontmatter_and_body():
     note = GraphifyTool.obsidian_note(
-        "Mi Nota", tags=["knowledge", "knowledge/papers"],
-        body="> [!info] Hola\n> cuerpo", aliases=["Alias"], cssclasses=["c1"],
+        "Mi Nota",
+        tags=["knowledge", "knowledge/papers"],
+        body="> [!info] Hola\n> cuerpo",
+        aliases=["Alias"],
+        cssclasses=["c1"],
     )
     assert note.startswith("---\ntitle: Mi Nota\n")
     assert "tags:\n  - knowledge\n  - knowledge/papers" in note
@@ -109,6 +114,7 @@ def test_knowledge_base_is_valid_yaml():
 def _has_yaml() -> bool:
     try:
         import yaml  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -138,14 +144,14 @@ def test_prune_isolated_only_keeps_connected(tmp_path: Path):
     }
     pruned, stats = GraphifyTool.prune(graph, drop_isolated=True)
     ids = {n["id"] for n in pruned["nodes"]}
-    assert "lonely" not in ids           # sin aristas → fuera
-    assert {"a", "b"} <= ids             # conectados → se quedan
+    assert "lonely" not in ids  # sin aristas → fuera
+    assert {"a", "b"} <= ids  # conectados → se quedan
     assert stats["isolated_removed"] == 1
 
 
 def test_detect_obsidian_vaults(tmp_path: Path):
-    (tmp_path / "knowledge" / ".obsidian").mkdir(parents=True)
+    (tmp_path / "docs" / "vault" / ".obsidian").mkdir(parents=True)
     (tmp_path / ".venv" / "junk" / ".obsidian").mkdir(parents=True)  # debe ignorarse
     vaults = GraphifyTool.detect_obsidian_vaults(tmp_path)
-    assert tmp_path / "knowledge" in vaults
+    assert tmp_path / "docs" / "vault" in vaults
     assert all(".venv" not in str(v) for v in vaults)

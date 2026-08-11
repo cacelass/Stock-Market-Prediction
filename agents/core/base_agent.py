@@ -42,10 +42,7 @@ def _fold(text: str) -> str:
     # ñ no es una "n con adorno", es otra letra — "año" y "ano" no son la
     # misma palabra, y un agente no debería creer que sí.
     protected = text.lower().replace("ñ", "\0")
-    folded = "".join(
-        ch for ch in unicodedata.normalize("NFD", protected)
-        if unicodedata.category(ch) != "Mn"
-    )
+    folded = "".join(ch for ch in unicodedata.normalize("NFD", protected) if unicodedata.category(ch) != "Mn")
     return folded.replace("\0", "ñ")
 
 
@@ -65,6 +62,13 @@ class AgentResult:
     # información" del sistema (lo usa PlanAgent, y cualquier agente puede
     # usarlo igual).
     needs: list[str] = field(default_factory=list)
+    # Qué de seguro está el agente de su propio resultado, 0..1 (idea `μ.cert`
+    # del codec trasgo). El default es 1.0: un agente determinista que ejecutó
+    # la herramienta y la vio responder no tiene motivo para dudar. Quien lo
+    # baje es el que sabe — el ruteo heurístico con confianza baja, el
+    # reviewer que no le convence el diff. `harness.finish` la usa como puerta:
+    # un `done` con certeza baja es una ronda que iba a fallar.
+    certainty: float = 1.0
 
     def __bool__(self) -> bool:
         return self.success
@@ -109,17 +113,37 @@ class BaseAgent(ABC):
         delegate_to) queda registrada en el log de auditoría
         (`agents/workspace/audit/audit.jsonl`, ver `agents/audit.py`) — es
         la base para medir y mejorar a los agentes con el agente `audit`.
+
+        Y es también la puerta: las acciones que el contrato del agente marca
+        como destructivas no se ejecutan por aquí sin `confirm=True` (ver
+        `agents/permissions.py`). Este es el camino de los automatismos; el
+        que se salta la puerta —llamar al método directo— es el de una
+        persona escribiendo Python a propósito.
         """
         import time
 
-        from agents import audit
+        from agents import audit, permissions, redaction
 
         available = self.actions()
         if action not in available:
-            raise ActionNotSupportedError(
-                f"El agente '{self.name}' no soporta la acción '{action}'. "
-                f"Acciones disponibles: {sorted(available)}"
+            raise ActionNotSupportedError(f"El agente '{self.name}' no soporta la acción '{action}'. Acciones disponibles: {sorted(available)}")
+
+        confirmado = bool(kwargs.pop("confirm", False))
+        if not confirmado and permissions.requiere_confirmacion(self.name, action, kwargs):
+            mensaje, needs = permissions.peticion(self.name, action, kwargs)
+            # Se audita: lo que un agente INTENTÓ hacer y no se le dejó es
+            # justo el dato que hace falta para saber si la puerta estorba o
+            # está salvando el repositorio.
+            audit.record(
+                self.ctx,
+                agent=self.name,
+                action=action,
+                success=False,
+                duration_ms=0.0,
+                message="bloqueado: falta confirmación",
+                kwarg_names=sorted(kwargs),
             )
+            return AgentResult(False, self.name, action, mensaje, needs=needs)
 
         start = time.perf_counter()
         try:
@@ -129,18 +153,32 @@ class BaseAgent(ABC):
             # del módulo), pero si ocurre, se audita igualmente antes de
             # propagarla — un fallo no auditado es invisible para `audit`.
             audit.record(
-                self.ctx, agent=self.name, action=action, success=False,
+                self.ctx,
+                agent=self.name,
+                action=action,
+                success=False,
                 duration_ms=(time.perf_counter() - start) * 1000,
-                message="excepción no controlada", error=f"{type(exc).__name__}: {exc}",
+                message="excepción no controlada",
+                error=f"{type(exc).__name__}: {exc}",
                 kwarg_names=sorted(kwargs),
             )
             raise
 
+        # Se redacta ANTES de auditar y de devolver: el `message` va a la
+        # ventana del modelo y a un fichero en disco, y ninguno de los dos es
+        # sitio para una credencial (ver agents/redaction.py).
+        redaction.redactar_resultado(result)
+
         audit.record(
-            self.ctx, agent=self.name, action=action, success=result.success,
+            self.ctx,
+            agent=self.name,
+            action=action,
+            success=result.success,
             duration_ms=(time.perf_counter() - start) * 1000,
-            message=result.message, warnings=len(result.warnings),
+            message=result.message,
+            warnings=len(result.warnings or ()),
             kwarg_names=sorted(kwargs),
+            certainty=getattr(result, "certainty", None),
         )
         return cast(AgentResult, result)
 

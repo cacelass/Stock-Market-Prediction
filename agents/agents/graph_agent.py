@@ -22,9 +22,17 @@ class GraphAgent(BaseAgent):
         "bordes blancos excesivos y archivos demasiado grandes."
     )
     capabilities = [
-        "grafico", "grafico", "figura", "plot", "reports/figures",
-        "visualizacion", "chart", "resolucion", "calidad imagen",
-        "figuras", "figuras del reporte",
+        "grafico",
+        "grafico",
+        "figura",
+        "plot",
+        "reports/figures",
+        "visualizacion",
+        "chart",
+        "resolucion",
+        "calidad imagen",
+        "figuras",
+        "figuras del reporte",
     ]
 
     def actions(self) -> dict:
@@ -36,7 +44,9 @@ class GraphAgent(BaseAgent):
     def list_figures(self) -> AgentResult:
         figures = VisionTool.list_figures(self.ctx.figures_dir)
         return AgentResult(
-            True, self.name, "list_figures",
+            True,
+            self.name,
+            "list_figures",
             f"{len(figures)} figura(s) en {self.ctx.figures_dir.relative_to(self.ctx.root)}.",
             data=[str(p.name) for p in figures],
         )
@@ -45,7 +55,9 @@ class GraphAgent(BaseAgent):
         figures = VisionTool.list_figures(self.ctx.figures_dir)
         if not figures:
             return AgentResult(
-                True, self.name, "audit_figures",
+                True,
+                self.name,
+                "audit_figures",
                 "No hay figuras en reports/figures/ todavía (ejecuta 'make train' o 'make pipeline' primero).",
                 data=[],
             )
@@ -75,7 +87,7 @@ class GraphAgent(BaseAgent):
                 entry["warnings"].append(f"Archivo grande ({entry['size_kb'] / 1024:.1f} MB)")
 
             # Aspect ratio extremo (muy panorámico o muy vertical)
-            if metrics.aspect_ratio > 0 and abs(metrics.aspect_ratio - 4/3) > 2.0:
+            if metrics.aspect_ratio > 0 and abs(metrics.aspect_ratio - 4 / 3) > 2.0:
                 entry["warnings"].append(f"Aspect ratio inusual ({metrics.aspect_ratio:.2f}:1) — posible borde blanco")
 
             results.append(entry)
@@ -83,7 +95,10 @@ class GraphAgent(BaseAgent):
 
         n_flagged = sum(1 for r in results if r["warnings"])
         return AgentResult(
-            True, self.name, "audit_figures",
+            True,
+            self.name,
+            "audit_figures",
             f"{len(results)} figura(s) analizada(s), {n_flagged} con avisos.",
-            data=results, warnings=all_warnings,
+            data=results,
+            warnings=all_warnings,
         )

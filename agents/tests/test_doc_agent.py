@@ -6,6 +6,7 @@ from __future__ import annotations
 # Se conservo la implementacion de docsearch (no cachea los fallos) y se
 # trajeron sus acciones de navegacion.
 
+
 def test_graph_query_falla_sin_grafo(context):
     from agents.agents.doc_agent import DocAgent
 

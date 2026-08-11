@@ -17,6 +17,7 @@ universal para cualquier problema o métrica.
 | `run ml inspect_model` | `--model_name` (obligatorio) |
 | `run ml feature_importance` | `--model_name` (obligatorio) · `--feature_names` |
 | `run ml check_overfitting` | `--train_score`, `--test_score` (obligatorio) · `--gap_threshold` |
+| `run ml analyze_optuna` | — |
 | `run ml model_comparison` | — |
 
 ## Límites

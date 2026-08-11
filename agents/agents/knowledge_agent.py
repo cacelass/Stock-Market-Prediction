@@ -58,8 +58,16 @@ class KnowledgeAgent(BaseAgent):
         "padre con la correlación entre sus hijos, y mantiene el grafo al día."
     )
     capabilities = [
-        "conocimiento", "knowledge", "grafo", "graph", "graphify", "obsidian",
-        "boveda", "vault", "nodo padre", "resumen del grafo",
+        "conocimiento",
+        "knowledge",
+        "grafo",
+        "graph",
+        "graphify",
+        "obsidian",
+        "boveda",
+        "vault",
+        "nodo padre",
+        "resumen del grafo",
         "sincroniza el grafo",
     ]
 
@@ -110,18 +118,14 @@ class KnowledgeAgent(BaseAgent):
 
         warnings = []
         if not available:
-            warnings.append(
-                "graphify no está instalado. Ejecuta el skill /graphify una vez "
-                "para instalarlo y construir el grafo inicial."
-            )
+            warnings.append("graphify no está instalado. Ejecuta el skill /graphify una vez para instalarlo y construir el grafo inicial.")
         if not vaults:
-            warnings.append(
-                "No se detectó ninguna bóveda de Obsidian. Ejecuta "
-                "'knowledge setup_vault' para crear una con estructura de árbol."
-            )
+            warnings.append("No se detectó ninguna bóveda de Obsidian. Ejecuta 'knowledge setup_vault' para crear una con estructura de árbol.")
 
         return AgentResult(
-            available or graph_exists, self.name, "status",
+            available or graph_exists,
+            self.name,
+            "status",
             f"graphify {'disponible' if available else 'no instalado'}; "
             f"grafo con {n_nodes} nodo(s)/{n_edges} arista(s); "
             f"{len(vaults)} bóveda(s) Obsidian; {n_cache} entrada(s) en caché.",
@@ -141,7 +145,7 @@ class KnowledgeAgent(BaseAgent):
         """
         Detecta la bóveda de Obsidian del proyecto. Si no hay ninguna y
         ``create_if_missing`` es True, crea una en ``vault_dir`` (por defecto
-        ``knowledge/``) con la estructura de árbol adaptada al grafo.
+        ``docs/vault/``) con la estructura de árbol adaptada al grafo.
 
         Es la respuesta determinista a "¿existe alguna carpeta de obsidian?":
         si existe, la reutiliza; si no, la construye.
@@ -150,17 +154,21 @@ class KnowledgeAgent(BaseAgent):
         existing = GraphifyTool.detect_obsidian_vaults(root)
         if existing and vault_dir is None:
             return AgentResult(
-                True, self.name, "setup_vault",
+                True,
+                self.name,
+                "setup_vault",
                 f"Ya existe {len(existing)} bóveda(s) de Obsidian: "
                 f"{', '.join(str(v.relative_to(root)) for v in existing)}. "
                 f"Se reutilizará(n) — no hace falta crear otra.",
                 data={"vaults": [str(v) for v in existing], "created": False},
             )
 
-        target = (root / (vault_dir or "knowledge")).resolve()
+        target = (root / (vault_dir or "docs/vault")).resolve()
         if not create_if_missing and not (target / ".obsidian").exists():
             return AgentResult(
-                False, self.name, "setup_vault",
+                False,
+                self.name,
+                "setup_vault",
                 f"No hay bóveda en {target} y create_if_missing=False.",
             )
 
@@ -181,7 +189,9 @@ class KnowledgeAgent(BaseAgent):
                 )
                 note.write_text(
                     GraphifyTool.obsidian_note(
-                        folder, tags=["knowledge", f"knowledge/{folder}"], body=body,
+                        folder,
+                        tags=["knowledge", f"knowledge/{folder}"],
+                        body=body,
                     ),
                     encoding="utf-8",
                 )
@@ -190,9 +200,7 @@ class KnowledgeAgent(BaseAgent):
         # MOC raíz: índice de la bóveda desde el que se navega el árbol.
         moc = target / "00-index" / "MOC.md"
         if not moc.exists():
-            tree_links = "\n".join(
-                f"- [[{f}/README|{f}]] — {p}" for f, p in _VAULT_TREE.items()
-            )
+            tree_links = "\n".join(f"- [[{f}/README|{f}]] — {p}" for f, p in _VAULT_TREE.items())
             body = (
                 "> [!abstract] Mapa de contenido\n"
                 "> Bóveda generada por el `knowledge` agent de dskit. El grafo de "
@@ -205,8 +213,11 @@ class KnowledgeAgent(BaseAgent):
             )
             moc.write_text(
                 GraphifyTool.obsidian_note(
-                    "Mapa de contenido", tags=["knowledge", "moc"],
-                    body=body, aliases=["MOC", "Índice"], cssclasses=["knowledge-moc"],
+                    "Mapa de contenido",
+                    tags=["knowledge", "moc"],
+                    body=body,
+                    aliases=["MOC", "Índice"],
+                    cssclasses=["knowledge-moc"],
                 ),
                 encoding="utf-8",
             )
@@ -219,7 +230,8 @@ class KnowledgeAgent(BaseAgent):
         if not skills_note.exists():
             skills_note.write_text(
                 GraphifyTool.obsidian_note(
-                    "obsidian-skills", tags=["knowledge", "reference"],
+                    "obsidian-skills",
+                    tags=["knowledge", "reference"],
                     body=(
                         "> [!quote] Convención de esta bóveda\n"
                         "> Las notas siguen [Obsidian Flavored Markdown](https://github.com/kepano/obsidian-skills) "
@@ -235,9 +247,10 @@ class KnowledgeAgent(BaseAgent):
             )
 
         return AgentResult(
-            True, self.name, "setup_vault",
-            f"Bóveda creada en {target.relative_to(root)} con {len(created_dirs)} "
-            f"carpeta(s) de árbol: {', '.join(created_dirs)}.",
+            True,
+            self.name,
+            "setup_vault",
+            f"Bóveda creada en {target.relative_to(root)} con {len(created_dirs)} carpeta(s) de árbol: {', '.join(created_dirs)}.",
             data={"vault": str(target), "tree": created_dirs, "created": True},
         )
 
@@ -250,7 +263,9 @@ class KnowledgeAgent(BaseAgent):
         root = self.ctx.root
         if not GraphifyTool.is_available(root):
             return AgentResult(
-                False, self.name, "build",
+                False,
+                self.name,
+                "build",
                 "graphify no está instalado. Ejecuta el skill /graphify una vez primero.",
             )
 
@@ -283,10 +298,7 @@ class KnowledgeAgent(BaseAgent):
                 except FileNotFoundError as exc:
                     warnings.append(str(exc))
             else:
-                warnings.append(
-                    "No hay bóveda de Obsidian — se omitió la exportación. "
-                    "Ejecuta 'knowledge setup_vault' para crear una."
-                )
+                warnings.append("No hay bóveda de Obsidian — se omitió la exportación. Ejecuta 'knowledge setup_vault' para crear una.")
 
         graph_stats = {}
         if GraphifyTool.graph_exists(root):
@@ -300,8 +312,12 @@ class KnowledgeAgent(BaseAgent):
         if exported_to:
             msg += f" Exportado a Obsidian en {exported_to}."
         return AgentResult(
-            True, self.name, "build", msg,
-            data={"graph": graph_stats, "obsidian": exported_to}, warnings=warnings,
+            True,
+            self.name,
+            "build",
+            msg,
+            data={"graph": graph_stats, "obsidian": exported_to},
+            warnings=warnings,
         )
 
     def build_and_index(self, *, vault_dir: str | None = None) -> AgentResult:
@@ -310,6 +326,7 @@ class KnowledgeAgent(BaseAgent):
         rag_msg = None
         try:
             from agents.tools.rag_tool import RagTool
+
             if RagTool.available():
                 rag_result = RagTool.index_project(self.ctx.root)
                 if "error" not in rag_result:
@@ -325,7 +342,10 @@ class KnowledgeAgent(BaseAgent):
         if rag_msg:
             msg += f" | {rag_msg}"
         return AgentResult(
-            build_result.success, self.name, "build_and_index", msg,
+            build_result.success,
+            self.name,
+            "build_and_index",
+            msg,
             data={"build": build_result.data, "rag": rag_msg},
             warnings=build_result.warnings,
         )
@@ -339,7 +359,9 @@ class KnowledgeAgent(BaseAgent):
         root = self.ctx.root
         if not GraphifyTool.graph_exists(root):
             return AgentResult(
-                False, self.name, "summarize_parents",
+                False,
+                self.name,
+                "summarize_parents",
                 "No hay grafo (graphify-out/graph.json). Ejecuta 'knowledge build' primero.",
             )
         self._cache_dir()
@@ -364,14 +386,18 @@ class KnowledgeAgent(BaseAgent):
 
         if not summaries:
             return AgentResult(
-                True, self.name, "summarize_parents",
+                True,
+                self.name,
+                "summarize_parents",
                 f"Ningún nodo tiene ≥{min_children} hijos — el grafo es plano o pequeño.",
                 data=[],
             )
 
         lines = [f"{s['label']}: {s['summary']}" for s in summaries[:top]]
         return AgentResult(
-            True, self.name, "summarize_parents",
+            True,
+            self.name,
+            "summarize_parents",
             f"{len(summaries)} nodo(s) padre resumido(s):\n" + "\n".join(lines),
             data=summaries,
         )
@@ -385,7 +411,9 @@ class KnowledgeAgent(BaseAgent):
         root = self.ctx.root
         if not GraphifyTool.graph_exists(root) and not GraphifyTool.is_available(root):
             return AgentResult(
-                True, self.name, "sync",
+                True,
+                self.name,
+                "sync",
                 "No hay grafo ni graphify instalado — nada que sincronizar.",
                 data={"skipped": True},
             )
@@ -410,7 +438,9 @@ class KnowledgeAgent(BaseAgent):
             return guard
         if not node_types and not node_ids and not drop_isolated:
             return AgentResult(
-                False, self.name, "prune",
+                False,
+                self.name,
+                "prune",
                 "Indica qué podar: node_types=['reference'], node_ids=[...] o drop_isolated=True.",
             )
         try:
@@ -419,12 +449,17 @@ class KnowledgeAgent(BaseAgent):
             return AgentResult(False, self.name, "prune", f"No se pudo leer el grafo: {exc}")
 
         pruned, stats = GraphifyTool.prune(
-            graph, node_types=node_types, node_ids=node_ids, drop_isolated=drop_isolated,
+            graph,
+            node_types=node_types,
+            node_ids=node_ids,
+            drop_isolated=drop_isolated,
         )
 
         if dry_run:
             return AgentResult(
-                True, self.name, "prune",
+                True,
+                self.name,
+                "prune",
                 f"[dry-run] Se quitarían {stats['nodes_removed']} nodo(s) y "
                 f"{stats['edges_removed']} arista(s) "
                 f"(quedarían {stats['nodes_remaining']} nodos). "
@@ -435,7 +470,9 @@ class KnowledgeAgent(BaseAgent):
 
         GraphifyTool.save_graph(self.ctx.root, pruned, backup=True)
         return AgentResult(
-            True, self.name, "prune",
+            True,
+            self.name,
+            "prune",
             f"Grafo podado: -{stats['nodes_removed']} nodo(s), "
             f"-{stats['edges_removed']} arista(s). Quedan {stats['nodes_remaining']} nodos. "
             f"Backup en graph.json.bak.",
@@ -445,7 +482,9 @@ class KnowledgeAgent(BaseAgent):
     def _require_graph(self, action: str) -> AgentResult | None:
         if not GraphifyTool.graph_exists(self.ctx.root):
             return AgentResult(
-                False, self.name, action,
+                False,
+                self.name,
+                action,
                 "No hay grafo (graphify-out/graph.json). Ejecuta 'knowledge build' primero.",
             )
         return None

@@ -16,9 +16,7 @@ def test_commit_with_changelog_includes_changelog_in_same_commit(context):
     assert result.data["changelog_updated"] is True
     assert (context.root / "CHANGELOG.md").exists()
 
-    log = subprocess.run(
-        ["git", "show", "--stat", "HEAD"], cwd=context.root, capture_output=True, text=True, check=True
-    ).stdout
+    log = subprocess.run(["git", "show", "--stat", "HEAD"], cwd=context.root, capture_output=True, text=True, check=True).stdout
     assert "CHANGELOG.md" in log
     assert "nuevo.py" in log
 

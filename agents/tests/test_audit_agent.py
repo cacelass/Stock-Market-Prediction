@@ -42,11 +42,14 @@ def test_failures_empty_when_no_logs(audit_context):
 
 
 def test_report_aggregates_successful_runs(audit_context):
-    _write(audit_context, [
-        {"agent": "git", "action": "status", "success": True, "duration_ms": 10.0, "warnings": 0, "message": "ok"},
-        {"agent": "git", "action": "status", "success": True, "duration_ms": 15.0, "warnings": 0, "message": "ok"},
-        {"agent": "test", "action": "run_tests", "success": True, "duration_ms": 500.0, "warnings": 1, "message": "ok"},
-    ])
+    _write(
+        audit_context,
+        [
+            {"agent": "git", "action": "status", "success": True, "duration_ms": 10.0, "warnings": 0, "message": "ok"},
+            {"agent": "git", "action": "status", "success": True, "duration_ms": 15.0, "warnings": 0, "message": "ok"},
+            {"agent": "test", "action": "run_tests", "success": True, "duration_ms": 500.0, "warnings": 1, "message": "ok"},
+        ],
+    )
     agent = AuditAgent(context=audit_context)
     result = agent.report(last=50)
     assert result.success
@@ -57,10 +60,13 @@ def test_report_aggregates_successful_runs(audit_context):
 
 
 def test_report_shows_failure_rate(audit_context):
-    _write(audit_context, [
-        {"agent": "git", "action": "commit", "success": True, "duration_ms": 100.0, "warnings": 0, "message": "ok"},
-        {"agent": "git", "action": "commit", "success": False, "duration_ms": 50.0, "warnings": 0, "message": "fail"},
-    ])
+    _write(
+        audit_context,
+        [
+            {"agent": "git", "action": "commit", "success": True, "duration_ms": 100.0, "warnings": 0, "message": "ok"},
+            {"agent": "git", "action": "commit", "success": False, "duration_ms": 50.0, "warnings": 0, "message": "fail"},
+        ],
+    )
     agent = AuditAgent(context=audit_context)
     result = agent.report(last=50)
     row = result.data[0]
@@ -68,10 +74,13 @@ def test_report_shows_failure_rate(audit_context):
 
 
 def test_failures_lists_only_failed(audit_context):
-    _write(audit_context, [
-        {"agent": "git", "action": "commit", "success": True, "duration_ms": 10.0, "message": "ok"},
-        {"agent": "git", "action": "commit", "success": False, "duration_ms": 10.0, "message": "error", "error": "git error"},
-    ])
+    _write(
+        audit_context,
+        [
+            {"agent": "git", "action": "commit", "success": True, "duration_ms": 10.0, "message": "ok"},
+            {"agent": "git", "action": "commit", "success": False, "duration_ms": 10.0, "message": "error", "error": "git error"},
+        ],
+    )
     agent = AuditAgent(context=audit_context)
     result = agent.failures(last=50)
     assert len(result.data) == 1
@@ -79,43 +88,32 @@ def test_failures_lists_only_failed(audit_context):
 
 
 def test_failures_respects_last_limit(audit_context):
-    _write(audit_context, [
-        {"agent": "g", "action": str(i), "success": False, "duration_ms": 1.0, "message": "fail"}
-        for i in range(10)
-    ])
+    _write(audit_context, [{"agent": "g", "action": str(i), "success": False, "duration_ms": 1.0, "message": "fail"} for i in range(10)])
     agent = AuditAgent(context=audit_context)
     result = agent.failures(last=3)
     assert len(result.data) == 3
 
 
 def test_suggest_improvements_high_failure_rate(audit_context):
-    _write(audit_context, [
-        {"agent": "git", "action": "commit", "success": False, "duration_ms": 10.0, "warnings": 0, "message": "fail"}
-        for _ in range(5)
-    ] + [
-        {"agent": "git", "action": "commit", "success": True, "duration_ms": 10.0, "warnings": 0, "message": "ok"}
-        for _ in range(1)
-    ])
+    _write(
+        audit_context,
+        [{"agent": "git", "action": "commit", "success": False, "duration_ms": 10.0, "warnings": 0, "message": "fail"} for _ in range(5)]
+        + [{"agent": "git", "action": "commit", "success": True, "duration_ms": 10.0, "warnings": 0, "message": "ok"} for _ in range(1)],
+    )
     agent = AuditAgent(context=audit_context)
     result = agent.suggest_improvements(last=50)
     assert any("falla" in s for s in result.data)
 
 
 def test_suggest_improvements_slow_action(audit_context):
-    _write(audit_context, [
-        {"agent": "test", "action": "run_tests", "success": True, "duration_ms": 35_000.0, "warnings": 0, "message": "slow"}
-        for _ in range(4)
-    ])
+    _write(audit_context, [{"agent": "test", "action": "run_tests", "success": True, "duration_ms": 35_000.0, "warnings": 0, "message": "slow"} for _ in range(4)])
     agent = AuditAgent(context=audit_context)
     result = agent.suggest_improvements(last=50)
     assert any("tarda" in s for s in result.data)
 
 
 def test_suggest_improvements_noisy_warnings(audit_context):
-    _write(audit_context, [
-        {"agent": "docker", "action": "lint", "success": True, "duration_ms": 10.0, "warnings": 3, "message": "ok"}
-        for _ in range(4)
-    ])
+    _write(audit_context, [{"agent": "docker", "action": "lint", "success": True, "duration_ms": 10.0, "warnings": 3, "message": "ok"} for _ in range(4)])
     agent = AuditAgent(context=audit_context)
     result = agent.suggest_improvements(last=50)
     assert any("warnings" in s for s in result.data)
@@ -123,10 +121,7 @@ def test_suggest_improvements_noisy_warnings(audit_context):
 
 def test_suggest_improvements_healthy_team(audit_context):
     """No sugerencias si todas las acciones tienen buen rendimiento."""
-    _write(audit_context, [
-        {"agent": "git", "action": "status", "success": True, "duration_ms": 5.0, "warnings": 0, "message": "ok"}
-        for _ in range(10)
-    ])
+    _write(audit_context, [{"agent": "git", "action": "status", "success": True, "duration_ms": 5.0, "warnings": 0, "message": "ok"} for _ in range(10)])
     agent = AuditAgent(context=audit_context)
     result = agent.suggest_improvements(last=50)
     assert result.success
@@ -137,7 +132,7 @@ def test_suggest_improvements_healthy_team(audit_context):
 def test_corrupted_log_line_skipped(audit_context):
     _log_path(audit_context).write_text(
         '{"agent": "git", "action": "status", "success": true, "duration_ms": 1.0, "warnings": 0, "message": "ok"}\n'
-        'not json at all\n'
+        "not json at all\n"
         '{"agent": "git", "action": "commit", "success": false, "duration_ms": 1.0, "warnings": 0, "message": "fail"}\n'
     )
     agent = AuditAgent(context=audit_context)

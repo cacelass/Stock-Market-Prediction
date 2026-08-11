@@ -31,15 +31,12 @@ def _cache_dir() -> Path:
 
 
 def _cache_path(func_name: str, args: tuple, kwargs: dict) -> Path:
-    key = _md5(
-        json.dumps((func_name, args, sorted(kwargs.items())), sort_keys=True, default=str).encode()
-    )
+    key = _md5(json.dumps((func_name, args, sorted(kwargs.items())), sort_keys=True, default=str).encode())
     return _cache_dir() / f"{func_name}_{key}.joblib"
 
 
 @register_tool("cache")
 class CacheTool:
-
     _instance_cache_dir: Path | None = None
 
     @staticmethod
@@ -79,6 +76,7 @@ class CacheTool:
             def expensive_function(x):
                 ...
         """
+
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             def wrapper(*args, **kwargs):
@@ -98,7 +96,9 @@ class CacheTool:
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 joblib.dump(result, path)
                 return result
+
             return wrapper
+
         return decorator
 
     @staticmethod
@@ -111,6 +111,7 @@ class CacheTool:
             def fast_function(x):
                 ...
         """
+
         def decorator(func: Callable) -> Callable:
             cache: dict[str, Any] = {}
             hits = 0
@@ -119,9 +120,7 @@ class CacheTool:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 nonlocal hits, misses
-                key = _md5(
-                    json.dumps((func.__name__, args, sorted(kwargs.items())), sort_keys=True, default=str).encode()
-                )
+                key = _md5(json.dumps((func.__name__, args, sorted(kwargs.items())), sort_keys=True, default=str).encode())
                 if key in cache:
                     hits += 1
                     return cache[key]
@@ -135,4 +134,5 @@ class CacheTool:
             wrapper.cache_info = lambda: {"hits": hits, "misses": misses, "size": len(cache), "maxsize": maxsize}
             wrapper.cache_clear = lambda: cache.clear()
             return wrapper
+
         return decorator

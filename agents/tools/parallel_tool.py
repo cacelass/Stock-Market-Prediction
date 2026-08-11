@@ -17,8 +17,7 @@ from agents.tools.registry import register_tool
 @register_tool("parallel")
 class ParallelTool:
     @staticmethod
-    def parallel_map(func: Callable, iterable: Iterable, n_jobs: int = -1,
-                     desc: str | None = None, backend: str = "loky") -> list[Any]:
+    def parallel_map(func: Callable, iterable: Iterable, n_jobs: int = -1, desc: str | None = None, backend: str = "loky") -> list[Any]:
         """
         Map paralelo con barra de progreso.
 
@@ -30,19 +29,17 @@ class ParallelTool:
         """
         items = list(iterable)
         if desc:
-            return list(tqdm(
-                joblib.Parallel(n_jobs=n_jobs, backend=backend)(
-                    joblib.delayed(func)(item) for item in items
-                ),
-                total=len(items), desc=desc,
-            ))
-        return joblib.Parallel(n_jobs=n_jobs, backend=backend)(
-            joblib.delayed(func)(item) for item in items
-        )
+            return list(
+                tqdm(
+                    joblib.Parallel(n_jobs=n_jobs, backend=backend)(joblib.delayed(func)(item) for item in items),
+                    total=len(items),
+                    desc=desc,
+                )
+            )
+        return joblib.Parallel(n_jobs=n_jobs, backend=backend)(joblib.delayed(func)(item) for item in items)
 
     @staticmethod
-    def parallel_starmap(func: Callable, iterable: Iterable, n_jobs: int = -1,
-                         desc: str | None = None, backend: str = "loky") -> list[Any]:
+    def parallel_starmap(func: Callable, iterable: Iterable, n_jobs: int = -1, desc: str | None = None, backend: str = "loky") -> list[Any]:
         """
         Starmap paralelo para funciones que reciben tuplas.
 
@@ -50,15 +47,14 @@ class ParallelTool:
         """
         items = list(iterable)
         if desc:
-            return list(tqdm(
-                joblib.Parallel(n_jobs=n_jobs, backend=backend)(
-                    joblib.delayed(func)(*item) for item in items
-                ),
-                total=len(items), desc=desc,
-            ))
-        return joblib.Parallel(n_jobs=n_jobs, backend=backend)(
-            joblib.delayed(func)(*item) for item in items
-        )
+            return list(
+                tqdm(
+                    joblib.Parallel(n_jobs=n_jobs, backend=backend)(joblib.delayed(func)(*item) for item in items),
+                    total=len(items),
+                    desc=desc,
+                )
+            )
+        return joblib.Parallel(n_jobs=n_jobs, backend=backend)(joblib.delayed(func)(*item) for item in items)
 
     @staticmethod
     def chunked(iterable: Iterable, n_chunks: int) -> list[list]:
@@ -68,4 +64,4 @@ class ParallelTool:
         if n_chunks <= 0:
             return [items]
         chunk_size = (n + n_chunks - 1) // n_chunks
-        return [items[i:i + chunk_size] for i in range(0, n, chunk_size)]
+        return [items[i : i + chunk_size] for i in range(0, n, chunk_size)]

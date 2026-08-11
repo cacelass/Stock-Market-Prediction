@@ -38,7 +38,7 @@ def _parsea_clausula(clausula: str) -> tuple[str, tuple[int, ...]] | None:
     op = next((o for o in _OPERADORES if clausula.startswith(o)), None)
     if op is None:
         return None
-    partes = [p for p in clausula[len(op):].strip().split(".") if p.isdigit()]
+    partes = [p for p in clausula[len(op) :].strip().split(".") if p.isdigit()]
     return (op, tuple(int(p) for p in partes)) if partes else None
 
 
@@ -96,14 +96,12 @@ class DoctorAgent(BaseAgent):
         total = len(checks)
         all_ok = ok == total
         return AgentResult(
-            all_ok, self.name, "checkup",
+            all_ok,
+            self.name,
+            "checkup",
             f"{ok}/{total} verificaciones superadas",
             data=checks,
-            warnings=[
-                f"{k}: {v['message']}"
-                for k, v in checks.items()
-                if not v.get("ok")
-            ],
+            warnings=[f"{k}: {v['message']}" for k, v in checks.items() if not v.get("ok")],
         )
 
     def disk_usage(self) -> AgentResult:
@@ -118,9 +116,7 @@ class DoctorAgent(BaseAgent):
         sizes = {}
         for label, path in dirs.items():
             if path.exists():
-                total_bytes = sum(
-                    f.stat().st_size for f in path.rglob("*") if f.is_file()
-                )
+                total_bytes = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
                 sizes[label] = self._human_size(total_bytes)
             else:
                 sizes[label] = "no existe"
@@ -129,14 +125,9 @@ class DoctorAgent(BaseAgent):
     def summary(self) -> AgentResult:
         """Resumen ejecutivo del proyecto."""
         pyproject = self._load_pyproject()
-        git_result = run_command(
-            ["git", "log", "--oneline", "-5"], cwd=self.ctx.root
-        )
+        git_result = run_command(["git", "log", "--oneline", "-5"], cwd=self.ctx.root)
         git_log = git_result.stdout.strip() if git_result.ok else "no disponible"
-        project_name = (
-            pyproject.get("project", {}).get("name", "desconocido")
-            if pyproject else "desconocido"
-        )
+        project_name = pyproject.get("project", {}).get("name", "desconocido") if pyproject else "desconocido"
         python_v = f"{sys.version_info.major}.{sys.version_info.minor}"
         test_dirs = list(self.ctx.tests_dir.glob("test_*.py")) if self.ctx.tests_dir.exists() else []
         data_files = list(self.ctx.raw_data_dir.glob("*")) if self.ctx.raw_data_dir.exists() else []
@@ -155,6 +146,7 @@ class DoctorAgent(BaseAgent):
 
     def _load_pyproject(self) -> dict | None:
         import tomllib
+
         try:
             with open(self.ctx.pyproject_file, "rb") as f:
                 return tomllib.load(f)
@@ -183,9 +175,7 @@ class DoctorAgent(BaseAgent):
             return {"ok": False, "message": "no es un repositorio git"}
         changes = result.stdout.strip()
         n_changes = len([line for line in changes.split("\n") if line.strip()]) if changes else 0
-        branch_result = run_command(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.ctx.root
-        )
+        branch_result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.ctx.root)
         branch = branch_result.stdout.strip() if branch_result.ok else "?"
         if n_changes == 0:
             return {"ok": True, "message": f"Working directory clean ({branch})"}
@@ -226,21 +216,17 @@ class DoctorAgent(BaseAgent):
         `harness gate`): aquí solo se comprueba que el andamiaje existe, para
         que un diagnóstico no tarde lo que tarda la suite de tests.
         """
-        missing = [
-            rel
-            for rel in ("init.sh", "featureslist.json", "progress/current.md", "AGENTS.md")
-            if not (self.ctx.root / rel).exists()
-        ]
+        missing = [rel for rel in ("init.sh", "harness/featureslist.json", "harness/progress/current.md", "AGENTS.md") if not (self.ctx.root / rel).exists()]
         if missing:
             return {"ok": False, "message": f"faltan piezas del arnés: {', '.join(missing)}"}
 
         try:
             import json
 
-            doc = json.loads((self.ctx.root / "featureslist.json").read_text(encoding="utf-8"))
+            doc = json.loads((self.ctx.root / "harness/featureslist.json").read_text(encoding="utf-8"))
             features = doc.get("features", [])
         except (OSError, json.JSONDecodeError) as exc:
-            return {"ok": False, "message": f"featureslist.json ilegible: {exc}"}
+            return {"ok": False, "message": f"harness/featureslist.json ilegible: {exc}"}
 
         pending = sum(1 for f in features if f.get("status") == "pending")
         running = [f.get("id") for f in features if f.get("status") == "in_progress"]

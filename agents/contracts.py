@@ -33,7 +33,7 @@ Además, cada agente posee implícitamente `agents/workspace/<su_nombre>/`.
 
 El vault Obsidian como contexto compartido
 ------------------------------------------
-El vault (`vault/`) es la memoria compartida del equipo. Cualquier agente
+El vault (`docs/vault/`) es la memoria compartida del equipo. Cualquier agente
 puede LEERLO, pero solo `knowledge` lo ESCRIBE. El vault contiene:
 
 - `00_META/IA_index.md` — punto de entrada: metadata del proyecto, estructura
@@ -47,8 +47,8 @@ puede LEERLO, pero solo `knowledge` lo ESCRIBE. El vault contiene:
   agente tiene su ficha aquí, actualizada por `knowledge`.
 
 Regla: si un agente necesita contexto sobre el proyecto, primero lee
-`vault/00_META/IA_index.md`. Si necesita contexto sobre otro agente, lee
-`vault/05_AGENTES/<Agent>.md`.
+`docs/vault/00_META/IA_index.md`. Si necesita contexto sobre otro agente, lee
+`docs/vault/05_AGENTES/<Agent>.md`.
 
 El arnés: quién razona y quién ejecuta
 --------------------------------------
@@ -60,7 +60,7 @@ capas y la división es estricta:
   si el trabajo vale. No aparecen en `CONTRACTS` porque no son código: no
   tienen módulo en `agents/agents/` y `validate_contracts()` audita el registro.
 - **Ejecuta** — el agente Python `harness` (abajo en este mismo diccionario).
-  Es el dueño real de `featureslist.json` y `progress/`: cambiar un estado,
+  Es el dueño real de `harness/featureslist.json` y `harness/progress/`: cambiar un estado,
   escribir el histórico o ejecutar la puerta son operaciones deterministas, y
   un LLM editando JSON a mano se equivoca.
 
@@ -77,12 +77,12 @@ Las tres memorias del proyecto no se solapan, cada una tiene su plazo:
 
 | Soporte | Dueño | Alcance |
 |---------|-------|---------|
-| `progress/` | `harness` | La feature en curso y el histórico de features |
+| `harness/progress/` | `harness` | La feature en curso y el histórico de features |
 | `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
-| `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
+| `docs/vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
 
 Si un agente Python necesita saber en qué se está trabajando, LEE
-`progress/current.md` — no lo escribe.
+`harness/progress/current.md` — no lo escribe.
 """
 
 from __future__ import annotations
@@ -95,12 +95,17 @@ from typing import Any
 class Contract:
     """Contrato de rol de un agente. Solo documentación estructurada + validable."""
 
-    role: str                                  # una línea: su misión
-    can: tuple[str, ...] = ()                  # qué hace (resumen honesto, no marketing)
-    cannot: tuple[str, ...] = ()               # qué NO hace y a quién derivar ("X → agente y")
-    needs: tuple[str, ...] = ()                # información que debe recibir (si falta: preguntar)
-    owns: tuple[str, ...] = ()                 # recursos que SOLO este agente puede modificar
-    collaborates: tuple[str, ...] = ()         # agentes a los que delega o que le delegan
+    role: str  # una línea: su misión
+    can: tuple[str, ...] = ()  # qué hace (resumen honesto, no marketing)
+    cannot: tuple[str, ...] = ()  # qué NO hace y a quién derivar ("X → agente y")
+    needs: tuple[str, ...] = ()  # información que debe recibir (si falta: preguntar)
+    owns: tuple[str, ...] = ()  # recursos que SOLO este agente puede modificar
+    collaborates: tuple[str, ...] = ()  # agentes a los que delega o que le delegan
+    # Acciones que no se deshacen (escriben en el historial git, modifican el
+    # código fuente, instalan cosas). No son documentación: `BaseAgent.run()`
+    # se niega a ejecutarlas sin autorización explícita — ver
+    # `agents/permissions.py`.
+    destructive: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -110,24 +115,33 @@ class Contract:
             "needs": list(self.needs),
             "owns": list(self.owns),
             "collaborates": list(self.collaborates),
+            "destructive": list(self.destructive),
         }
 
 
 CONTRACTS: dict[str, Contract] = {
     # ── Coordinación ─────────────────────────────────────────────────────
     "plan": Contract(
-        role="Jefe de proyecto: convierte un encargo humano en una orden de trabajo, pregunta lo que falte y delega.",
+        role=(
+            "Jefe de proyecto: convierte un encargo humano en una orden de trabajo, pregunta "
+            "lo que falte y delega. También dirige la entrevista de arranque (`plan scope`) "
+            "que construye el spec y siembra el backlog."
+        ),
         can=(
             "descomponer un encargo en pasos y asignar cada paso al agente responsable",
             "detectar qué información falta y devolver las preguntas ANTES de ejecutar nada",
             "ejecutar la orden de trabajo aprobada (via GStack) y resumir qué debe verificar el humano",
-            "leer vault/00_META/IA_index.md para obtener contexto del proyecto y la topología de agentes",
-            "consultar vault/05_AGENTES/<Agent>.md para decidir a quién delegar cada paso",
+            "dirigir la entrevista de arranque (plan scope): preguntar el spec, validar la métrica numérica y escribir references/00-objetivo.md",
+            "sembrar el backlog con las features de dirección en su orden lógico, delegando en 'harness add' (un recurso, un dueño)",
+            "leer docs/vault/00_META/IA_index.md para obtener contexto del proyecto y la topología de agentes",
+            "consultar docs/vault/05_AGENTES/<Agent>.md para decidir a quién delegar cada paso",
         ),
         cannot=(
             "ejecutar ninguna acción de dominio él mismo → siempre delega en el agente dueño",
             "inventar argumentos que no le han dado → los convierte en preguntas",
             "ejecutar una orden con preguntas sin responder",
+            "cerrar el scope sin las respuestas obligatorias (pregunta, métrica, datos, parada)",
+            "escribir docs/prd.md → es un documento derivado que genera `documentation update_prd`",
         ),
         needs=("el encargo (brief) en lenguaje natural", "las respuestas a las preguntas que genere"),
         collaborates=("todos — es el punto de entrada que delega en el resto",),
@@ -146,7 +160,6 @@ CONTRACTS: dict[str, Contract] = {
         owns=(),
         collaborates=(),
     ),
-
     "supervisor": Contract(
         role="Coordina workers en paralelo: los pone a COMPETIR y arbitra, o los abre en abanico y SINTETIZA.",
         can=(
@@ -162,14 +175,13 @@ CONTRACTS: dict[str, Contract] = {
         needs=("la tarea a poner en competición y el criterio de evaluación",),
         collaborates=("research",),
     ),
-
     # ── Conocimiento e investigación ─────────────────────────────────────
     "knowledge": Contract(
         role="Dueño del grafo de conocimiento y la bóveda Obsidian: los construye y mantiene al día.",
         can=(
             "construir/reconstruir el grafo (graphify), crear la bóveda, resumir nodos padre, sync",
-            "poblar vault/05_AGENTES/ con fichas individuales de cada agente desde contracts.py",
-            "actualizar vault/04_VISUALIZACIONES/grafo_conocimiento.md tras cada build del grafo",
+            "poblar docs/vault/05_AGENTES/ con fichas individuales de cada agente desde contracts.py",
+            "actualizar docs/vault/04_VISUALIZACIONES/grafo_conocimiento.md tras cada build del grafo",
         ),
         cannot=(
             "buscar o navegar por el grafo → doc (absorbió docsearch)",
@@ -177,29 +189,36 @@ CONTRACTS: dict[str, Contract] = {
         ),
         owns=(
             "graphify-out/",
-            "vault/ (bóveda Obsidian del proyecto — todo vault/00_META/, 01_PROYECTO/, 04_VISUALIZACIONES/, 05_AGENTES/)",
+            "docs/vault/ (bóveda Obsidian del proyecto — todo docs/vault/00_META/, 01_PROYECTO/, 04_VISUALIZACIONES/, 05_AGENTES/)",
         ),
         collaborates=("doc", "research"),
     ),
     "rag": Contract(
-        role="RAG local: indexa código, prompts, docs, vault, la memoria del arnés y URLs "
-             "externas; busca en lenguaje natural fundiendo similitud vectorial (ChromaDB) "
-             "con BM25 léxico.",
+        role="RAG local: indexa código, prompts, docs/ (incl. vault y corpus), el corpus de "
+        "conocimiento (docs/knowledge/) y la memoria del arnés; busca en lenguaje natural "
+        "fundiendo similitud vectorial (ChromaDB) con BM25 léxico. Mantiene el corpus al día.",
         can=(
             "indexar el proyecto (código de todos los módulos, prompts, docs, "
-            "vault, README, CHANGELOG, progress/ y featureslist.json) en ChromaDB",
+            "docs/vault, docs/knowledge/, README, CHANGELOG, harness/progress/ y "
+            "harness/featureslist.json) en ChromaDB",
             "reindexar solo lo que cambió, y purgar del índice lo que se borró",
             "indexar URLs externas (documentación de librerías, tutoriales)",
-            "buscar en el índice con consultas en lenguaje natural",
+            "buscar en el índice con consultas en lenguaje natural, incluido el corpus (--file_type knowledge)",
             "devolver fragmentos relevantes con puntuación de similitud",
+            "mantener el corpus: verificar cada fuente de docs/knowledge/sources.json contra arXiv y detectar papers nuevos (refrescar)",
+            "descargar papers nuevos a docs/knowledge/papers/ y actualizar docs/knowledge/sources.json al refrescar sin --dry-run",
         ),
         cannot=(
             "construir o modificar el grafo graphify → knowledge",
-            "buscar papers académicos nuevos → research",
-            "ejecutar código ni modificar archivos del proyecto",
+            "buscar papers académicos nuevos para el estado del arte → research",
+            "ejecutar código arbitrario ni modificar código del proyecto",
+            "escribir fuera de docs/knowledge/papers/, docs/knowledge/sources.json y .rag-index/",
         ),
-        needs=("que exista un índice (ejecutar 'rag index' primero)",),
-        owns=(".rag-index/ (índice vectorial ChromaDB, gitignored)",),
+        needs=(
+            "que exista un índice (ejecutar 'rag index' primero)",
+            "red para refresh; sin ella el mantenimiento falla de forma controlada",
+        ),
+        owns=(".rag-index/ (índice vectorial ChromaDB, gitignored); docs/knowledge/papers/ y docs/knowledge/sources.json (registro de fuentes del corpus)",),
         collaborates=("knowledge", "doc", "plan"),
     ),
     "research": Contract(
@@ -211,13 +230,10 @@ CONTRACTS: dict[str, Contract] = {
         ),
         collaborates=("knowledge", "supervisor"),
     ),
-
     # ── Código y calidad ─────────────────────────────────────────────────
     "review": Contract(
         role="Revisor de código: encuentra problemas y los reporta. Solo lee, nunca modifica.",
-        can=(
-            "detectar funciones largas, exceso de argumentos, except desnudos, duplicación, TODO/FIXME",
-        ),
+        can=("detectar funciones largas, exceso de argumentos, except desnudos, duplicación, TODO/FIXME",),
         cannot=(
             "modificar código → refactor",
             "ejecutar tests → test",
@@ -227,9 +243,7 @@ CONTRACTS: dict[str, Contract] = {
     ),
     "refactor": Contract(
         role="Único agente autorizado a modificar código fuente del paquete, siempre con dry_run primero.",
-        can=(
-            "corregir mutables por defecto, except: desnudos, añadir -> None, señalar weights_only=False",
-        ),
+        can=("corregir mutables por defecto, except: desnudos, añadir -> None, señalar weights_only=False",),
         cannot=(
             "refactorizar sin revisión previa: dry_run=True es el modo por defecto, el humano aprueba",
             "tocar notebooks → notebook",
@@ -238,6 +252,14 @@ CONTRACTS: dict[str, Contract] = {
         needs=("qué archivo/paquete tocar, o confirmación para aplicar (dry_run=False)",),
         owns=("codigo fuente del paquete ({project_slug}/)",),
         collaborates=("review",),
+        # `dry_run` es False por defecto en el código, así que la frase de
+        # `cannot` no se cumplía sola: quien aplica la regla es la puerta.
+        destructive=(
+            "fix_mutable_defaults",
+            "fix_bare_excepts",
+            "add_type_hints",
+            "fix_weights_only",
+        ),
     ),
     "test": Contract(
         role="Ejecuta la suite de tests y explica los resultados.",
@@ -248,13 +270,29 @@ CONTRACTS: dict[str, Contract] = {
         ),
         collaborates=(),
     ),
-
+    "mutation": Contract(
+        role="Mutation testing y CRAP: comprueba que los tests «muerden» y mide el riesgo de cambio.",
+        can=(
+            "ejecutar tools/mutate.py sobre un módulo y resumir killed/survived/score",
+            "calcular la métrica CRAP por función (complejidad ciclomática × cobertura)",
+        ),
+        cannot=(
+            "arreglar los tests que fallan ni añadir tests él mismo → implementer/reviewer",
+            "decidir qué sobrevivientes son aceptables — presenta los números, el humano decide",
+            "tocar código fuente del paquete → refactor",
+        ),
+        needs=(
+            "la ruta del módulo a analizar (--target)",
+            "una suite de tests que ejecutar para la mutación",
+        ),
+        collaborates=("test", "review"),
+    ),
     # ── Datos y ML ───────────────────────────────────────────────────────
     "data": Contract(
         role="Analista de datos: EDA y calidad de datasets. Lee data/, escribe solo en su workspace.",
         can=(
             "EDA: constantes, cardinalidad, missing, outliers, correlaciones, fuga de información",
-            "documentar hallazgos en vault/02_DATOS/ (features.md, fuentes.md) via knowledge",
+            "documentar hallazgos en docs/vault/02_DATOS/ (features.md, fuentes.md) via knowledge",
         ),
         cannot=(
             "modificar los datasets de data/ — los informes van a su workspace o al vault via knowledge",
@@ -281,7 +319,7 @@ CONTRACTS: dict[str, Contract] = {
         role="Analista de modelos entrenados: inspecciona .joblib, importancias, overfitting.",
         can=(
             "inspeccionar modelos guardados, comparar modelos, analizar estudios de Optuna",
-            "documentar resultados en vault/01_PROYECTO/modelos.md via knowledge",
+            "documentar resultados en docs/vault/01_PROYECTO/modelos.md via knowledge",
         ),
         cannot=(
             "entrenar modelos — eso es del pipeline (make train), no de un agente",
@@ -317,7 +355,6 @@ CONTRACTS: dict[str, Contract] = {
         owns=("notebooks/",),
         collaborates=(),
     ),
-
     # ── Entrega y entorno ────────────────────────────────────────────────
     "git": Contract(
         role="Único agente que escribe en el historial git: commits, tags, releases.",
@@ -337,12 +374,21 @@ CONTRACTS: dict[str, Contract] = {
         ),
         owns=("historial git (commits, tags, ramas)",),
         collaborates=("documentation", "cicd"),
+        destructive=(
+            "commit_with_changelog",
+            "commit_atomic",
+            "commit_feature",
+            "tag_release",
+            "create_branch",
+            "merge_branch",
+        ),
     ),
     "documentation": Contract(
         role="Dueño de la documentación: CHANGELOG.md, README.md, docs/ y la versión del proyecto.",
         can=(
             "actualizar CHANGELOG.md (también entradas por-feature), detectar README ↔ Makefile desincronizados",
             "bump_version en pyproject.toml + README, generar docs Sphinx",
+            "regenerar docs/prd.md (PRD vivo) desde references/00-objetivo.md, harness/featureslist.json y features/*.feature",
         ),
         cannot=(
             "hacer commit de lo que escribe → git",
@@ -390,9 +436,7 @@ CONTRACTS: dict[str, Contract] = {
     "dependency": Contract(
         role="Vigilante de dependencias: obsolescencia y vulnerabilidades contra PyPI/OSV. Solo lee.",
         can=("detectar paquetes desactualizados y vulnerabilidades conocidas (necesita internet)",),
-        cannot=(
-            "actualizar o instalar nada → env (dueño de uv.lock)",
-        ),
+        cannot=("actualizar o instalar nada → env (dueño de uv.lock)",),
         collaborates=("env",),
     ),
     "docker": Contract(
@@ -416,9 +460,7 @@ CONTRACTS: dict[str, Contract] = {
     "secrets": Contract(
         role="Escáner de secretos hardcodeados. Solo lee y reporta.",
         can=("escanear el proyecto con detect-secrets o un heurístico propio (más limitado, avisado)",),
-        cannot=(
-            "borrar o rotar secretos encontrados — decisión del humano",
-        ),
+        cannot=("borrar o rotar secretos encontrados — decisión del humano",),
         collaborates=(),
     ),
     "installer": Contract(
@@ -431,24 +473,24 @@ CONTRACTS: dict[str, Contract] = {
         needs=("repo_url o ruta local del agente a instalar",),
         owns=("agents/external/",),
         collaborates=("env",),
+        destructive=("install_from_git", "install_from_path"),
     ),
     "doctor": Contract(
         role="Diagnóstico integral del proyecto: agrega las verificaciones de los demás.",
         can=("checkup completo (python, git, estructura, tests, datos, dependencias, disco)",),
-        cannot=(
-            "arreglar lo que encuentra por su cuenta → cada dueño (pipeline fix lo orquesta)",
-        ),
+        cannot=("arreglar lo que encuentra por su cuenta → cada dueño (pipeline fix lo orquesta)",),
         collaborates=("env", "test", "data", "dependency", "git"),
     ),
     "memory": Contract(
         role="Memoria proactiva: observa trayectorias de agentes y mantiene un banco de memoria estructurado contra el decaimiento del estado en tareas largas.",
         can=(
             "observar el log de auditoría y extraer hechos, estado y trazas",
-            "buscar recuerdos por texto o tipo (facts/state/traces)",
+            "buscar recuerdos por texto, tipo (facts/state/traces) o scope (global/per-proyecto)",
             "inyectar recordatorios relevantes en el contexto del agente activo",
             "tomar una instantánea del estado actual del proyecto",
-            "almacenar una nota arbitraria en la memoria",
+            "almacenar una nota arbitraria en la memoria (con scope)",
             "olvidar entradas específicas del banco de memoria",
+            "editar memoria por id: memory_edit update/forget/invalidate",
         ),
         cannot=(
             "modificar el workspace de otros agentes — solo escribe en agents/workspace/memory/",
@@ -465,8 +507,7 @@ CONTRACTS: dict[str, Contract] = {
             "consultar el grafo estructural de graphify",
             "buscar en el vault Obsidian por texto",
             "informar de qué fuentes están disponibles y cuáles no",
-            "navegar el grafo: vecinos de un nodo y listado de referencias "
-            "(absorbido de `docsearch`, cuya búsqueda repetía la de aquí)",
+            "navegar el grafo: vecinos de un nodo y listado de referencias (absorbido de `docsearch`, cuya búsqueda repetía la de aquí)",
         ),
         cannot=(
             "escribir documentación → eso es de 'documentation' (README, CHANGELOG) o 'knowledge' (vault)",
@@ -479,21 +520,23 @@ CONTRACTS: dict[str, Contract] = {
     "harness": Contract(
         role="Dueño mecánico del arnés: mantiene el backlog y el progreso, y ejecuta la puerta init.sh.",
         can=(
-            "leer y actualizar featureslist.json (abrir, cerrar, bloquear y añadir features)",
-            "escribir progress/current.md y añadir entradas a progress/history.md",
-            "guardar los informes de los subagentes en progress/<agente>-<FEATURE-ID>.md",
+            "leer y actualizar harness/featureslist.json (abrir, cerrar, bloquear y añadir features)",
+            "escribir harness/progress/current.md y añadir entradas a harness/progress/history.md",
+            "guardar los informes de los subagentes en harness/progress/<agente>-<FEATURE-ID>.md",
             "ejecutar ./init.sh y devolver el veredicto estructurado",
             "rechazar el cierre de una feature si la puerta no pasa o si no hay evidencia",
+            "rechazar el cierre si la certeza (μ.cert) del reviewer quedó por debajo de 0.6",
+            "aceptar el packet §1 de un subagente (E/S/R/Δ/μ) como frontmatter del informe",
         ),
         cannot=(
-            "decidir QUÉ feature toca ni cómo implementarla → eso lo razonan los agentes "
-            "markdown del arnés (lider, explorer, implementer, reviewer)",
+            "decidir QUÉ feature toca ni cómo implementarla → eso lo razonan los agentes markdown del arnés (lider, explorer, implementer, reviewer)",
             "escribir código del producto → 'refactor' y el implementer",
             "ejecutar los tests por su cuenta → los ejecuta init.sh, o el agente 'test'",
             "cerrar una feature sin evidencia → devuelve needs, nunca la da por buena",
+            "cerrar una feature con certeza baja salvo verificación explícita → devuelve needs",
         ),
         needs=("el id de la feature", "la evidencia real de verificación para cerrarla"),
-        owns=("featureslist.json", "progress/"),
+        owns=("harness/featureslist.json", "harness/progress/", "harness/memory.md", "features/"),
         collaborates=("plan", "test", "review", "memory"),
     ),
 }
@@ -521,8 +564,7 @@ def validate_contracts(registered_names: set[str] | None = None) -> list[str]:
         for resource in contract.owns:
             if resource in owners:
                 problems.append(
-                    f"Recurso '{resource}' tiene dos dueños: '{owners[resource]}' y '{name}'. "
-                    f"Un recurso, un dueño — decide cuál y actualiza el otro contrato."
+                    f"Recurso '{resource}' tiene dos dueños: '{owners[resource]}' y '{name}'. Un recurso, un dueño — decide cuál y actualiza el otro contrato."
                 )
             owners[resource] = name
 
@@ -530,8 +572,7 @@ def validate_contracts(registered_names: set[str] | None = None) -> list[str]:
         core_without_contract = registered_names - set(CONTRACTS)
         for name in sorted(core_without_contract):
             problems.append(
-                f"El agente '{name}' está registrado pero no tiene contrato en agents/contracts.py. "
-                f"Define su rol, límites y recursos antes de usarlo en equipo."
+                f"El agente '{name}' está registrado pero no tiene contrato en agents/contracts.py. Define su rol, límites y recursos antes de usarlo en equipo."
             )
 
         for name, contract in CONTRACTS.items():
@@ -539,8 +580,6 @@ def validate_contracts(registered_names: set[str] | None = None) -> list[str]:
                 if collaborator.startswith("todos"):
                     continue
                 if collaborator not in registered_names and collaborator not in CONTRACTS:
-                    problems.append(
-                        f"El contrato de '{name}' dice colaborar con '{collaborator}', que no existe."
-                    )
+                    problems.append(f"El contrato de '{name}' dice colaborar con '{collaborator}', que no existe.")
 
     return problems

@@ -22,10 +22,7 @@ class DuckDBTool:
         try:
             import duckdb
         except ImportError as exc:
-            raise MissingDependencyError(
-                "DuckDB no está instalado. Actívalo con use_duckdb=true en copier.yml, "
-                "o instálalo manualmente: uv add duckdb"
-            ) from exc
+            raise MissingDependencyError("DuckDB no está instalado. Actívalo con use_duckdb=true en copier.yml, o instálalo manualmente: uv add duckdb") from exc
         return duckdb.connect()
 
     @staticmethod

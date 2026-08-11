@@ -20,11 +20,5 @@ def test_team_contracts_are_coherent():
 
 def test_every_contract_has_role_and_limits():
     """Un contrato sin límites (`cannot`) no delimita nada — es el origen de los solapes."""
-    missing_limits = [
-        name for name, contract in CONTRACTS.items()
-        if not contract.role.strip() or not contract.cannot
-    ]
-    assert not missing_limits, (
-        f"Contratos sin rol o sin límites (cannot): {missing_limits}. "
-        f"Todo agente debe declarar qué NO hace y a quién derivarlo."
-    )
+    missing_limits = [name for name, contract in CONTRACTS.items() if not contract.role.strip() or not contract.cannot]
+    assert not missing_limits, f"Contratos sin rol o sin límites (cannot): {missing_limits}. Todo agente debe declarar qué NO hace y a quién derivarlo."

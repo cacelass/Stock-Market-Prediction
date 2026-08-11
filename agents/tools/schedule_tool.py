@@ -16,16 +16,30 @@ from agents.tools.registry import register_tool
 
 
 _ALIASES = {
-    "@yearly": "0 0 1 1 *", "@annually": "0 0 1 1 *",
+    "@yearly": "0 0 1 1 *",
+    "@annually": "0 0 1 1 *",
     "@monthly": "0 0 1 * *",
     "@weekly": "0 0 * * 0",
-    "@daily": "0 0 * * *", "@midnight": "0 0 * * *",
+    "@daily": "0 0 * * *",
+    "@midnight": "0 0 * * *",
     "@hourly": "0 * * * *",
 }
 
 _DAY_NAMES = {0: "domingo", 1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves", 5: "viernes", 6: "sábado"}
-_MONTH_NAMES = {1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
-                7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"}
+_MONTH_NAMES = {
+    1: "enero",
+    2: "febrero",
+    3: "marzo",
+    4: "abril",
+    5: "mayo",
+    6: "junio",
+    7: "julio",
+    8: "agosto",
+    9: "septiembre",
+    10: "octubre",
+    11: "noviembre",
+    12: "diciembre",
+}
 
 
 def _parse_field(field: str, lo: int, hi: int) -> set[int]:
@@ -138,9 +152,7 @@ class ScheduleTool:
         dt = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
         attempts = 0
         while len(runs) < 5 and attempts < 525600:
-            if (dt.month in months and dt.day in days and
-                dt.hour in hours and dt.minute in minutes and
-                (dt.weekday() in weekdays if len(weekdays) < 7 else True)):
+            if dt.month in months and dt.day in days and dt.hour in hours and dt.minute in minutes and (dt.weekday() in weekdays if len(weekdays) < 7 else True):
                 runs.append(dt.isoformat())
             dt += timedelta(minutes=1)
             attempts += 1
@@ -172,11 +184,12 @@ class ScheduleTool:
             "months": sorted(months),
             "weekdays": sorted(weekdays),
             "frequency": (
-                "cada minuto" if len(hours) == 24 and len(minutes) == 60
-                else "cada hora" if len(hours) == 24
+                "cada minuto"
+                if len(hours) == 24 and len(minutes) == 60
+                else "cada hora"
+                if len(hours) == 24
                 else "cada día"
-                if (len(hours) == 1 and len(minutes) == 1
-                    and len(weekdays) == 7 and len(days) == 31)
+                if (len(hours) == 1 and len(minutes) == 1 and len(weekdays) == 7 and len(days) == 31)
                 else "personalizada"
             ),
         }

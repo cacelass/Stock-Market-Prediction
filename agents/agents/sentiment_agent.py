@@ -24,9 +24,17 @@ class SentimentAgent(BaseAgent):
         "Determinista: mismo input → mismo output."
     )
     capabilities = [
-        "sentimiento", "sentiment", "noticias", "news", "vader", "titulares",
-        "score de sentimiento", "analisis de sentimiento", "scores",
-        "sentimiento financiero", "clima del mercado",
+        "sentimiento",
+        "sentiment",
+        "noticias",
+        "news",
+        "vader",
+        "titulares",
+        "score de sentimiento",
+        "analisis de sentimiento",
+        "scores",
+        "sentimiento financiero",
+        "clima del mercado",
     ]
 
     def action_aliases(self) -> dict[str, list[str]]:
@@ -49,20 +57,25 @@ class SentimentAgent(BaseAgent):
             daily = analyze_ticker(ticker)
         except Exception as exc:  # noqa: BLE001 — error claro al usuario
             return AgentResult(
-                False, self.name, "analyze",
+                False,
+                self.name,
+                "analyze",
                 f"No se pudo analizar el sentimiento de '{ticker}': {exc}",
             )
         if daily.empty:
             return AgentResult(
-                False, self.name, "analyze",
+                False,
+                self.name,
+                "analyze",
                 f"No hay noticias para {ticker.upper()} con las que puntuar.",
             )
         rows = daily.head(10).to_dict(orient="records")
         n_days = int(len(daily))
         return AgentResult(
-            True, self.name, "analyze",
-            f"Sentimiento de {ticker.upper()} completo: {n_days} día(s) con noticias. "
-            f"Últimas filas: {rows}",
+            True,
+            self.name,
+            "analyze",
+            f"Sentimiento de {ticker.upper()} completo: {n_days} día(s) con noticias. Últimas filas: {rows}",
             data={"ticker": ticker.upper(), "n_days": n_days, "ultimas_filas": rows},
         )
 
@@ -75,6 +88,9 @@ class SentimentAgent(BaseAgent):
         except FetchError as exc:
             return AgentResult(False, self.name, "fetch", str(exc))
         return AgentResult(
-            True, self.name, "fetch", f"Noticias de {ticker.upper()} guardadas en {out}",
+            True,
+            self.name,
+            "fetch",
+            f"Noticias de {ticker.upper()} guardadas en {out}",
             data={"ticker": ticker.upper(), "path": str(out)},
         )

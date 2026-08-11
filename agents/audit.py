@@ -58,8 +58,20 @@ def record(
     warnings: int = 0,
     kwarg_names: list[str] | None = None,
     error: str | None = None,
+    certainty: float | None = None,
 ) -> None:
-    """Añade una entrada al log. Nunca lanza: la auditoría no rompe lo auditado."""
+    """
+    Añade una entrada al log. Nunca lanza: la auditoría no rompe lo auditado.
+
+    El `message` y el `error` se redactan aquí además de en `BaseAgent.run`:
+    esto es un fichero que se queda en el disco y —si el proyecto no lo
+    ignora— acaba en un commit, así que no puede depender de que quien llame
+    se haya acordado de limpiar el texto.
+    """
+    from agents.redaction import redactar
+
+    message = redactar(message)
+    error = redactar(error) if error else error
     try:
         entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -71,6 +83,8 @@ def record(
             "warnings": warnings,
             "kwarg_names": kwarg_names or [],
         }
+        if certainty is not None:
+            entry["certainty"] = round(min(max(certainty, 0.0), 1.0), 3)
         if error:
             entry["error"] = error[:300]
         with open(audit_log_path(ctx), "a", encoding="utf-8") as f:

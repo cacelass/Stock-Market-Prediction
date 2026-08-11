@@ -63,7 +63,7 @@ def test_parse_openalex_reconstructs_abstract_and_doi():
     p = papers[0]
     assert p["title"] == "Attention Is All You Need"
     assert p["abstract"] == "The transformer attention"  # índice invertido reconstruido
-    assert p["doi"] == "10.5555/attn"                     # normalizado, sin el prefijo URL
+    assert p["doi"] == "10.5555/attn"  # normalizado, sin el prefijo URL
     assert p["citations"] == 90000
 
 
@@ -94,5 +94,5 @@ def test_rank_orders_by_relevance_then_citations():
     ]
     ranked = ResearchTool.rank(papers, keywords)
     assert ranked[0]["title"] == "transformer attention"  # relevancia 1.0
-    assert ranked[-1]["title"] == "Unrelated"             # relevancia 0.0
+    assert ranked[-1]["title"] == "Unrelated"  # relevancia 0.0
     assert ranked[0]["relevance"] == 1.0

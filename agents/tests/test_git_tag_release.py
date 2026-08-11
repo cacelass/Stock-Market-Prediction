@@ -8,9 +8,7 @@ from agents.agents.git_agent import GitAgent
 
 def _write_versioned_files(root):
     (root / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
-    (root / "README.md").write_text(
-        "![Version](https://img.shields.io/badge/Version-1.0.0-green)\n\n**Versión:** 1.0.0\n"
-    )
+    (root / "README.md").write_text("![Version](https://img.shields.io/badge/Version-1.0.0-green)\n\n**Versión:** 1.0.0\n")
 
 
 def test_bump_version_updates_pyproject_and_readme(context):
@@ -48,9 +46,7 @@ def test_tag_release_full_flow(context):
     tags = subprocess.run(["git", "tag"], cwd=context.root, capture_output=True, text=True, check=True).stdout
     assert "1.1.0" in tags.splitlines()
 
-    show = subprocess.run(
-        ["git", "show", "--stat", "1.1.0"], cwd=context.root, capture_output=True, text=True, check=True
-    ).stdout
+    show = subprocess.run(["git", "show", "--stat", "1.1.0"], cwd=context.root, capture_output=True, text=True, check=True).stdout
     assert "pyproject.toml" in show and "README.md" in show and "CHANGELOG.md" in show
 
 
@@ -76,8 +72,6 @@ def test_tag_release_generates_cicd_when_missing(context):
 
     assert result.success
     assert (context.root / ".github" / "workflows" / "ci.yml").exists()
-    show = subprocess.run(
-        ["git", "show", "--stat", "1.1.0"], cwd=context.root, capture_output=True, text=True, check=True
-    ).stdout
+    show = subprocess.run(["git", "show", "--stat", "1.1.0"], cwd=context.root, capture_output=True, text=True, check=True).stdout
     assert ".github/workflows/ci.yml" in show
     assert any("No había ningún workflow de CI" in w for w in result.warnings)

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -22,14 +23,26 @@ def _make_notebook_with_image(path: Path) -> None:
     png_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
 
     notebook = {
-        "nbformat": 4, "nbformat_minor": 5, "metadata": {},
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {},
         "cells": [
-            {"cell_type": "code", "id": "c1", "metadata": {}, "execution_count": 1,
-             "source": ["plt.plot([1,2,3],[1,4,9])"],
-             "outputs": [{"output_type": "display_data", "data": {"image/png": [png_b64]}, "metadata": {}}]},
-            {"cell_type": "code", "id": "c2", "metadata": {}, "execution_count": 2,
-             "source": ["print('ok')"],
-             "outputs": [{"output_type": "stream", "name": "stdout", "text": ["ok\n"]}]},
+            {
+                "cell_type": "code",
+                "id": "c1",
+                "metadata": {},
+                "execution_count": 1,
+                "source": ["plt.plot([1,2,3],[1,4,9])"],
+                "outputs": [{"output_type": "display_data", "data": {"image/png": [png_b64]}, "metadata": {}}],
+            },
+            {
+                "cell_type": "code",
+                "id": "c2",
+                "metadata": {},
+                "execution_count": 2,
+                "source": ["print('ok')"],
+                "outputs": [{"output_type": "stream", "name": "stdout", "text": ["ok\n"]}],
+            },
         ],
     }
     path.write_text(json.dumps(notebook))

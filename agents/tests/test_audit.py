@@ -8,9 +8,7 @@ from agents.orchestrator import Orchestrator
 
 
 def test_run_records_audit_entry(context, project_root):
-    (project_root / "pyproject.toml").write_text(
-        '[project]\nname = "mi_paquete"\nversion = "0.1.0"\nrequires-python = ">=3.10"\n'
-    )
+    (project_root / "pyproject.toml").write_text('[project]\nname = "mi_paquete"\nversion = "0.1.0"\nrequires-python = ">=3.10"\n')
     orchestrator = Orchestrator(context=context)
     result = orchestrator.run("env", "check_python_version")
     assert result.success
@@ -36,9 +34,7 @@ def test_failed_actions_are_recorded_too(context):
 
 
 def test_audit_agent_report_and_suggestions(context, project_root):
-    (project_root / "pyproject.toml").write_text(
-        '[project]\nname = "mi_paquete"\nversion = "0.1.0"\nrequires-python = ">=3.10"\n'
-    )
+    (project_root / "pyproject.toml").write_text('[project]\nname = "mi_paquete"\nversion = "0.1.0"\nrequires-python = ">=3.10"\n')
     orchestrator = Orchestrator(context=context)
     orchestrator.run("env", "check_python_version")
     orchestrator.run("env", "check_python_version")
@@ -60,3 +56,82 @@ def test_audit_report_on_empty_log(context):
     result = AuditAgent(context=context).report()
     assert result.success
     assert result.data == []
+
+
+def test_run_records_certainty_from_result(context, project_root):
+    """`BaseAgent.run` audita la certeza (μ.cert) que el resultado declara."""
+    (project_root / "pyproject.toml").write_text('[project]\nname = "mi_paquete"\nversion = "0.1.0"\nrequires-python = ">=3.10"\n')
+    orchestrator = Orchestrator(context=context)
+    result = orchestrator.run("env", "check_python_version")
+    assert result.success
+
+    entry = audit.read_entries(context)[-1]
+    assert entry["certainty"] == 1.0, "un agente determinista que ejecutó bien tiene certeza plena"
+
+
+def test_audit_agent_flagea_exito_con_certeza_baja(context):
+    """Un 'éxito' que nadie avala con seguridad es una ronda que pudo fallar."""
+    import json as _json
+    from datetime import datetime, timezone
+
+    from agents import audit
+
+    path = audit.audit_log_path(context)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with path.open("a", encoding="utf-8") as f:
+        for _ in range(3):  # MIN_RUNS_TO_JUDGE = 3
+            f.write(
+                _json.dumps(
+                    {
+                        "timestamp": now,
+                        "agent": "env",
+                        "action": "check_python_version",
+                        "success": True,
+                        "duration_ms": 1.0,
+                        "message": "ok",
+                        "warnings": 0,
+                        "kwarg_names": [],
+                        "certainty": 0.4,
+                    }
+                )
+                + "\n"
+            )
+
+    suggestions = AuditAgent(context=context).suggest_improvements()
+    assert suggestions.success
+    assert any("certeza baja" in s for s in suggestions.data)
+    assert any("env.check_python_version" in s for s in suggestions.data)
+
+
+def test_exito_con_certeza_plena_no_genera_sugerencia(context):
+    """Certeza 1.0 = señal de duda ausente → la heurística calla."""
+    import json as _json
+    from datetime import datetime, timezone
+
+    from agents import audit
+
+    path = audit.audit_log_path(context)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with path.open("a", encoding="utf-8") as f:
+        for _ in range(3):
+            f.write(
+                _json.dumps(
+                    {
+                        "timestamp": now,
+                        "agent": "env",
+                        "action": "check_python_version",
+                        "success": True,
+                        "duration_ms": 1.0,
+                        "message": "ok",
+                        "warnings": 0,
+                        "kwarg_names": [],
+                        "certainty": 1.0,
+                    }
+                )
+                + "\n"
+            )
+
+    suggestions = AuditAgent(context=context).suggest_improvements()
+    assert not any("certeza baja" in s for s in suggestions.data)

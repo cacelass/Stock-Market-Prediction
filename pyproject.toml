@@ -1,42 +1,179 @@
 [project]
 name = "inversion"
 version = "0.1.2"
-description = "A short description of the project."
+description = "Predicción de tendencia bursátil (sube >2% en 5 días) con RandomForest + sentimiento VADER, multi-ticker."
 authors = [
   { name = "Alejandro Cancelas Chapela" }
 ]
 readme = "README.md"
 requires-python = ">= 3.12"
-license = {text = "MIT"}
+license = { text = "MIT" }
 dependencies = [
-  "black",
-  "invoke",
-  "jupyter",
-  "jupyterlab",
-  "matplotlib",
-  "nbdime",
-  "numpy",
-  "pandas",
-  "plotly",
-  "pyjanitor",
-  "pyprojroot",
-  "seaborn",
-  "dotenv",
-  "nltk",
-  "yfinance",
-  "scikit-learn",
-  "joblib",
-  "scipy",
-  "tqdm",
+    # ── Datos y computación ───────────────────────────────────────────────
+    "numpy>=1.26",
+    "pandas",
+    "scipy",           # stats, tests de normalidad, clustering jerárquico
+    # ── ML core (usadas en todos los ml_type) ────────────────────────────
+    "scikit-learn>=1.3",    # modelos, PCA, pipelines, métricas, preprocesado
+    "joblib",          # serialización de modelos y paralelismo
+    # ── Visualización ────────────────────────────────────────────────────
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "missingno",
+    # ── Notebooks ────────────────────────────────────────────────────────
+    "jupyter",
+    "jupyterlab",
+    # ── Utilidades ───────────────────────────────────────────────────────
+    "python-dotenv",
+    "loguru",          # logging estructurado
+    "rich",            # output de consola con color y tablas
+    "tqdm",            # barras de progreso
+    # ── Sentimiento (SENT-001/002): descarga de noticias y puntuación VADER ──
+    "nltk",
+    "yfinance",
 ]
 
 [project.optional-dependencies]
-supervisado = []
+dev = [
+    "bandit",
+    "black",
+    "hypothesis",
+    "invoke",
+    "isort",
+    "mypy",
+    "nbdime",
+    "pip-audit",
+    "pre-commit",
+    "radon",
+    "ruff",
+    "pytest",
+    "pytest-cov",
+    "sphinx",
+    "sphinx-rtd-theme",
+    "myst-parser",
+    "snakeviz",
+]
+
+# ML supervisado: clasificación + regresión
+# El proyecto usa RandomForest (model_type) — sin boosting extra que exija
+# libgomp (xgboost/lightgbm/catboost no están en el entorno).
+supervisado = [
+    "statsmodels",
+    "imbalanced-learn",
+
+    "shap>=0.46,<2.0",
+    "numba>=0.59",
+
+]
+
+
+mlflow_tracking = [
+    "mlflow>=2.10,<3.0",
+]
+
+
+# ML no supervisado: clustering + reducción de dimensionalidad
+no_supervisado = [
+    "yellowbrick>=1.5",       # SilhouetteVisualizer
+    "umap-learn>=0.5.7", # reducción de dimensionalidad no lineal (UMAP)
+    "pynndescent>=0.5.12", # dependencia de umap-learn — pin explícito
+    "numba>=0.59",       # dependencia de pynndescent — evita resolver llvmlite antiguo
+    "hdbscan",           # clustering basado en densidad jerárquico
+]
+
+# Redes neuronales: deep learning con PyTorch
+redes_neuronales = [
+    "torch>=2.0",
+    "torchmetrics[visual]",
+    "tensorboard",
+    "captum>=0.7",    # explicabilidad (Integrated Gradients, LayerIG)
+    "polars",         # carga eficiente de datos con dtypes explícitos
+    "pyarrow",        # backend requerido por polars para conversión a pandas
+]
+
+# Modelos híbridos: combinan técnicas supervisadas y no supervisadas
+hibrido = [
+    "umap-learn>=0.5.7",   # UMAP como alternativa a PCA (no lineal)
+    "pynndescent>=0.5.12", # dependencia de umap-learn — pin explícito
+    "numba>=0.59",         # dependencia de pynndescent — evita resolver llvmlite antiguo
+    "lightgbm",             # clasificador final potente
+    "xgboost",               # clasificador final alternativo
+
+    "catboost",       # boosting nativo para variables categoricas
+
+    "imbalanced-learn",
+
+    "shap>=0.46,<2.0",
+    "numba>=0.59",
+
+]
+
+
+# Optuna: optimizacion de hiperparametros
+optuna = [
+    "optuna",
+    "optuna-dashboard",  # UI web para explorar estudios (opcional)
+]
+
+
+
+# DuckDB: queries SQL sobre CSV/Parquet/JSON sin servidor
+duckdb = [
+    "duckdb",
+    "pyarrow",   # necesario para leer/escribir Parquet con pandas y DuckDB
+]
+
+
+
+# API REST para servir el modelo entrenado
+api = [
+    "fastapi>=0.100",
+    "uvicorn[standard]",
+    "pydantic>=2.0,<3.0",
+    "httpx>=0.27,<1.0",  # necesario para TestClient de FastAPI
+]
+
+
+
+# Monitorización: drift detection y performance tracking
+monitoring = [
+    "evidently>=0.4,<1.0",
+    # nltk entra de forma transitiva por evidently. La 3.10.1 trae un hook de
+    # importación (`nltk/inisec.py`) contra el secuestro de módulos desde el
+    # directorio actual (CWE-427) que está roto: bloquea importaciones que NO
+    # vienen del CWD —desde otro directorio llega a bloquear `locale`, de la
+    # stdlib— así que un simple `import nltk` revienta y con él `import
+    # evidently`. El remedio que sugiere el propio error (`-P`,
+    # `PYTHONSAFEPATH=1`) tampoco funciona; verificado que 3.9.2 y 3.10.0 sí
+    # importan. Se excluye solo esa versión para que la corrección de upstream
+    # entre sola.
+    "nltk!=3.10.1",
+]
+
+
+
+# Graphify: grafo de conocimiento del proyecto.
+# El paquete en PyPI se llama `graphifyy` (con doble y); el modulo que se
+# importa es `graphify`. No son lo mismo, y poner el del import hacia que
+# `uv sync` no resolviera: no existe ningun paquete llamado `graphify`.
+# Requiere GEMINI_API_KEY en .env para extracción semántica vía Gemini.
+graphify = [
+    "graphifyy[gemini]",
+]
+
+
 
 # RAG: búsqueda híbrida local (vector + BM25) con ChromaDB
 # Modelo all-MiniLM-L6-v2 vía ONNX (descarga única ~80MB, sin GPU ni API key).
+# El suelo es 0.5.0: por debajo la API de colecciones es otra y el índice no
+# llega a crearse. El techo evita que un major de chroma rompa el arnés solo.
 rag = [
     "chromadb>=0.5.0,<2.0",
+    # markitdown convierte PDFs de arXiv a markdown en `rag refresh` (para
+    # papers sin versión HTML). Es import opcional: si no está, refresh
+    # degrada a "solo papers con HTML" y avisa.
+    "markitdown[pdf]>=0.1",
 ]
 
 # Embeddings multilingües de verdad: all-MiniLM-L6-v2 está entrenado en inglés
@@ -46,18 +183,6 @@ rag = [
 rag_multilingual = [
     "chromadb>=0.5.0,<2.0",
     "sentence-transformers>=2.2",
-]
-
-dev = [
-  "bandit",
-  "hypothesis",
-  "isort",
-  "mypy",
-  "pip-audit",
-  "pytest",
-  "pytest-cov",
-  "radon",
-  "ruff",
 ]
 
 [tool.setuptools]

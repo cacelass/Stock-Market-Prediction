@@ -51,7 +51,10 @@ class SecretsAgent(BaseAgent):
 
         data = [f.__dict__ for f in findings]
         return AgentResult(
-            len(findings) == 0, self.name, "scan",
+            len(findings) == 0,
+            self.name,
+            "scan",
             f"{len(findings)} posible(s) secreto(s) encontrado(s) (detector: {detector}).",
-            data=data, warnings=warnings,
+            data=data,
+            warnings=warnings,
         )

@@ -36,12 +36,15 @@ _TARGET_SUGGESTIONS: dict[str, list[dict]] = {
 @register_agent
 class MakeAgent(BaseAgent):
     name = "make"
-    description = (
-        "Valida y gestiona el Makefile del proyecto: verifica que los targets "
-        "existan, que la cadena del pipeline sea correcta, y sugiere nuevos targets."
-    )
+    description = "Valida y gestiona el Makefile del proyecto: verifica que los targets existan, que la cadena del pipeline sea correcta, y sugiere nuevos targets."
     capabilities = [
-        "makefile", "make", "target", "pipeline", "build", "task", "tarea",
+        "makefile",
+        "make",
+        "target",
+        "pipeline",
+        "build",
+        "task",
+        "tarea",
     ]
 
     def actions(self) -> dict:
@@ -97,7 +100,9 @@ class MakeAgent(BaseAgent):
                 warnings.append(f"Falta el target '{target}' en el Makefile.")
         missing = len([w for w in warnings if w.startswith("Falta")])
         return AgentResult(
-            len(warnings) == 0, self.name, "check_pipeline_chain",
+            len(warnings) == 0,
+            self.name,
+            "check_pipeline_chain",
             f"Pipeline: {len(_PIPELINE_CHAIN) - missing}/{len(_PIPELINE_CHAIN)} targets encontrados.",
             data={"found": [t for t in _PIPELINE_CHAIN if t in targets], "missing": [t for t in _PIPELINE_CHAIN if t not in targets]},
             warnings=warnings,
@@ -120,7 +125,9 @@ class MakeAgent(BaseAgent):
         new_suggestions = [s for s in suggestions if s["target"] not in existing]
 
         return AgentResult(
-            True, self.name, "suggest_targets",
+            True,
+            self.name,
+            "suggest_targets",
             f"{len(new_suggestions)} target(s) sugerido(s) para tu configuración actual.",
             data={"suggested": new_suggestions, "total_possible": len(suggestions)},
             warnings=[] if new_suggestions else ["Todos los targets relevantes ya existen."],
@@ -136,6 +143,7 @@ class MakeAgent(BaseAgent):
             return AgentResult(True, self.name, "run", f"[dry-run] make {target}")
 
         from agents.tools.process_tool import run_command
+
         result = run_command(["make", target], cwd=self.ctx.root)
         if not result.ok:
             return AgentResult(False, self.name, "run", f"make {target} falló: {result.stderr.strip()}")

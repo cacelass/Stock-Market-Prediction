@@ -10,6 +10,7 @@ from agents.tools.dependency_tool import (
 
 # --- tests puros de parseo, sin red -----------------------------------------
 
+
 def test_parse_dependency_name_strips_version_and_extras():
     assert parse_dependency_name("requests>=2.20.0") == "requests"
     assert parse_dependency_name("pandas[extra]") == "pandas"
@@ -41,6 +42,7 @@ def test_parse_uv_lock_versions():
 
 
 # --- tests de agente sin red (rutas de error) -------------------------------
+
 
 def test_check_outdated_without_pyproject_fails(context):
     agent = DependencyAgent(context=context)

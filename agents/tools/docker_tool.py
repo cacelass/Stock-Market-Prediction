@@ -71,9 +71,7 @@ class DockerTool:
                 if ":" not in image_ref or image_ref.endswith(":latest"):
                     findings.append(
                         DockerfileFinding(
-                            i, "warning",
-                            f"Imagen base sin versión fijada ('{image_ref}'): "
-                            f"usa un tag concreto (ej. python:3.12-slim) para builds reproducibles."
+                            i, "warning", f"Imagen base sin versión fijada ('{image_ref}'): usa un tag concreto (ej. python:3.12-slim) para builds reproducibles."
                         )
                     )
 
@@ -83,40 +81,34 @@ class DockerTool:
             if upper.startswith("ADD") and not line.split()[-1].startswith(("http://", "https://")):
                 findings.append(
                     DockerfileFinding(
-                        i, "info",
+                        i,
+                        "info",
                         "ADD usado para copiar archivos locales: prefiere COPY, "
                         "que es más explícito (ADD tiene comportamiento especial con "
-                        "URLs y archivos comprimidos)."
+                        "URLs y archivos comprimidos).",
                     )
                 )
 
-            if (upper.startswith("RUN")
-                and " APT-GET INSTALL" in upper.replace("-Y", "")
-                and "--NO-INSTALL-RECOMMENDS" not in upper):
-                findings.append(
-                    DockerfileFinding(
-                        i, "info",
-                        "apt-get install sin --no-install-recommends: la imagen puede "
-                        "quedar más pesada de lo necesario."
-                    )
-                )
+            if upper.startswith("RUN") and " APT-GET INSTALL" in upper.replace("-Y", "") and "--NO-INSTALL-RECOMMENDS" not in upper:
+                findings.append(DockerfileFinding(i, "info", "apt-get install sin --no-install-recommends: la imagen puede quedar más pesada de lo necesario."))
 
             if upper.startswith("RUN") and " APT-GET UPDATE" in upper and "&&" not in line:
                 findings.append(
                     DockerfileFinding(
-                        i, "warning",
+                        i,
+                        "warning",
                         "apt-get update en un RUN separado de apt-get install: "
                         "invalida el cache de capas de forma inconsistente. "
-                        "Combínalos en el mismo RUN con &&."
+                        "Combínalos en el mismo RUN con &&.",
                     )
                 )
 
         if saw_from and not saw_user:
             findings.append(
                 DockerfileFinding(
-                    len(lines), "warning",
-                    "No se declara USER: el contenedor corre como root por defecto. "
-                    "Considera crear un usuario sin privilegios para producción."
+                    len(lines),
+                    "warning",
+                    "No se declara USER: el contenedor corre como root por defecto. Considera crear un usuario sin privilegios para producción.",
                 )
             )
 

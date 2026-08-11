@@ -5,8 +5,12 @@ from agents.orchestrator import Orchestrator
 
 
 def test_all_core_agents_are_discovered():
+    # El núcleo SIEMPRE está, se genere el proyecto con el perfil que se
+    # genere. Los agentes ligados a extras (docker, api, mlflow, rag,
+    # knowledge, mutation) y los periféricos (supervisor, audit, research,
+    # installer) dependen del perfil — no son parte de este invariante.
     agents = agent_registry.all()
-    expected = {"git", "data", "graph", "docker", "ml", "review", "documentation"}
+    expected = {"git", "data", "graph", "ml", "review", "documentation", "harness", "test", "plan", "doctor", "env", "make"}
     assert expected.issubset(agents.keys())
 
 
@@ -23,6 +27,8 @@ def test_orchestrator_routes_git_query(context):
 
 
 def test_orchestrator_routes_docker_query(context):
+    if "docker" not in agent_registry.all():
+        return  # el agente no existe en este perfil — no es un fallo de ruteo
     orchestrator = Orchestrator(context=context)
     decision = orchestrator.select_agent("revisa el Dockerfile de este proyecto")
     assert decision.agent_name == "docker"
@@ -52,6 +58,8 @@ def test_dispatch_auto_runs_zero_arg_action(context):
     # inglés), pero "revisa el dockerfile" sí solapa con 'lint_dockerfile'
     # -> docker es el agente, lint_dockerfile la acción, sin argumentos
     # obligatorios -> debe ejecutarse sola, sin pedir action= explícito.
+    if "docker" not in agent_registry.all():
+        return  # el agente no existe en este perfil — no es un fallo
     (context.root / "Dockerfile").write_text("FROM python:3.12-slim\nUSER app\n")
     orchestrator = Orchestrator(context=context)
     result = orchestrator.dispatch("revisa el dockerfile de este proyecto")
@@ -81,3 +89,18 @@ def test_dispatch_disambiguates_commit_actions_via_aliases(context):
 
     suggest_result = orchestrator.dispatch("sugiéreme un mensaje de commit")
     assert suggest_result.action == "suggest_commit_message"
+
+
+def test_dispatch_propaga_la_confianza_del_ruteo_a_la_certeza(context):
+    # La certeza (μ.cert) del resultado hereda la confianza del ruteo
+    # heurístico: si no estoy seguro de que el agente sea el correcto, el
+    # resultado tampoco lo está — aunque el agente ejecutara perfecto.
+    orchestrator = Orchestrator(context=context)
+    decision = orchestrator.select_agent("revisa el dockerfile de este proyecto")
+    if decision.agent_name is None:
+        return  # docker no existe en este perfil — no es un fallo
+    (context.root / "Dockerfile").write_text("FROM python:3.12-slim\nUSER app\n")
+    result = orchestrator.dispatch("revisa el dockerfile de este proyecto")
+    assert result.success
+    assert result.certainty <= decision.confidence + 1e-9
+    assert result.certainty > 0.0

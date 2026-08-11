@@ -46,10 +46,7 @@ def require_binary(binary: str, *, cwd: Path | None = None) -> None:
         return
     if _resolver_binario(binary, cwd) is not None:
         return
-    raise MissingDependencyError(
-        f"'{binary}' no está instalado o no está en el PATH. "
-        f"Este agente necesita el binario '{binary}' disponible en el sistema."
-    )
+    raise MissingDependencyError(f"'{binary}' no está instalado o no está en el PATH. Este agente necesita el binario '{binary}' disponible en el sistema.")
 
 
 def _resolver_binario(binary: str, cwd: Path | None) -> str | None:

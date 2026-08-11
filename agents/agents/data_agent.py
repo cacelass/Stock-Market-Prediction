@@ -27,6 +27,7 @@ def _has_plt() -> bool:
     """Verifica si matplotlib está disponible."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         return True
     except ImportError:
@@ -42,9 +43,23 @@ class DataAgent(BaseAgent):
         "informes de perfilado / sugerencias de imputación."
     )
     capabilities = [
-        "dataset", "datos", "eda", "outlier", "outliers", "cardinalidad",
-        "fuga de informacion", "leakage", "correlacion", "csv", "parquet",
-        "limpieza", "features", "skewness", "sesgo", "imputacion", "profiling",
+        "dataset",
+        "datos",
+        "eda",
+        "outlier",
+        "outliers",
+        "cardinalidad",
+        "fuga de informacion",
+        "leakage",
+        "correlacion",
+        "csv",
+        "parquet",
+        "limpieza",
+        "features",
+        "skewness",
+        "sesgo",
+        "imputacion",
+        "profiling",
     ]
 
     def action_aliases(self) -> dict:
@@ -75,21 +90,18 @@ class DataAgent(BaseAgent):
         reader = DataIOTool.infer_reader(path)
         result = reader(path)
         if not isinstance(result, pd.DataFrame):
-            raise TypeError(
-                f"'{path.name}' no se pudo cargar como tabla (¿es un .json con estructura no tabular?)."
-            )
+            raise TypeError(f"'{path.name}' no se pudo cargar como tabla (¿es un .json con estructura no tabular?).")
         return result
 
     def list_datasets(self) -> AgentResult:
         candidates = []
         for stage_dir in (self.ctx.raw_data_dir, self.ctx.interim_data_dir, self.ctx.processed_data_dir):
             if stage_dir.exists():
-                candidates.extend(
-                    p for p in stage_dir.iterdir()
-                    if p.is_file() and p.suffix.lower() in (".csv", ".parquet", ".json")
-                )
+                candidates.extend(p for p in stage_dir.iterdir() if p.is_file() and p.suffix.lower() in (".csv", ".parquet", ".json"))
         return AgentResult(
-            True, self.name, "list_datasets",
+            True,
+            self.name,
+            "list_datasets",
             f"{len(candidates)} archivo(s) de datos encontrado(s).",
             data=[str(p.relative_to(self.ctx.root)) for p in sorted(candidates)],
         )
@@ -126,14 +138,14 @@ class DataAgent(BaseAgent):
             if leakage:
                 warnings.append(f"{len(leakage)} columna(s) sospechosa(s) de fuga de información con '{target_col}'.")
 
-        n_issues = sum(
-            len(report[k]) for k in
-            ("constant_columns", "high_cardinality_columns", "high_missing_columns", "outliers")
-        )
+        n_issues = sum(len(report[k]) for k in ("constant_columns", "high_cardinality_columns", "high_missing_columns", "outliers"))
         return AgentResult(
-            True, self.name, "eda_report",
+            True,
+            self.name,
+            "eda_report",
             f"EDA de '{filename}' completo: {df.shape[0]} filas × {df.shape[1]} columnas, {n_issues} hallazgo(s).",
-            data=report, warnings=warnings,
+            data=report,
+            warnings=warnings,
         )
 
     def detect_leakage(self, *, filename: str, target_col: str, correlation_threshold: float = 0.95) -> AgentResult:
@@ -150,7 +162,9 @@ class DataAgent(BaseAgent):
 
         suspects = DataFrameAnalysisTool.leakage_suspects(df, target_col, correlation_threshold=correlation_threshold)
         return AgentResult(
-            True, self.name, "detect_leakage",
+            True,
+            self.name,
+            "detect_leakage",
             f"{len(suspects)} columna(s) sospechosa(s) de fuga de información.",
             data=[f.__dict__ for f in suspects],
             warnings=["Correlación alta no es prueba de fuga — es una señal para revisar manualmente."] if suspects else [],
@@ -178,7 +192,9 @@ class DataAgent(BaseAgent):
                 from pandas_profiling import ProfileReport
             except ImportError:
                 return AgentResult(
-                    False, self.name, "profiling_report",
+                    False,
+                    self.name,
+                    "profiling_report",
                     "ydata-profiling no está instalado. Ejecuta: uv add ydata-profiling",
                 )
 
@@ -192,7 +208,9 @@ class DataAgent(BaseAgent):
         profile.to_file(str(output_path))
 
         return AgentResult(
-            True, self.name, "profiling_report",
+            True,
+            self.name,
+            "profiling_report",
             f"Informe de perfilado generado: {output_path}",
             data={"path": str(output_path), "n_rows": df.shape[0], "n_cols": df.shape[1]},
         )
@@ -231,7 +249,9 @@ class DataAgent(BaseAgent):
                     suggestions.append({"column": col, "null_pct": round(pct, 3), "suggestion": "considera agrupar nulos como categoría 'Unknown'"})
 
         return AgentResult(
-            True, self.name, "suggest_imputation",
+            True,
+            self.name,
+            "suggest_imputation",
             f"{len(suggestions)} columna(s) con nulos analizadas.",
             data={"suggestions": suggestions, "n_rows": df.shape[0]},
             warnings=[] if len(suggestions) < 5 else [f"{len(suggestions)} columnas con nulos — revisa si todas son relevantes."],
@@ -260,13 +280,12 @@ class DataAgent(BaseAgent):
         low_skew = {k: round(v, 3) for k, v in sorted(skew_values.items(), key=lambda x: -abs(x[1])) if abs(v) <= threshold}
 
         return AgentResult(
-            True, self.name, "detect_skewness",
+            True,
+            self.name,
+            "detect_skewness",
             f"{len(high_skew)} columna(s) con |skew| > {threshold} candidatas para LOGCOLS.",
             data={"high_skew": high_skew, "low_skew": low_skew, "threshold": threshold},
-            warnings=(
-                [f"Añade a LOGCOLS: {list(high_skew.keys())[:10]}" + ("..." if len(high_skew) > 10 else "")]
-                if high_skew else []
-            ),
+            warnings=([f"Añade a LOGCOLS: {list(high_skew.keys())[:10]}" + ("..." if len(high_skew) > 10 else "")] if high_skew else []),
         )
 
     def quality_check(self, *, filename: str) -> AgentResult:
@@ -299,7 +318,9 @@ class DataAgent(BaseAgent):
             warnings.append(f"{quality['duplicate_rows_pct']:.1%} filas duplicadas.")
 
         return AgentResult(
-            True, self.name, "quality_check",
+            True,
+            self.name,
+            "quality_check",
             f"Calidad de '{filename}': {profile['rows']} filas × {profile['cols']} columnas, {len(warnings)} advertencia(s).",
             data={"profile": profile, "quality": quality},
             warnings=warnings,
@@ -330,7 +351,7 @@ class DataAgent(BaseAgent):
         correlation_results = {}
         if len(num_cols) >= 2:
             for i, c1 in enumerate(num_cols[:10]):
-                for c2 in num_cols[i + 1:10]:
+                for c2 in num_cols[i + 1 : 10]:
                     clean = df[[c1, c2]].dropna()
                     if len(clean) >= 10:
                         corr = StatsTool.correlation(clean[c1].values, clean[c2].values)
@@ -340,8 +361,12 @@ class DataAgent(BaseAgent):
         target_stats = None
         if target_col and target_col in df.columns:
             if df[target_col].dtype.kind in "ifc":
-                target_stats = {"mean": float(df[target_col].mean()), "std": float(df[target_col].std()),
-                                "min": float(df[target_col].min()), "max": float(df[target_col].max())}
+                target_stats = {
+                    "mean": float(df[target_col].mean()),
+                    "std": float(df[target_col].std()),
+                    "min": float(df[target_col].min()),
+                    "max": float(df[target_col].max()),
+                }
             else:
                 target_stats = {"value_counts": df[target_col].value_counts().head(10).to_dict()}
 
@@ -352,7 +377,9 @@ class DataAgent(BaseAgent):
             warnings.append(f"{len(correlation_results)} par(es) con |r| > 0.7.")
 
         return AgentResult(
-            True, self.name, "statistical_summary",
+            True,
+            self.name,
+            "statistical_summary",
             f"Análisis estadístico de '{filename}': {len(num_cols)} numéricas, {len(non_normal)} no normales, {len(correlation_results)} correlaciones fuertes.",
             data={
                 "normality": normality_results,
@@ -373,7 +400,9 @@ class DataAgent(BaseAgent):
         """
         if not _has_plt():
             return AgentResult(
-                False, self.name, "generate_plots",
+                False,
+                self.name,
+                "generate_plots",
                 "matplotlib no está instalado. Ejecuta: uv add matplotlib seaborn",
             )
 
@@ -382,7 +411,9 @@ class DataAgent(BaseAgent):
             import seaborn as sns
         except ImportError:
             return AgentResult(
-                False, self.name, "generate_plots",
+                False,
+                self.name,
+                "generate_plots",
                 "seaborn no está instalado. Ejecuta: uv add seaborn",
             )
 
@@ -429,7 +460,7 @@ class DataAgent(BaseAgent):
                 axes_2d = axes
             for i, col in enumerate(num_cols[:n_plots]):
                 ax_hist = axes_2d[i, 0]
-                ax_box  = axes_2d[i, 1]
+                ax_box = axes_2d[i, 1]
                 sns.histplot(df[col].dropna(), kde=True, ax=ax_hist)
                 ax_hist.set_title(f"{col} — Histograma")
                 sns.boxplot(y=df[col].dropna(), ax=ax_box)
@@ -458,7 +489,9 @@ class DataAgent(BaseAgent):
             generated.append(str(cat_path.relative_to(self.ctx.root)))
 
         return AgentResult(
-            True, self.name, "generate_plots",
+            True,
+            self.name,
+            "generate_plots",
             f"{len(generated)} gráfico(s) generado(s) en {out_dir}",
             data={"generated": generated, "output_dir": str(out_dir)},
         )

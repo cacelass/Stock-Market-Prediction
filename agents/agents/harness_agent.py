@@ -15,6 +15,7 @@ forma de saltársela pidiéndoselo amablemente al modelo.
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -23,7 +24,7 @@ from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 from agents.tools.process_tool import run_command
 
-VALID_STATUS = ("pending", "in_progress", "done", "blocked")
+VALID_STATUS = ("pending", "spec_ready", "in_progress", "done", "blocked")
 REQUIRED_FIELDS = ("id", "title", "description", "acceptance_criteria", "status")
 
 #: Rechazos seguidos del reviewer antes de bloquear la feature y escalar.
@@ -31,11 +32,166 @@ REQUIRED_FIELDS = ("id", "title", "description", "acceptance_criteria", "status"
 #: casi nunca es el código, sino el criterio o cómo está planteada la feature.
 MAX_REVIEW_ROUNDS = 3
 
+#: Umbral de certeza (`μ.cert`) para cerrar una feature. Un `done` con certeza
+#: baja es una ronda que iba a fallar — quien la cierra debería saber por qué
+#: duda y pedir verificación explícita, no colarla por el hueco del `success`.
+FINISH_MIN_CERTAINTY = 0.6
+
+#: Acepta "1.0", "0.8", ".5"… el formato de `certainty` que escribe `record`,
+#: con o sin el negrita markdown del header (`- **Certeza:** 0.5`).
+_CERT_RE = re.compile(r"Certeza:\*{0,2}\s*(\d+(?:\.\d+)?)")
+
 _RECHAZOS = ("rechazado", "rechaza", "rejected", "fail", "ko")
+
+#: Longitud mínima que tiene una salida de comando real. "ok", "hecho" o "pasa"
+#: son afirmaciones, no evidencia — y `finish()` las rechaza (ver
+#: `_evidencia_plausible`).
+_EVIDENCIA_MIN_LEN = 24
+
+
+def _evidencia_plausible(evidence: str) -> bool:
+    """
+    ¿Esto parece la salida literal de un comando, o una afirmación?
+
+    Un pytest/make/init.sh real siempre produce varias palabras y algo de
+    estructura. Una evidencia inventada suele ser corta y llana ("ok",
+    "los tests pasan"). La puerta no puede saber si la salida es verdad, pero
+    sí puede exigir que no sea una afirmación suelta: la verificación de que
+    es verdad ya la hace `gate()` ejecutando `init.sh` — este check solo
+    obliga a que la evidencia documente esa ejecución, no a que se la inventen.
+    """
+    texto = evidence.strip()
+    if len(texto) < _EVIDENCIA_MIN_LEN:
+        return False
+    return len(texto.split()) >= 3
 
 
 def _es_rechazo(verdict: str) -> bool:
     return verdict.strip().lower() in _RECHAZOS
+
+
+#: Ejes del protocolo §1 (ver prompts/harness_workflow.md). `μ` es obligatorio
+#: porque es donde vive el rol y la certeza (`cert`) que `finish` lee. `§` es
+#: la versión del codec (1), igual que en el seed de trasgo — se acepta y se
+#: ignora salvo para futuras migraciones.
+_PACKET_AXES = ("E", "S", "R", "Δ", "μ", "§")
+
+
+def _validar_packet(packet: str) -> tuple[dict | None, str]:
+    """
+    Valida un packet §1 y devuelve (dict, error). Error vacío = válido.
+
+    El packet es la forma compacta de un informe de subagente (ver el boot
+    seed de prompts/harness_workflow.md): un JSON con los ejes E/S/R/Δ/μ.
+    No se exige que `E` y `S` estén llenos — un informe puede no tocar
+    entidades nuevas — pero sí que el JSON sea parseable, que no meta ejes
+    desconocidos (un typo en 'Entidades' silenciaría el ahorro de tokens) y
+    que declare `μ` con `rol`. El `cert` es opcional aquí: la prosa del
+    `--content` sigue existiendo igualmente.
+    """
+    try:
+        doc = json.loads(packet)
+    except json.JSONDecodeError as exc:
+        return None, f"packet no es JSON válido: {exc}"
+    if not isinstance(doc, dict):
+        return None, "el packet debe ser un objeto JSON"
+
+    claves = set(doc)
+    ejes = set(_PACKET_AXES)
+    extra = claves - ejes
+    if extra:
+        return None, f"ejes desconocidos en el packet: {sorted(extra)} (válidos: {sorted(ejes)})"
+    if "μ" not in doc:
+        return None, "el packet debe declarar el eje μ (rol, cert)"
+    mu = doc["μ"]
+    if not isinstance(mu, dict) or not isinstance(mu.get("rol"), str) or not mu["rol"]:
+        return None, "μ.rol es obligatorio (qué agente reporta este packet)"
+    cert = mu.get("cert")
+    if cert is not None:
+        try:
+            cert = float(cert)
+        except (TypeError, ValueError):
+            return None, f"μ.cert debe ser un número 0..1, no '{cert}'"
+        if not 0.0 <= cert <= 1.0:
+            return None, f"μ.cert debe estar entre 0 y 1, no '{cert}'"
+        mu["cert"] = round(cert, 3)
+    return doc, ""
+
+
+def _certeza_de_informe(path: Path) -> float | None:
+    """Lee la certeza (`μ.cert`) que `record` guardó en la cabecera del informe."""
+    try:
+        texto = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    match = _CERT_RE.search(texto)
+    if not match:
+        return None
+    try:
+        valor = float(match.group(1))
+    except ValueError:
+        return None
+    return min(max(valor, 0.0), 1.0)
+
+
+#: Frontmatter §1: `<!-- §1: {...} -->` al principio del informe (ver `record`).
+_PACKET_RE = re.compile(r"<!--\s*§1:\s*(\{.*?\})\s*-->", re.DOTALL)
+
+
+def _leer_packet(path: Path) -> dict | None:
+    """Extrae el packet §1 del frontmatter de un informe, o None si no lo tiene."""
+    try:
+        texto = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    match = _PACKET_RE.search(texto)
+    if not match:
+        return None
+    try:
+        doc = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def _packet_resumen(packet: dict) -> str:
+    """
+    Comprime un packet §1 a una línea legible para el siguiente agente: qué
+    cambió (`Δ`) y con qué certeza (`μ.cert`). El resto del packet vive en el
+    fichero; el handoff no necesita más que el resumen.
+    """
+    deltas = packet.get("Δ", [])
+    mu = packet.get("μ", {})
+    cert = mu.get("cert")
+    base = "; ".join(str(d) for d in deltas) if isinstance(deltas, list) and deltas else "(sin cambios)"
+    if isinstance(cert, (int, float)):
+        return f"Δ: {base} · μ.cert {float(cert):.2f}"
+    return f"Δ: {base}"
+
+
+def validate_gherkin(text: str) -> list[str]:
+    """
+    Valida la estructura mínima de un contrato Gherkin sin dependencias.
+
+    No es un parser completo de Gherkin: comprueba lo que el arnés necesita
+    (una Feature, al menos un Scenario, y pasos Given/When/Then en cada uno)
+    para que un `.feature` escrito a mano no pase la puerta con un formato
+    roto. La semántica —si los escenarios capturan bien el comportamiento—
+    es de la revisión humana, no de un validador de sintaxis.
+    """
+    problems: list[str] = []
+    if "Feature:" not in text:
+        problems.append("falta 'Feature:'")
+
+    scenarios = re.findall(r"(?m)^\s*Scenario:.*$", text)
+    if not scenarios:
+        problems.append("no hay ningún 'Scenario:'")
+
+    steps = re.findall(r"(?m)^\s+(Given|When|Then|And|But)\b", text)
+    if scenarios and not steps:
+        problems.append("ningún escenario tiene pasos Given/When/Then")
+    return problems
+
 
 CURRENT_TEMPLATE = """# Tarea actual
 
@@ -94,15 +250,23 @@ _(qué impide avanzar y qué se necesita para desbloquearlo — vacío si nada)_
 class HarnessAgent(BaseAgent):
     name = "harness"
     description = (
-        "Dueño del arnés: lee y actualiza featureslist.json y progress/, y "
-        "ejecuta la puerta init.sh. No cierra una feature si la puerta no pasa."
+        "Dueño del arnés: lee y actualiza harness/featureslist.json y harness/progress/, y ejecuta la puerta init.sh. No cierra una feature si la puerta no pasa."
     )
     # Ojo: "feature"/"features" NO van aquí — son del agente `data`
     # (feature engineering). Un keyword, un dueño.
     capabilities = [
-        "arnes", "arnés", "harness", "backlog",
-        "tarea pendiente", "siguiente tarea", "progreso", "progress",
-        "criterios de aceptacion", "criterios de aceptación", "puerta", "gate",
+        "arnes",
+        "arnés",
+        "harness",
+        "backlog",
+        "tarea pendiente",
+        "siguiente tarea",
+        "progreso",
+        "progress",
+        "criterios de aceptacion",
+        "criterios de aceptación",
+        "puerta",
+        "gate",
     ]
 
     def actions(self) -> dict:
@@ -110,6 +274,8 @@ class HarnessAgent(BaseAgent):
             "status": self.status,
             "next": self.next,
             "start": self.start,
+            "write_feature": self.write_feature,
+            "approve": self.approve,
             "finish": self.finish,
             "block": self.block,
             "record": self.record,
@@ -118,13 +284,24 @@ class HarnessAgent(BaseAgent):
         }
 
     # -- rutas ---------------------------------------------------------------
+    #: Todo el estado del arnés vive bajo `harness/`. Antes estaba repartido
+    #: por la raíz (`featureslist.json`, `progress/`, `memory.md`) y lo primero
+    #: que veía alguien al abrir el proyecto era el andamiaje de la IA, no su
+    #: proyecto de datos. Es un directorio visible y no oculto a propósito: el
+    #: backlog es justo lo que quieres que un humano abra.
+    HARNESS_DIR = "harness"
+
+    @property
+    def _harness_dir(self) -> Path:
+        return self.ctx.root / self.HARNESS_DIR
+
     @property
     def _backlog_file(self) -> Path:
-        return self.ctx.root / "featureslist.json"
+        return self._harness_dir / "featureslist.json"
 
     @property
     def _progress_dir(self) -> Path:
-        return self.ctx.root / "progress"
+        return self._harness_dir / "progress"
 
     @property
     def _current_file(self) -> Path:
@@ -134,6 +311,10 @@ class HarnessAgent(BaseAgent):
     def _history_file(self) -> Path:
         return self._progress_dir / "history.md"
 
+    @property
+    def _features_dir(self) -> Path:
+        return self.ctx.root / "features"
+
     # -- backlog -------------------------------------------------------------
     def _load(self) -> tuple[dict | None, str]:
         """Devuelve (documento, error). Si error != "", el documento es None."""
@@ -142,15 +323,13 @@ class HarnessAgent(BaseAgent):
         try:
             doc = json.loads(self._backlog_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            return None, f"featureslist.json no es JSON válido: {exc}"
+            return None, f"harness/featureslist.json no es JSON válido: {exc}"
         if not isinstance(doc, dict) or not isinstance(doc.get("features"), list):
-            return None, "featureslist.json debe ser un objeto con la clave 'features' (lista)."
+            return None, "harness/featureslist.json debe ser un objeto con la clave 'features' (lista)."
         return doc, ""
 
     def _save(self, doc: dict) -> None:
-        self._backlog_file.write_text(
-            json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
+        self._backlog_file.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     @staticmethod
     def _find(doc: dict, feature_id: str) -> dict | None:
@@ -163,12 +342,7 @@ class HarnessAgent(BaseAgent):
     def _eligible(doc: dict) -> list[dict]:
         """Pendientes cuyas dependencias están todas en done, en orden de backlog."""
         done = {f["id"] for f in doc["features"] if f.get("status") == "done"}
-        return [
-            f
-            for f in doc["features"]
-            if f.get("status") == "pending"
-            and all(dep in done for dep in f.get("depends_on", []))
-        ]
+        return [f for f in doc["features"] if f.get("status") == "pending" and all(dep in done for dep in f.get("depends_on", []))]
 
     def _fail(self, action: str, message: str, **kw: Any) -> AgentResult:
         return AgentResult(success=False, agent=self.name, action=action, message=message, **kw)
@@ -188,10 +362,7 @@ class HarnessAgent(BaseAgent):
         running = [f["id"] for f in features if f.get("status") == "in_progress"]
         warnings = []
         if len(running) > 1:
-            warnings.append(
-                f"{len(running)} features in_progress a la vez ({', '.join(running)}). "
-                f"El arnés espera una: cierra o bloquea las demás."
-            )
+            warnings.append(f"{len(running)} features in_progress a la vez ({', '.join(running)}). El arnés espera una: cierra o bloquea las demás.")
 
         eligible = self._eligible(doc)
         return AgentResult(
@@ -199,18 +370,13 @@ class HarnessAgent(BaseAgent):
             agent=self.name,
             action="status",
             message=(
-                f"{len(features)} features · {counts['pending']} pending · "
-                f"{counts['in_progress']} in_progress · {counts['done']} done · "
-                f"{counts['blocked']} blocked"
+                f"{len(features)} features · {counts['pending']} pending · {counts['in_progress']} in_progress · {counts['done']} done · {counts['blocked']} blocked"
             ),
             data={
                 "counts": counts,
                 "in_progress": running,
                 "eligible": [f["id"] for f in eligible],
-                "features": [
-                    {"id": f.get("id"), "title": f.get("title"), "status": f.get("status")}
-                    for f in features
-                ],
+                "features": [{"id": f.get("id"), "title": f.get("title"), "status": f.get("status")} for f in features],
             },
             warnings=warnings,
         )
@@ -225,7 +391,9 @@ class HarnessAgent(BaseAgent):
         if running:
             feat = running[0]
             return AgentResult(
-                success=True, agent=self.name, action="next",
+                success=True,
+                agent=self.name,
+                action="next",
                 message=f"Retoma {feat['id']} — {feat['title']} (ya estaba in_progress).",
                 data=feat,
             )
@@ -237,28 +405,101 @@ class HarnessAgent(BaseAgent):
             if pending:
                 return self._fail(
                     "next",
-                    "Hay features pendientes pero ninguna tiene sus dependencias en done. "
-                    "Revisa depends_on o desbloquea lo que falte.",
+                    "Hay features pendientes pero ninguna tiene sus dependencias en done. Revisa depends_on o desbloquea lo que falte.",
                     data={"pending": pending, "blocked": blocked},
                 )
             return AgentResult(
-                success=True, agent=self.name, action="next",
+                success=True,
+                agent=self.name,
+                action="next",
                 message="Sin trabajo pendiente: el backlog está cerrado.",
                 data={"blocked": blocked},
             )
 
         feat = eligible[0]
+        if feat.get("id") == "SCOPE-001" and not (self.ctx.root / "references" / "00-objetivo.md").exists():
+            # Primera vez en un proyecto recién generado: no rellenes el spec a
+            # mano. La entrevista `plan scope` lo construye y siembra el backlog
+            # en orden lógico — el agente lo propone, no espera a que se lo pidan.
+            return AgentResult(
+                success=True,
+                agent=self.name,
+                action="next",
+                message=(
+                    f"Siguiente: {feat['id']} — {feat['title']}. Este proyecto no tiene spec todavía: "
+                    "ejecuta `run plan scope` para la entrevista de arranque que escribe "
+                    "references/00-objetivo.md y siembra el backlog en orden lógico."
+                ),
+                data={**feat, "sugerencia": "plan scope", "motivo": "sin references/00-objetivo.md (proyecto recién generado)"},
+            )
+
         return AgentResult(
-            success=True, agent=self.name, action="next",
+            success=True,
+            agent=self.name,
+            action="next",
             message=f"Siguiente: {feat['id']} — {feat['title']}",
-            data=feat,
+            data={**feat, "antecedentes": self._antecedentes(feat)},
         )
 
+    def _antecedentes(self, feat: dict) -> list[dict]:
+        """
+        Qué se hizo antes que se parezca a esta feature, según `harness/progress/`.
+
+        `harness/progress/history.md` crece con cada feature cerrada y nadie lo relee
+        entero. Buscar en él por la descripción de lo que toca ahora es la
+        forma barata de que el líder pueda pasarle al subagente la ruta del
+        precedente en vez de nada. Se devuelven rutas y líneas, no el texto
+        completo: heredar contexto es justo lo que el arnés evita.
+
+        Si el proyecto no tiene RAG, no hay antecedentes y ya está: es
+        información de más, nunca un requisito.
+        """
+        try:
+            from agents.tools.rag_tool import RagTool
+
+            if not RagTool.available():
+                return []
+            consulta = f"{feat.get('title', '')} {feat.get('description', '')}".strip()
+            if not consulta:
+                return []
+            hits = RagTool.search(self.ctx.root, consulta, top_k=3, source="harness/progress/", max_per_source=1)
+        except Exception:  # noqa: BLE001 — una pista de más no puede tumbar `next`
+            return []
+
+        antecedentes = []
+        for h in hits:
+            if "error" in h:
+                continue
+            item: dict = {"source": h["source"], "line": h["line"]}
+            packet = _leer_packet(self.ctx.root / h["source"])
+            if packet is not None:
+                # El protocolo §1: el precedente se resume en su packet (Δ + μ),
+                # unos pocos tokens, en vez del extracto de 200 caracteres.
+                item["packet"] = packet
+                item["extracto"] = _packet_resumen(packet)
+            else:
+                item["extracto"] = h["text"][:200]
+            antecedentes.append(item)
+        return antecedentes
+
+    def _ultima_certeza_reviewer(self, feature_id: str) -> float | None:
+        """
+        La certeza del último informe del reviewer sobre `feature_id`, o None.
+
+        `finish` la usa como señal `μ.cert` cuando quien cierra no pasa una
+        certeza explícita: si el reviewer dudó al aprobar, el 'done' hereda
+        esa duda. Si no hay informe de reviewer (o no tiene certeza), se
+        devuelve None — y `finish` asume confianza plena, como siempre fue.
+        """
+        path = self._progress_dir / f"reviewer-{feature_id}.md"
+        if not path.exists():
+            return None
+        return _certeza_de_informe(path)
+
     def start(self, *, id: str = "", owner: str = "implementer") -> AgentResult:
-        """Abre una feature: status in_progress y progress/current.md rellenado."""
+        """Abre una feature: status in_progress y harness/progress/current.md rellenado."""
         if not id:
-            return self._fail("start", "Falta el id de la feature.",
-                              needs=["¿Qué feature abro? Usa el id de featureslist.json (ej. DATA-001)."])
+            return self._fail("start", "Falta el id de la feature.", needs=["¿Qué feature abro? Usa el id de featureslist.json (ej. DATA-001)."])
 
         doc, error = self._load()
         if doc is None:
@@ -311,9 +552,129 @@ class HarnessAgent(BaseAgent):
         )
 
         return AgentResult(
-            success=True, agent=self.name, action="start",
-            message=f"{id} abierta (in_progress) y volcada en progress/current.md.",
+            success=True,
+            agent=self.name,
+            action="start",
+            message=f"{id} abierta (in_progress) y volcada en harness/progress/current.md.",
             data={"id": id, "criteria": feat.get("acceptance_criteria", [])},
+        )
+
+    # -- contrato Gherkin (flujo SDD) ----------------------------------------
+    def write_feature(self, *, id: str = "", content: str = "") -> AgentResult:
+        """
+        Escribe el contrato Gherkin de una feature en `features/<id>.feature`.
+
+        Flujo spec-driven: antes de codear, la feature pasa por `spec_ready`
+        y un humano aprueba los escenarios (`approve`). `content` es el texto
+        Gherkin; si no se pasa, se genera un borrador con un escenario por
+        criterio de aceptación. El fichero es el estado de la spec, fuera del
+        JSON — igual que `harness/progress/` lo es del progreso.
+        """
+        if not id:
+            return self._fail("write_feature", "Falta el id de la feature.", needs=["¿Qué feature documento? Usa el id de featureslist.json."])
+
+        doc, error = self._load()
+        if doc is None:
+            return self._fail("write_feature", error)
+
+        feat = self._find(doc, id)
+        if feat is None:
+            return self._fail("write_feature", f"No existe la feature '{id}' en el backlog.")
+        if feat.get("status") == "done":
+            return self._fail("write_feature", f"'{id}' ya está cerrada.")
+
+        gherkin = content.strip() if content.strip() else self._draft_feature(feat)
+        problems = validate_gherkin(gherkin)
+        if problems:
+            return self._fail("write_feature", f"El Gherkin no es válido: {'; '.join(problems)}.")
+
+        self._features_dir.mkdir(parents=True, exist_ok=True)
+        path = self._features_dir / f"{id}.feature"
+        path.write_text(gherkin.rstrip() + "\n", encoding="utf-8")
+        feat["status"] = "spec_ready"
+        self._save(doc)
+
+        return AgentResult(
+            success=True,
+            agent=self.name,
+            action="write_feature",
+            message=f"Contrato Gherkin escrito en features/{id}.feature ({feat.get('status')} → spec_ready).",
+            data={"path": str(path.relative_to(self.ctx.root)), "scenarios": gherkin.count("Scenario:"), "draft": not bool(content.strip())},
+            warnings=(
+                ["Borrador generado desde acceptance_criteria: revisa que los escenarios capturen los casos límite antes de aprobar."] if not content.strip() else []
+            ),
+        )
+
+    def _draft_feature(self, feat: dict) -> str:
+        """Un escenario Given-When-Then por criterio de aceptación."""
+        lines = [f"Feature: {feat.get('title', feat.get('id', ''))}", ""]
+        for i, criterion in enumerate(feat.get("acceptance_criteria", []), start=1):
+            lines += [
+                f"  Scenario: S{i} — {criterion}",
+                "    Given el sistema en su estado inicial",
+                "    When se ejecuta el comportamiento de esta feature",
+                f"    Then {criterion}",
+                "",
+            ]
+        return "\n".join(lines)
+
+    def approve(self, *, id: str = "", owner: str = "implementer") -> AgentResult:
+        """
+        Puerta humana del flujo SDD: aprueba la spec de una feature en
+        `spec_ready` y la abre (`in_progress`). Solo un humano aprueba —
+        esto es un paso explícito, no algo que el líder decide solo.
+        """
+        if not id:
+            return self._fail("approve", "Falta el id de la feature.", needs=["¿Qué feature apruebas? Usa el id de featureslist.json."])
+
+        doc, error = self._load()
+        if doc is None:
+            return self._fail("approve", error)
+
+        feat = self._find(doc, id)
+        if feat is None:
+            return self._fail("approve", f"No existe la feature '{id}' en el backlog.")
+        if feat.get("status") != "spec_ready":
+            return self._fail(
+                "approve",
+                f"'{id}' no está en spec_ready (está en '{feat.get('status')}'). Escribe primero el contrato con `harness write_feature`.",
+            )
+
+        feature_file = self._features_dir / f"{id}.feature"
+        if not feature_file.exists():
+            return self._fail(
+                "approve",
+                f"No existe features/{id}.feature — ejecuta `harness write_feature` primero.",
+            )
+
+        feat["status"] = "in_progress"
+        feat["started"] = date.today().isoformat()
+        feat["review_rounds"] = 0
+        feat.pop("blocked_reason", None)
+        self._save(doc)
+
+        self._progress_dir.mkdir(parents=True, exist_ok=True)
+        criteria = "\n".join(f"- [ ] {c}" for c in feat.get("acceptance_criteria", []))
+        self._current_file.write_text(
+            CURRENT_TEMPLATE.format(
+                fid=feat["id"],
+                status="in_progress",
+                started=feat["started"],
+                owner=owner,
+                description=feat.get("description", ""),
+                criteria=criteria or "_(sin criterios definidos)_",
+                log=f"Spec aprobada por el humano; contrato en features/{id}.feature.",
+                blockers="_(ninguno)_",
+            ),
+            encoding="utf-8",
+        )
+
+        return AgentResult(
+            success=True,
+            agent=self.name,
+            action="approve",
+            message=f"Spec de {id} aprobada e in_progress. Implementa contra features/{id}.feature.",
+            data={"id": id, "path": str(feature_file.relative_to(self.ctx.root))},
         )
 
     def gate(self, *, quick: bool = False) -> AgentResult:
@@ -341,24 +702,24 @@ class HarnessAgent(BaseAgent):
             success=bool(report.get("ready")),
             agent=self.name,
             action="gate",
-            message=(
-                "ENTORNO LISTO — se puede trabajar."
-                if report.get("ready")
-                else f"ENTORNO BLOQUEADO — {len(failed)} check(s) fallando."
-            ),
+            message=("ENTORNO LISTO — se puede trabajar." if report.get("ready") else f"ENTORNO BLOQUEADO — {len(failed)} check(s) fallando."),
             data=report,
             warnings=[f"{c['check']}: {c['detail']}" for c in failed],
         )
 
-    def finish(self, *, id: str = "", evidence: str = "", changes: str = "",
-               decisions: str = "", pending: str = "") -> AgentResult:
+    def finish(self, *, id: str = "", evidence: str = "", changes: str = "", decisions: str = "", pending: str = "", certainty: float | None = None) -> AgentResult:
         """
         Cierra una feature. REHÚSA si ./init.sh no pasa en verde: es la regla
         del arnés, y aquí es código, no una instrucción que se pueda ignorar.
+
+        `certainty` (0..1, idea `μ.cert`) es cuánta confianza tiene quien cierra
+        de que la feature está bien. Si no se pasa, se lee del último informe
+        del `reviewer` (si lo hay); si ninguno existe, se asume 1.0. Por debajo
+        de `FINISH_MIN_CERTAINTY` se rechaza: una feature que nadie avala con
+        seguridad no se cierra por la vía fácil.
         """
         if not id:
-            return self._fail("finish", "Falta el id de la feature.",
-                              needs=["¿Qué feature cierro? Usa su id de featureslist.json."])
+            return self._fail("finish", "Falta el id de la feature.", needs=["¿Qué feature cierro? Usa su id de featureslist.json."])
 
         doc, error = self._load()
         if doc is None:
@@ -383,9 +744,32 @@ class HarnessAgent(BaseAgent):
             return self._fail(
                 "finish",
                 f"'{id}' no se cierra sin evidencia.",
+                needs=["Pega la salida real del comando que demuestra cada criterio (pytest, make check, ./init.sh). Una afirmación no es evidencia."],
+            )
+
+        if not _evidencia_plausible(evidence):
+            return self._fail(
+                "finish",
+                f"'{id}' no se cierra: la evidencia no parece la salida de un comando.",
                 needs=[
-                    "Pega la salida real del comando que demuestra cada criterio "
-                    "(pytest, make check, ./init.sh). Una afirmación no es evidencia."
+                    "Pega la salida LITERAL del comando que lo demuestra (pytest, "
+                    "make check, ./init.sh). 'los tests pasan' es una afirmación, "
+                    "no evidencia: si no puedes pegar la salida, no lo has ejecutado."
+                ],
+            )
+
+        if certainty is None:
+            certainty = self._ultima_certeza_reviewer(id)
+        if certainty is not None and certainty < FINISH_MIN_CERTAINTY:
+            return self._fail(
+                "finish",
+                f"'{id}' no se cierra: certeza {certainty:.2f} por debajo del "
+                f"umbral ({FINISH_MIN_CERTAINTY}). El reviewer dudó, y un 'done' "
+                f"con dudas es una ronda que iba a fallar.",
+                needs=[
+                    f"Revisa harness/progress/reviewer-{id}.md: ¿qué le falta a la "
+                    f"feature para que el reviewer la avale? No se cierra con certeza "
+                    f"baja — se reabre el bucle implementer ↔ reviewer."
                 ],
             )
 
@@ -394,9 +778,7 @@ class HarnessAgent(BaseAgent):
         self._save(doc)
 
         gate_line = gate.data.get("checks", []) if isinstance(gate.data, dict) else []
-        pytest_line = next(
-            (c["detail"] for c in gate_line if c.get("check") == "pytest"), "init.sh en verde"
-        )
+        pytest_line = next((c["detail"] for c in gate_line if c.get("check") == "pytest"), "init.sh en verde")
 
         entry = (
             f"\n## {id} — {feat.get('title', '')}\n\n"
@@ -414,7 +796,9 @@ class HarnessAgent(BaseAgent):
         self._current_file.write_text(IDLE_CURRENT, encoding="utf-8")
 
         return AgentResult(
-            success=True, agent=self.name, action="finish",
+            success=True,
+            agent=self.name,
+            action="finish",
             message=f"{id} cerrada. Histórico actualizado y current.md en idle.",
             data={"id": id, "closed": feat["closed"]},
         )
@@ -441,14 +825,15 @@ class HarnessAgent(BaseAgent):
         feat["blocked_reason"] = reason
         self._save(doc)
         return AgentResult(
-            success=True, agent=self.name, action="block",
+            success=True,
+            agent=self.name,
+            action="block",
             message=f"{id} bloqueada: {reason}",
             data={"id": id, "reason": reason},
         )
 
-    def record(self, *, agent: str = "", id: str = "", content: str = "",
-               verdict: str = "ok") -> AgentResult:
-        """Guarda el informe de un subagente en progress/<agente>-<ID>.md."""
+    def record(self, *, agent: str = "", id: str = "", content: str = "", verdict: str = "ok", certainty: float | None = None, packet: str = "") -> AgentResult:
+        """Guarda el informe de un subagente en harness/progress/<agente>-<ID>.md."""
         if not agent or not id or not content:
             missing = []
             if not agent:
@@ -459,13 +844,27 @@ class HarnessAgent(BaseAgent):
                 missing.append("¿Qué contenido? El informe no puede ir vacío.")
             return self._fail("record", "Faltan datos para guardar el informe.", needs=missing)
 
+        # Protocolo §1: el packet compacto (JSON) es la cabecera del informe.
+        # Se valida aquí — un JSON roto o con ejes inventados no entra al disco.
+        if packet:
+            packet_doc, error = _validar_packet(packet)
+            if packet_doc is None:
+                return self._fail("record", f"packet inválido: {error}", needs=["Envía el packet como JSON §1 (E/S/R/Δ/μ), o usa solo --content."])
+            if certainty is None and "cert" in packet_doc["μ"]:
+                certainty = float(packet_doc["μ"]["cert"])
+        elif content.strip():
+            # Sin packet: se intenta inducir la certeza desde la prosa de la
+            # cabecera si alguien ya la escribió a mano — no se exige nada.
+            pass
+
         self._progress_dir.mkdir(parents=True, exist_ok=True)
         path = self._progress_dir / f"{agent}-{id}.md"
-        header = (
-            f"# {agent} · {id}\n\n"
-            f"- **Fecha:** {date.today().isoformat()}\n"
-            f"- **Veredicto:** {verdict}\n\n"
-        )
+        header = f"# {agent} · {id}\n\n- **Fecha:** {date.today().isoformat()}\n- **Veredicto:** {verdict}\n"
+        if certainty is not None:
+            header += f"- **Certeza:** {min(max(certainty, 0.0), 1.0):.2f}\n"
+        header += "\n"
+        if packet and packet_doc is not None:
+            header += f"<!-- §1: {json.dumps(packet_doc, ensure_ascii=False)} -->\n\n"
         path.write_text(header + content.strip() + "\n", encoding="utf-8")
 
         # El bucle implementer <-> reviewer es un patrón evaluador-optimizador,
@@ -485,41 +884,32 @@ class HarnessAgent(BaseAgent):
                 feat["review_rounds"] = rounds
                 if rounds >= MAX_REVIEW_ROUNDS:
                     feat["status"] = "blocked"
-                    feat["blocked_reason"] = (
-                        f"El reviewer rechazó {rounds} veces seguidas: el bucle se agotó."
-                    )
+                    feat["blocked_reason"] = f"El reviewer rechazó {rounds} veces seguidas: el bucle se agotó."
                 self._save(doc)
 
                 if rounds >= MAX_REVIEW_ROUNDS:
                     return self._fail(
                         "record",
                         f"Informe guardado, pero '{id}' se bloquea: {rounds} rechazos seguidos.",
-                        data={"path": str(path.relative_to(self.ctx.root)),
-                              "verdict": verdict, "review_rounds": rounds},
+                        data={"path": str(path.relative_to(self.ctx.root)), "verdict": verdict, "review_rounds": rounds},
                         needs=[
                             f"El reviewer ha rechazado '{id}' {rounds} veces. Repetir la misma "
-                            f"iteración no lo va a arreglar: lee progress/reviewer-{id}.md y "
+                            f"iteración no lo va a arreglar: lee harness/progress/reviewer-{id}.md y "
                             f"decide si el criterio es correcto, si la feature está mal "
                             f"planteada o si hace falta partirla en varias."
                         ],
                     )
 
         return AgentResult(
-            success=True, agent=self.name, action="record",
-            message=(
-                f"Informe guardado en progress/{path.name}"
-                + (f" · ronda de revisión {rounds}/{MAX_REVIEW_ROUNDS}" if rounds else "")
-            ),
-            warnings=(
-                [f"Van {rounds} rechazos de {MAX_REVIEW_ROUNDS}: a la siguiente se bloquea."]
-                if rounds and rounds == MAX_REVIEW_ROUNDS - 1 else []
-            ),
-            data={"path": str(path.relative_to(self.ctx.root)), "verdict": verdict,
-                  "review_rounds": rounds},
+            success=True,
+            agent=self.name,
+            action="record",
+            message=(f"Informe guardado en harness/progress/{path.name}" + (f" · ronda de revisión {rounds}/{MAX_REVIEW_ROUNDS}" if rounds else "")),
+            warnings=([f"Van {rounds} rechazos de {MAX_REVIEW_ROUNDS}: a la siguiente se bloquea."] if rounds and rounds == MAX_REVIEW_ROUNDS - 1 else []),
+            data={"path": str(path.relative_to(self.ctx.root)), "verdict": verdict, "review_rounds": rounds},
         )
 
-    def add(self, *, id: str = "", title: str = "", description: str = "",
-            criteria: str = "", depends_on: str = "") -> AgentResult:
+    def add(self, *, id: str = "", title: str = "", description: str = "", criteria: str = "", depends_on: str = "") -> AgentResult:
         """Añade una feature al backlog. `criteria` y `depends_on` van separados por `;`."""
         missing = []
         if not id:
@@ -552,7 +942,9 @@ class HarnessAgent(BaseAgent):
         doc["features"].append(feature)
         self._save(doc)
         return AgentResult(
-            success=True, agent=self.name, action="add",
+            success=True,
+            agent=self.name,
+            action="add",
             message=f"{id} añadida al backlog ({len(feature['acceptance_criteria'])} criterios).",
             data=feature,
         )

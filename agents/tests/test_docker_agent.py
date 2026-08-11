@@ -83,9 +83,7 @@ def test_lint_add_url_no_warning(tmp_path: Path):
 
 def test_lint_apt_without_recommends_warns(tmp_path: Path):
     dockerfile = tmp_path / "Dockerfile"
-    dockerfile.write_text(
-        "FROM ubuntu:22.04\nRUN apt-get update && apt-get install -y curl\n"
-    )
+    dockerfile.write_text("FROM ubuntu:22.04\nRUN apt-get update && apt-get install -y curl\n")
     findings = DockerTool.lint_dockerfile(dockerfile)
     assert any("--no-install-recommends" in f.message for f in findings)
 

@@ -61,7 +61,7 @@ class Orchestrator:
             scores.append((name, instance.can_handle(query)))
         scores.sort(key=lambda pair: -pair[1])
 
-        best_name, best_score = (scores[0] if scores else (None, 0.0))
+        best_name, best_score = scores[0] if scores else (None, 0.0)
         if best_score < MIN_CONFIDENCE:
             best_name = None
         return RoutingDecision(query=query, agent_name=best_name, confidence=best_score, candidates=scores)
@@ -81,19 +81,16 @@ class Orchestrator:
         """
         decision = self.select_agent(query)
         if decision.agent_name is None:
-            return AgentResult(
-                False, "orchestrator", "dispatch",
-                f"Ningún agente registrado alcanza la confianza mínima ({MIN_CONFIDENCE}) para: '{query}'. "
-                f"Candidatos evaluados: {decision.candidates}. Prueba a invocar el agente directamente "
-                f"si sabes cuál necesitas: agents.run(nombre, accion, **kwargs).",
-            )
+            return self._sin_agente(query, decision)
 
         agent = self._get_instance(decision.agent_name)
 
         chosen_action = action or agent.best_action(query)
         if chosen_action is None or chosen_action not in agent.actions():
             return AgentResult(
-                True, "orchestrator", "dispatch",
+                True,
+                "orchestrator",
+                "dispatch",
                 f"Agente seleccionado: '{decision.agent_name}' (confianza {decision.confidence:.2f}), "
                 f"pero no pude adivinar qué acción concreta usar. Especifica una acción con action=... "
                 f"— acciones disponibles: {sorted(agent.actions())}",
@@ -103,19 +100,70 @@ class Orchestrator:
         if action is None and not kwargs and not agent.can_auto_run(chosen_action):
             signature = inspect.signature(agent.actions()[chosen_action])
             required = [
-                name for name, param in signature.parameters.items()
-                if param.default is inspect.Parameter.empty
-                and param.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+                name
+                for name, param in signature.parameters.items()
+                if param.default is inspect.Parameter.empty and param.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
             ]
             return AgentResult(
-                True, "orchestrator", "dispatch",
+                True,
+                "orchestrator",
+                "dispatch",
                 f"Agente y acción más probables: '{decision.agent_name}.{chosen_action}', pero necesita "
                 f"argumento(s) que no puedo adivinar de una frase en lenguaje natural: {required}. "
                 f"Llama a run('{decision.agent_name}', '{chosen_action}', {', '.join(f'{r}=...' for r in required)}).",
                 data={"selected_agent": decision.agent_name, "selected_action": chosen_action, "required_args": required},
             )
 
-        return self.run(decision.agent_name, chosen_action, **kwargs)
+        result = self.run(decision.agent_name, chosen_action, **kwargs)
+        # El ruteo por palabras clave es heurístico (ver can_handle): si la
+        # confianza de haber elegido el agente correcto es baja, el resultado
+        # hereda esa duda. Es la señal `μ.cert` — el agente ejecutó bien, pero
+        # quizá no era el agente correcto. `harness.finish` y `audit` la leen.
+        result.certainty = min(result.certainty, decision.confidence)
+        return result
+
+    def _sin_agente(self, query: str, decision: RoutingDecision) -> AgentResult:
+        """
+        Nadie llega a la confianza mínima: antes de rendirse, mira en el índice.
+
+        El ruteo por palabras clave falla justo cuando la pregunta está bien
+        formulada pero no usa el vocabulario de ningún agente ("¿por qué
+        elegimos este modelo?"). Ahí no hay una acción que ejecutar, pero casi
+        siempre hay una respuesta escrita en el repositorio, y el RAG ya la
+        tiene indexada. Devolver dónde está es más útil que devolver la lista
+        de candidatos descartados.
+
+        No se ejecuta nada por el usuario y `success` sigue siendo `False`: es
+        una pista, no una acción. Si el RAG no está instalado o no encuentra
+        nada, se cae al mensaje de siempre.
+        """
+        cierre = (
+            f"Candidatos evaluados: {decision.candidates}. Prueba a invocar el agente directamente si sabes cuál necesitas: agents.run(nombre, accion, **kwargs)."
+        )
+        cabecera = f"Ningún agente registrado alcanza la confianza mínima ({MIN_CONFIDENCE}) para: '{query}'."
+        try:
+            from agents.tools.rag_tool import RagTool
+        except ImportError:
+            return AgentResult(False, "orchestrator", "dispatch", f"{cabecera} {cierre}")
+
+        if not RagTool.available():
+            return AgentResult(False, "orchestrator", "dispatch", f"{cabecera} {cierre}")
+
+        try:
+            hits = RagTool.search(self.ctx.root, query, top_k=3, max_per_source=1)
+        except Exception:  # noqa: BLE001 — una pista rota no debe tapar el mensaje real
+            hits = []
+        if not hits or "error" in hits[0]:
+            return AgentResult(False, "orchestrator", "dispatch", f"{cabecera} {cierre}")
+
+        pistas = "\n".join(f"  - {h['source']}:{h['line']} — {h['text'][:120]}" for h in hits)
+        return AgentResult(
+            False,
+            "orchestrator",
+            "dispatch",
+            f'{cabecera} No es una acción, pero el índice apunta a dónde está escrito:\n{pistas}\n(búsqueda completa: run rag search --query "{query}")\n{cierre}',
+            data={"rag_hints": hits, "candidates": decision.candidates},
+        )
 
     def run(self, agent_name: str, action: str, /, **kwargs: Any) -> AgentResult:
         """Ejecuta una acción concreta de un agente concreto, sin pasar por el ruteo por keywords."""

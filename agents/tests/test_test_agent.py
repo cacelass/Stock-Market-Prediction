@@ -30,6 +30,7 @@ def test_list_untested_modules_excludes_init(context):
 
 def test_list_untested_modules_missing_package_dir_fails(context):
     import shutil
+
     shutil.rmtree(context.root / "mi_paquete")
     agent = TestAgent(context=context)
     result = agent.list_untested_modules()
@@ -39,6 +40,7 @@ def test_list_untested_modules_missing_package_dir_fails(context):
 def test_coverage_report_without_project_slug_fails(context):
     from agents.config import ProjectConfig
     from agents.context import SharedContext
+
     ctx_sin_slug = SharedContext(root=context.root, config=ProjectConfig(project_slug=""))
     agent = TestAgent(context=ctx_sin_slug)
     result = agent.coverage_report()
@@ -57,7 +59,8 @@ def _junit_xml(content: str, tmp_path: Path) -> Path:
 def test_parse_junit_all_passing(tmp_path: Path):
     xml = _junit_xml(
         '<testsuites><testsuite name="pytest" tests="3" failures="0" errors="0" skipped="0" time="0.5">'
-        '<testcase classname="test_a" name="test_passes"/></testsuite></testsuites>', tmp_path,
+        '<testcase classname="test_a" name="test_passes"/></testsuite></testsuites>',
+        tmp_path,
     )
     result = PytestTool.parse_junit_xml(xml)
     assert result.total == 3
@@ -70,7 +73,8 @@ def test_parse_junit_with_failures(tmp_path: Path):
         '<testsuites><testsuite name="pytest" tests="2" failures="1" errors="0" skipped="0" time="0.3">'
         '<testcase classname="test_b" name="test_fails">'
         '<failure message="AssertionError">assert 1 == 2</failure>'
-        '</testcase></testsuite></testsuites>', tmp_path,
+        "</testcase></testsuite></testsuites>",
+        tmp_path,
     )
     result = PytestTool.parse_junit_xml(xml)
     assert result.total == 2
@@ -85,7 +89,8 @@ def test_parse_junit_with_errors(tmp_path: Path):
         '<testsuites><testsuite name="pytest" tests="1" failures="0" errors="1" skipped="0" time="0.1">'
         '<testcase classname="test_c" name="test_errors">'
         '<error message="ImportError">No module named x</error>'
-        '</testcase></testsuite></testsuites>', tmp_path,
+        "</testcase></testsuite></testsuites>",
+        tmp_path,
     )
     result = PytestTool.parse_junit_xml(xml)
     assert result.errors == 1
@@ -97,7 +102,8 @@ def test_parse_junit_with_skipped(tmp_path: Path):
         '<testsuites><testsuite name="pytest" tests="1" failures="0" errors="0" skipped="1" time="0.0">'
         '<testcase classname="test_d" name="test_skipped">'
         '<skipped message="reason"/>'
-        '</testcase></testsuite></testsuites>', tmp_path,
+        "</testcase></testsuite></testsuites>",
+        tmp_path,
     )
     result = PytestTool.parse_junit_xml(xml)
     assert result.skipped == 1
@@ -105,8 +111,8 @@ def test_parse_junit_with_skipped(tmp_path: Path):
 
 def test_parse_junit_empty_suite(tmp_path: Path):
     xml = _junit_xml(
-        '<testsuites><testsuite name="pytest" tests="0" failures="0" errors="0" skipped="0" time="0.0"/>'
-        '</testsuites>', tmp_path,
+        '<testsuites><testsuite name="pytest" tests="0" failures="0" errors="0" skipped="0" time="0.0"/></testsuites>',
+        tmp_path,
     )
     result = PytestTool.parse_junit_xml(xml)
     assert result.total == 0
@@ -130,41 +136,51 @@ def test_parse_junit_no_testsuite_raises(tmp_path: Path):
 
 def _coverage_json(data: dict, tmp_path: Path) -> Path:
     import json
+
     path = tmp_path / "coverage.json"
     path.write_text(json.dumps(data))
     return path
 
 
 def test_parse_coverage_all_files(tmp_path: Path):
-    cov = _coverage_json({
-        "meta": {},
-        "files": {
-            "src/mod.py": {"summary": {"percent_covered": 85.0, "covered_lines": 17, "num_statements": 20}},
+    cov = _coverage_json(
+        {
+            "meta": {},
+            "files": {
+                "src/mod.py": {"summary": {"percent_covered": 85.0, "covered_lines": 17, "num_statements": 20}},
+            },
+            "totals": {"percent_covered": 85.0},
         },
-        "totals": {"percent_covered": 85.0},
-    }, tmp_path)
+        tmp_path,
+    )
     result = PytestTool.parse_coverage_json(cov)
     assert result["total_percent_covered"] == 85.0
     assert "src/mod.py" in result["per_file"]
 
 
 def test_parse_coverage_zero(tmp_path: Path):
-    cov = _coverage_json({
-        "meta": {},
-        "files": {},
-        "totals": {"percent_covered": 0.0},
-    }, tmp_path)
+    cov = _coverage_json(
+        {
+            "meta": {},
+            "files": {},
+            "totals": {"percent_covered": 0.0},
+        },
+        tmp_path,
+    )
     result = PytestTool.parse_coverage_json(cov)
     assert result["total_percent_covered"] == 0.0
     assert result["per_file"] == {}
 
 
 def test_parse_coverage_one_hundred(tmp_path: Path):
-    cov = _coverage_json({
-        "meta": {},
-        "files": {"src/mod.py": {"summary": {"percent_covered": 100.0, "covered_lines": 10, "num_statements": 10}}},
-        "totals": {"percent_covered": 100.0},
-    }, tmp_path)
+    cov = _coverage_json(
+        {
+            "meta": {},
+            "files": {"src/mod.py": {"summary": {"percent_covered": 100.0, "covered_lines": 10, "num_statements": 10}}},
+            "totals": {"percent_covered": 100.0},
+        },
+        tmp_path,
+    )
     result = PytestTool.parse_coverage_json(cov)
     assert result["total_percent_covered"] == 100.0
 
@@ -189,6 +205,7 @@ def test_generate_skeleton_existing_test_skips(context):
 
 def test_generate_skeleton_no_package_dir_empty_result(context):
     import shutil
+
     shutil.rmtree(context.root / "mi_paquete")
     agent = TestAgent(context=context)
     result = agent.generate_test_skeletons()

@@ -108,8 +108,7 @@ class GraphifyTool:
         """
         import os
 
-        skip = {".git", ".venv", "venv", "node_modules", "graphify-out",
-                "__pycache__", ".mypy_cache", ".ruff_cache"}
+        skip = {".git", ".venv", "venv", "node_modules", "graphify-out", "__pycache__", ".mypy_cache", ".ruff_cache"}
         vaults: list[Path] = []
         root = root.resolve()
         for dirpath, dirnames, _ in os.walk(root):
@@ -118,10 +117,7 @@ class GraphifyTool:
             rel = Path(dirpath).relative_to(root)
             depth = 0 if rel == Path(".") else len(rel.parts)
             # Poda in situ: no descender a skip, a .obsidian, ni más allá de max_depth.
-            dirnames[:] = [
-                d for d in dirnames
-                if d not in skip and d != ".obsidian" and (depth + 1) <= max_depth
-            ]
+            dirnames[:] = [d for d in dirnames if d not in skip and d != ".obsidian" and (depth + 1) <= max_depth]
         return sorted(set(vaults))
 
     # -- lectura del grafo ----------------------------------------------------
@@ -198,26 +194,29 @@ class GraphifyTool:
                 if comm is not None:
                     comm_counts[str(comm)] += 1
 
-            dominant_community = (
-                max(comm_counts.items(), key=lambda kv: kv[1])[0] if comm_counts else None
-            )
+            dominant_community = max(comm_counts.items(), key=lambda kv: kv[1])[0] if comm_counts else None
 
             # Correlación entre hijos: pares con mayor solapamiento de vecinos.
             correlated = GraphifyTool._correlated_pairs(children, adj, nodes, top=5)
 
-            summaries.append({
-                "id": parent_id,
-                "label": parent_node.get("label", parent_id),
-                "type": parent_node.get("type", "desconocido"),
-                "n_children": len(children),
-                "child_types": dict(type_counts),
-                "dominant_community": dominant_community,
-                "correlated_children": correlated,
-                "summary": GraphifyTool._render_summary(
-                    parent_node.get("label", parent_id),
-                    len(children), dict(type_counts), dominant_community, correlated,
-                ),
-            })
+            summaries.append(
+                {
+                    "id": parent_id,
+                    "label": parent_node.get("label", parent_id),
+                    "type": parent_node.get("type", "desconocido"),
+                    "n_children": len(children),
+                    "child_types": dict(type_counts),
+                    "dominant_community": dominant_community,
+                    "correlated_children": correlated,
+                    "summary": GraphifyTool._render_summary(
+                        parent_node.get("label", parent_id),
+                        len(children),
+                        dict(type_counts),
+                        dominant_community,
+                        correlated,
+                    ),
+                }
+            )
             if len(summaries) >= top:
                 break
         return summaries
@@ -260,12 +259,14 @@ class GraphifyTool:
         pairs.sort(reverse=True)
         result = []
         for score, a, b in pairs[:top]:
-            result.append({
-                "a": nodes.get(a, {}).get("label", a),
-                "b": nodes.get(b, {}).get("label", b),
-                "score": round(score, 3),
-                "shared_neighbors": len(adj.get(a, set()) & adj.get(b, set())),
-            })
+            result.append(
+                {
+                    "a": nodes.get(a, {}).get("label", a),
+                    "b": nodes.get(b, {}).get("label", b),
+                    "score": round(score, 3),
+                    "shared_neighbors": len(adj.get(a, set()) & adj.get(b, set())),
+                }
+            )
         return result
 
     @staticmethod
@@ -276,17 +277,13 @@ class GraphifyTool:
         dominant_community: str | None,
         correlated: list[dict[str, Any]],
     ) -> str:
-        types_str = ", ".join(f"{n} {t}" for t, n in
-                              sorted(type_counts.items(), key=lambda kv: -kv[1]))
+        types_str = ", ".join(f"{n} {t}" for t, n in sorted(type_counts.items(), key=lambda kv: -kv[1]))
         parts = [f"'{label}' agrupa {n_children} nodo(s) hijo ({types_str})"]
         if dominant_community is not None:
             parts.append(f"comunidad dominante {dominant_community}")
         if correlated:
             top_pair = correlated[0]
-            parts.append(
-                f"los más relacionados entre sí: '{top_pair['a']}' ↔ '{top_pair['b']}' "
-                f"({top_pair['shared_neighbors']} vecino(s) en común)"
-            )
+            parts.append(f"los más relacionados entre sí: '{top_pair['a']}' ↔ '{top_pair['b']}' ({top_pair['shared_neighbors']} vecino(s) en común)")
         return "; ".join(parts) + "."
 
     # -- poda de nodos --------------------------------------------------------
@@ -340,8 +337,7 @@ class GraphifyTool:
             # Aislado = superviviente de la poda por tipo/id que no aparece en
             # ninguna arista restante. Se calcula sobre kept_nodes (no sobre
             # todos los nodos) con un set de ids: O(n), sin comparar dicts.
-            isolated_ids = {str(n.get("id")) for n in kept_nodes
-                            if str(n.get("id")) not in connected}
+            isolated_ids = {str(n.get("id")) for n in kept_nodes if str(n.get("id")) not in connected}
             kept_nodes = [n for n in kept_nodes if str(n.get("id")) not in isolated_ids]
             removed_ids |= isolated_ids
             isolated_removed = len(isolated_ids)
@@ -406,9 +402,7 @@ class GraphifyTool:
         cssclasses: list[str] | None = None,
     ) -> str:
         """Nota completa: frontmatter + cuerpo en Obsidian Flavored Markdown."""
-        front = GraphifyTool.obsidian_frontmatter(
-            title, tags, aliases=aliases, cssclasses=cssclasses
-        )
+        front = GraphifyTool.obsidian_frontmatter(title, tags, aliases=aliases, cssclasses=cssclasses)
         return f"{front}\n\n{body.rstrip()}\n"
 
     @staticmethod
@@ -429,12 +423,12 @@ class GraphifyTool:
             "    displayName: Etiquetas\n"
             "views:\n"
             "  - type: table\n"
-            f"    name: \"{name}\"\n"
+            f'    name: "{name}"\n'
             "    order:\n"
             "      - file.name\n"
             "      - tags\n"
             "  - type: cards\n"
-            "    name: \"Tarjetas\"\n"
+            '    name: "Tarjetas"\n'
             "    order:\n"
             "      - file.name\n"
         )
@@ -449,10 +443,7 @@ class GraphifyTool:
         """
         prefix = GraphifyTool.command_prefix(root)
         if prefix is None:
-            raise FileNotFoundError(
-                "graphify no está disponible (ni .graphify_python ni binario en PATH). "
-                "Ejecuta el skill /graphify una vez para instalarlo."
-            )
+            raise FileNotFoundError("graphify no está disponible (ni .graphify_python ni binario en PATH). Ejecuta el skill /graphify una vez para instalarlo.")
         cmd = [*prefix, *args]
         return subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, timeout=timeout)
 
@@ -475,13 +466,10 @@ class GraphifyTool:
     @staticmethod
     def export_obsidian(root: Path, vault_dir: Path, *, timeout: int = 180) -> subprocess.CompletedProcess:
         """Exporta el grafo como bóveda de Obsidian (``graphify export obsidian --dir``)."""
-        return GraphifyTool.run_cli(
-            root, ["export", "obsidian", "--dir", str(vault_dir)], timeout=timeout
-        )
+        return GraphifyTool.run_cli(root, ["export", "obsidian", "--dir", str(vault_dir)], timeout=timeout)
 
     @staticmethod
-    def query(root: Path, question: str, *, budget: int | None = None,
-              timeout: int = 120) -> subprocess.CompletedProcess:
+    def query(root: Path, question: str, *, budget: int | None = None, timeout: int = 120) -> subprocess.CompletedProcess:
         """Consulta el grafo en lenguaje natural (``graphify query``)."""
         args = ["query", question]
         if budget:

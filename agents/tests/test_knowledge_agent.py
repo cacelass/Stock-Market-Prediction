@@ -37,7 +37,7 @@ def test_setup_vault_creates_tree(know_context):
     result = agent.setup_vault()
     assert result.success
     assert result.data["created"] is True
-    vault_path = know_context.root / "knowledge"
+    vault_path = know_context.root / "docs" / "vault"
     assert vault_path.exists()
     assert (vault_path / ".obsidian").exists()
     assert (vault_path / "00-index" / "MOC.md").exists()
@@ -104,6 +104,7 @@ def test_sync_without_graph(know_context):
 # `graphify-out/` tenia DOS duenos declarados: knowledge lo construia y
 # docsearch lo podaba. El test de contratos no lo detectaba porque cada uno lo
 # describia con una cadena distinta. La poda vive ahora donde el grafo.
+
 
 def test_prune_falla_sin_grafo(context):
     from agents.agents.knowledge_agent import KnowledgeAgent

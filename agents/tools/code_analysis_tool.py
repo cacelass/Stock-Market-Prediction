@@ -74,9 +74,7 @@ class CodeAnalysisTool:
         body = node.body
         if body and isinstance(body[0], ast.Expr) and isinstance(getattr(body[0], "value", None), ast.Constant):
             body = body[1:]  # ignora el docstring de la función, si lo tiene
-        is_trivial_dict_return = (
-            len(body) == 1 and isinstance(body[0], ast.Return) and isinstance(body[0].value, ast.Dict)
-        )
+        is_trivial_dict_return = len(body) == 1 and isinstance(body[0], ast.Return) and isinstance(body[0].value, ast.Dict)
         return not is_trivial_dict_return
 
     @classmethod
@@ -96,32 +94,41 @@ class CodeAnalysisTool:
 
                 functions.append(
                     FunctionInfo(
-                        file=rel_name, name=node.name, line=node.lineno,
-                        n_lines=n_lines, n_args=n_args,
+                        file=rel_name,
+                        name=node.name,
+                        line=node.lineno,
+                        n_lines=n_lines,
+                        n_args=n_args,
                         body_hash=cls._structural_hash(node),
                         has_substantive_logic=cls._has_substantive_logic(node),
                     )
                 )
 
                 if n_lines > cls.MAX_FUNCTION_LINES:
-                    smells.append(CodeSmell(
-                        rel_name, node.lineno, "long_function",
-                        f"'{node.name}' tiene {n_lines} líneas (umbral {cls.MAX_FUNCTION_LINES}). "
-                        f"Considera dividirla en funciones más pequeñas."
-                    ))
+                    smells.append(
+                        CodeSmell(
+                            rel_name,
+                            node.lineno,
+                            "long_function",
+                            f"'{node.name}' tiene {n_lines} líneas (umbral {cls.MAX_FUNCTION_LINES}). Considera dividirla en funciones más pequeñas.",
+                        )
+                    )
                 if n_args > cls.MAX_ARGS:
-                    smells.append(CodeSmell(
-                        rel_name, node.lineno, "too_many_args",
-                        f"'{node.name}' tiene {n_args} argumentos (umbral {cls.MAX_ARGS}). "
-                        f"Considera agrupar en un dataclass o dict de config."
-                    ))
+                    smells.append(
+                        CodeSmell(
+                            rel_name,
+                            node.lineno,
+                            "too_many_args",
+                            f"'{node.name}' tiene {n_args} argumentos (umbral {cls.MAX_ARGS}). Considera agrupar en un dataclass o dict de config.",
+                        )
+                    )
 
             elif isinstance(node, ast.ExceptHandler) and node.type is None:
-                smells.append(CodeSmell(
-                    rel_name, node.lineno, "bare_except",
-                    "except desnudo: captura hasta KeyboardInterrupt/SystemExit. "
-                    "Especifica el tipo de excepción esperado."
-                ))
+                smells.append(
+                    CodeSmell(
+                        rel_name, node.lineno, "bare_except", "except desnudo: captura hasta KeyboardInterrupt/SystemExit. Especifica el tipo de excepción esperado."
+                    )
+                )
 
         return smells, functions
 

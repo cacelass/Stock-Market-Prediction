@@ -21,6 +21,7 @@ def test_high_cardinality_columns_detected():
 
 def test_outliers_iqr_detected():
     import numpy as np
+
     rng = np.random.default_rng(0)
     values = list(rng.normal(loc=10, scale=1, size=50)) + [1000]  # un outlier evidente
     df = pd.DataFrame({"x": values})
@@ -32,11 +33,13 @@ def test_outliers_iqr_detected():
 def test_leakage_suspects_high_correlation():
     rng = np.random.default_rng(42)
     target = rng.normal(size=200)
-    df = pd.DataFrame({
-        "target": target,
-        "leaky": target * 2 + 0.0001,  # prácticamente el target reescalado
-        "normal_feature": rng.normal(size=200),
-    })
+    df = pd.DataFrame(
+        {
+            "target": target,
+            "leaky": target * 2 + 0.0001,  # prácticamente el target reescalado
+            "normal_feature": rng.normal(size=200),
+        }
+    )
     findings = DataFrameAnalysisTool.leakage_suspects(df, "target", correlation_threshold=0.95)
     assert [f.column for f in findings] == ["leaky"]
 

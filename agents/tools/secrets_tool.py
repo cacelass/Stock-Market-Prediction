@@ -44,15 +44,19 @@ _SLACK_TOKEN_RE = re.compile(r"xox[baprs]-[0-9a-zA-Z]{10,}")
 _JWT_RE = re.compile(r"eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+")
 _URL_PASSWORD_RE = re.compile(r"https?://[^:]+:[^@]+@")
 _PRIVATE_KEY_RE = re.compile(r"-----BEGIN (RSA |EC |OPENSSH |DSA |)?PRIVATE KEY-----")
-_ASSIGNMENT_RE = re.compile(
-    r"(?i)(?:^|[^a-z0-9])(api[_-]?key|secret|password|passwd|token|access[_-]?key)\s*[:=]\s*['\"]([^'\"]{8,})['\"]"
-)
+_ASSIGNMENT_RE = re.compile(r"(?i)(?:^|[^a-z0-9])(api[_-]?key|secret|password|passwd|token|access[_-]?key)\s*[:=]\s*['\"]([^'\"]{8,})['\"]")
 _ENTROPY_THRESHOLD = 4.3
 _MIN_LENGTH_FOR_ENTROPY_CHECK = 20
 
 _FALSE_POSITIVE_VALUES = {
-    "your_key_here", "your_secret", "changeme", "password123",
-    "test", "example", "dummy", "placeholder",
+    "your_key_here",
+    "your_secret",
+    "changeme",
+    "password123",
+    "test",
+    "example",
+    "dummy",
+    "placeholder",
 }
 
 _SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", "dist", "build"}
@@ -92,17 +96,21 @@ class SecretsTool:
         findings = []
         for filename, entries in data.get("results", {}).items():
             for entry in entries:
-                findings.append(SecretFinding(
-                    file=filename, line_number=entry.get("line_number", 0),
-                    finding_type=entry.get("type", "desconocido"), detector="detect-secrets",
-                ))
+                findings.append(
+                    SecretFinding(
+                        file=filename,
+                        line_number=entry.get("line_number", 0),
+                        finding_type=entry.get("type", "desconocido"),
+                        detector="detect-secrets",
+                    )
+                )
         return findings
 
     @staticmethod
     def scan_with_heuristic(
-        root: Path, *,
-        extensions: tuple[str, ...] = (".py", ".env", ".yml", ".yaml",
-                                       ".json", ".cfg", ".ini", ".toml", ".sh"),
+        root: Path,
+        *,
+        extensions: tuple[str, ...] = (".py", ".env", ".yml", ".yaml", ".json", ".cfg", ".ini", ".toml", ".sh"),
     ) -> list[SecretFinding]:
         findings = []
         for path in root.rglob("*"):
@@ -139,11 +147,14 @@ class SecretsTool:
                     if value.lower() in _FALSE_POSITIVE_VALUES:
                         continue
                     if len(value) >= _MIN_LENGTH_FOR_ENTROPY_CHECK and shannon_entropy(value) >= _ENTROPY_THRESHOLD:
-                        findings.append(SecretFinding(
-                            relative, i,
-                            f"Asignación de '{match.group(1)}' con valor de alta entropía",
-                            "heuristico-propio",
-                        ))
+                        findings.append(
+                            SecretFinding(
+                                relative,
+                                i,
+                                f"Asignación de '{match.group(1)}' con valor de alta entropía",
+                                "heuristico-propio",
+                            )
+                        )
         return findings
 
     @staticmethod

@@ -41,12 +41,15 @@ class APIAgent(BaseAgent):
         undocumented = declared - documented
         stale_docs = documented - declared
         warnings = [f"Endpoint {m} {p} declarado con @app pero no aparece en el docstring del módulo." for m, p in undocumented]
-        warnings += [f"El docstring menciona {m} {p} pero no hay ningún @app.{m.lower()}(\"{p}\") real." for m, p in stale_docs]
+        warnings += [f'El docstring menciona {m} {p} pero no hay ningún @app.{m.lower()}("{p}") real.' for m, p in stale_docs]
 
         return AgentResult(
-            not undocumented and not stale_docs, self.name, "check_endpoints_documented",
+            not undocumented and not stale_docs,
+            self.name,
+            "check_endpoints_documented",
             f"{len(declared)} endpoint(s) declarado(s), {len(undocumented)} sin documentar, {len(stale_docs)} documentado(s) que ya no existen.",
-            data={"declared": list(declared), "documented": list(documented)}, warnings=warnings,
+            data={"declared": list(declared), "documented": list(documented)},
+            warnings=warnings,
         )
 
     def smoke_test(self, *, endpoint: str = "/health") -> AgentResult:
@@ -54,7 +57,9 @@ class APIAgent(BaseAgent):
             from fastapi.testclient import TestClient
         except ImportError:
             return AgentResult(
-                False, self.name, "smoke_test",
+                False,
+                self.name,
+                "smoke_test",
                 "fastapi (o httpx, que TestClient necesita) no está instalado — instala el extra use_api.",
             )
 
@@ -64,6 +69,7 @@ class APIAgent(BaseAgent):
 
         try:
             import importlib
+
             module = importlib.import_module("api.main")
         except Exception as exc:  # noqa: BLE001 — cualquier fallo de import de la app es el propio resultado a reportar
             return AgentResult(False, self.name, "smoke_test", f"No se pudo importar api.main: {exc}")
@@ -77,7 +83,9 @@ class APIAgent(BaseAgent):
 
         success = response.status_code == 200
         return AgentResult(
-            success, self.name, "smoke_test",
+            success,
+            self.name,
+            "smoke_test",
             f"GET {endpoint} -> {response.status_code}.",
             data={"status_code": response.status_code, "body": response.json() if success else response.text},
         )

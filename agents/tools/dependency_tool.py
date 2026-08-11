@@ -73,10 +73,7 @@ def parse_pyproject_dependencies(pyproject_text: str) -> list[str]:
     if not match:
         return []
     block = match.group(1)
-    return [
-        item.strip().strip("'\"")
-        for item in re.findall(r'["\']([^"\']+)["\']', block)
-    ]
+    return [item.strip().strip("'\"") for item in re.findall(r'["\']([^"\']+)["\']', block)]
 
 
 def parse_uv_lock_versions(uv_lock_text: str) -> dict[str, str]:
@@ -127,6 +124,7 @@ class DependencyTool:
             if len(dates) < 2:
                 return None
             from datetime import datetime
+
             parsed = sorted(datetime.fromisoformat(d.replace("Z", "+00:00")) for d in dates)[-max_releases:]
             if len(parsed) < 2:
                 return None
@@ -136,14 +134,15 @@ class DependencyTool:
             return None
 
     @staticmethod
-    def check_package(
-        spec: str, *, locked_version: str | None, include_vulnerabilities: bool, include_cadence: bool
-    ) -> PackageStatus:
+    def check_package(spec: str, *, locked_version: str | None, include_vulnerabilities: bool, include_cadence: bool) -> PackageStatus:
         name = parse_dependency_name(spec)
         latest = DependencyTool.fetch_latest_version(name)
         if latest is None:
             return PackageStatus(
-                name=name, declared_spec=spec, locked_version=locked_version, latest_version=None,
+                name=name,
+                declared_spec=spec,
+                locked_version=locked_version,
+                latest_version=None,
                 is_outdated=None,
                 error="No se pudo consultar PyPI (red, timeout, o el paquete no existe con ese nombre).",
             )
@@ -152,6 +151,7 @@ class DependencyTool:
         is_outdated = None
         try:
             from packaging.version import Version
+
             is_outdated = Version(reference_version) < Version(latest)
         except ImportError:
             # 'packaging' no está garantizado como dependencia directa del proyecto
@@ -164,12 +164,15 @@ class DependencyTool:
         except Exception:  # noqa: BLE001 — versión con formato no estándar (p. ej. calver raro)
             pass
 
-        vulnerabilities = (
-            DependencyTool.fetch_vulnerabilities(name, reference_version) if include_vulnerabilities else []
-        )
+        vulnerabilities = DependencyTool.fetch_vulnerabilities(name, reference_version) if include_vulnerabilities else []
         cadence = DependencyTool.estimate_release_cadence_days(name) if include_cadence else None
 
         return PackageStatus(
-            name=name, declared_spec=spec, locked_version=locked_version, latest_version=latest,
-            is_outdated=is_outdated, release_cadence_days=cadence, vulnerabilities=vulnerabilities,
+            name=name,
+            declared_spec=spec,
+            locked_version=locked_version,
+            latest_version=latest,
+            is_outdated=is_outdated,
+            release_cadence_days=cadence,
+            vulnerabilities=vulnerabilities,
         )

@@ -28,14 +28,23 @@ from agents.tools.process_tool import ProcessResult, run_command
 @register_agent
 class GitAgent(BaseAgent):
     name = "git"
-    description = (
-        "Conventional Commits, análisis de diffs, changelog, release notes, "
-        "detección de breaking changes y preparación de Pull Requests."
-    )
+    description = "Conventional Commits, análisis de diffs, changelog, release notes, detección de breaking changes y preparación de Pull Requests."
     capabilities = [
-        "git", "commit", "diff", "release", "pull request", "pr", "genera", "generar",
-        "genera el changelog", "breaking change", "rama", "branch",
-        "cierra la feature", "cerrar feature", "commit de la feature",
+        "git",
+        "commit",
+        "diff",
+        "release",
+        "pull request",
+        "pr",
+        "genera",
+        "generar",
+        "genera el changelog",
+        "breaking change",
+        "rama",
+        "branch",
+        "cierra la feature",
+        "cerrar feature",
+        "commit de la feature",
     ]
 
     def __init__(self, *args, **kwargs):
@@ -50,6 +59,7 @@ class GitAgent(BaseAgent):
             "commit_with_changelog": ["commit", "confirma", "guarda los cambios", "haz commit"],
             "suggest_commit_message": ["sugiere", "sugerir", "mensaje", "propon un mensaje"],
             "commit_feature": ["cierra la feature", "cerrar feature", "commit de la feature", "feature lista"],
+            "commit_atomic": ["separa", "dividir", "commits atomicos", "split", "separar en commits"],
             "tag_release": ["tag", "etiqueta", "version", "versión", "release", "publica", "lanzamiento"],
         }
 
@@ -63,6 +73,7 @@ class GitAgent(BaseAgent):
             "detect_breaking_changes": self.detect_breaking_changes,
             "prepare_pr_summary": self.prepare_pr_summary,
             "commit_with_changelog": self.commit_with_changelog,
+            "commit_atomic": self.commit_atomic,
             "commit_feature": self.commit_feature,
             "tag_release": self.tag_release,
             "create_branch": self.create_branch,
@@ -85,7 +96,9 @@ class GitAgent(BaseAgent):
         entries = self.git.status_porcelain()
         branch = self.git.current_branch()
         return AgentResult(
-            True, self.name, "status",
+            True,
+            self.name,
+            "status",
             f"Rama '{branch}', {len(entries)} archivo(s) modificado(s).",
             data={"branch": branch, "changes": entries},
         )
@@ -105,14 +118,12 @@ class GitAgent(BaseAgent):
 
         warnings = []
         if touches_source and not touches_tests:
-            warnings.append(
-                "El diff toca código en "
-                f"{self.ctx.config.project_slug}/ pero no toca tests/ — "
-                f"considera si necesitas añadir o actualizar un test."
-            )
+            warnings.append(f"El diff toca código en {self.ctx.config.project_slug}/ pero no toca tests/ — considera si necesitas añadir o actualizar un test.")
 
         return AgentResult(
-            True, self.name, "analyze_diff",
+            True,
+            self.name,
+            "analyze_diff",
             f"{len(changed)} archivo(s) modificado(s).",
             data={"changed_files": changed, "stat": stat},
             warnings=warnings,
@@ -125,21 +136,18 @@ class GitAgent(BaseAgent):
 
         changed = self.git.changed_files(staged=staged)
         if not changed:
-            return AgentResult(
-                False, self.name, "suggest_commit_message",
-                "No hay cambios en staging (ni en el working tree) que resumir."
-            )
+            return AgentResult(False, self.name, "suggest_commit_message", "No hay cambios en staging (ni en el working tree) que resumir.")
 
         commit_type = self.git.guess_commit_type(changed)
-        scope = self.ctx.config.project_slug if any(
-            f.startswith(f"{self.ctx.config.project_slug}/") for f in changed
-        ) else ""
+        scope = self.ctx.config.project_slug if any(f.startswith(f"{self.ctx.config.project_slug}/") for f in changed) else ""
         scope_part = f"({scope})" if scope else ""
         files_preview = ", ".join(changed[:3]) + (f" y {len(changed) - 3} más" if len(changed) > 3 else "")
 
         suggestion = f"{commit_type}{scope_part}: actualiza {files_preview}"
         return AgentResult(
-            True, self.name, "suggest_commit_message",
+            True,
+            self.name,
+            "suggest_commit_message",
             "Sugerencia generada — revísala antes de usarla, es un punto de partida.",
             data={"suggested_message": suggestion, "detected_type": commit_type, "changed_files": changed},
             warnings=["El 'subject' es un placeholder genérico: sustitúyelo por una descripción real del cambio."],
@@ -166,9 +174,15 @@ class GitAgent(BaseAgent):
 
         # Mismas etiquetas de sección que ya usa CHANGELOG.md de este template.
         section_titles = {
-            "feat": "### Añadido", "fix": "### Corrección de bugs", "docs": "### Documentación",
-            "refactor": "### Refactorización", "perf": "### Rendimiento", "test": "### Tests",
-            "build": "### Build / dependencias", "ci": "### CI", "chore": "### Mantenimiento",
+            "feat": "### Añadido",
+            "fix": "### Corrección de bugs",
+            "docs": "### Documentación",
+            "refactor": "### Refactorización",
+            "perf": "### Rendimiento",
+            "test": "### Tests",
+            "build": "### Build / dependencias",
+            "ci": "### CI",
+            "chore": "### Mantenimiento",
             "revert": "### Reversiones",
         }
 
@@ -187,7 +201,9 @@ class GitAgent(BaseAgent):
 
         markdown = "\n".join(lines).rstrip() + "\n"
         return AgentResult(
-            True, self.name, "generate_changelog",
+            True,
+            self.name,
+            "generate_changelog",
             f"Changelog generado a partir de {len(commits)} commit(s) desde {tag or 'el inicio del repo'}.",
             data=markdown,
         )
@@ -202,7 +218,11 @@ class GitAgent(BaseAgent):
             header += "**Contiene breaking changes — revisa la sección correspondiente antes de actualizar.**\n\n"
         body = header + changelog_result.data
         return AgentResult(
-            True, self.name, "generate_release_notes", "Release notes generadas.", data=body,
+            True,
+            self.name,
+            "generate_release_notes",
+            "Release notes generadas.",
+            data=body,
         )
 
     def detect_breaking_changes(self, *, since_tag: str | None = None, max_count: int = 100) -> AgentResult:
@@ -228,9 +248,12 @@ class GitAgent(BaseAgent):
             "todavía."
         )
         return AgentResult(
-            True, self.name, "detect_breaking_changes",
+            True,
+            self.name,
+            "detect_breaking_changes",
             f"{len(breaking)} breaking change(s) detectado(s) por mensaje de commit.",
-            data=breaking, warnings=[note],
+            data=breaking,
+            warnings=[note],
         )
 
     def prepare_pr_summary(self, *, since_tag: str | None = None) -> AgentResult:
@@ -256,7 +279,10 @@ class GitAgent(BaseAgent):
             body_parts.append(changelog_result.data)
 
         return AgentResult(
-            True, self.name, "prepare_pr_summary", "Resumen de PR generado.",
+            True,
+            self.name,
+            "prepare_pr_summary",
+            "Resumen de PR generado.",
             data={"title": title, "body": "\n".join(body_parts)},
             warnings=diff_result.warnings,
         )
@@ -299,8 +325,11 @@ class GitAgent(BaseAgent):
         commit_result = self.git.commit(message)
         if not commit_result.ok:
             return AgentResult(
-                False, self.name, "commit_with_changelog",
-                f"'git commit' falló: {commit_result.stderr.strip()}", warnings=warnings,
+                False,
+                self.name,
+                "commit_with_changelog",
+                f"'git commit' falló: {commit_result.stderr.strip()}",
+                warnings=warnings,
             )
 
         graphify_warnings = self._update_graphify()
@@ -319,14 +348,115 @@ class GitAgent(BaseAgent):
         extras_str = f" ({', '.join(extras)})" if extras else ""
 
         return AgentResult(
-            True, self.name, "commit_with_changelog",
+            True,
+            self.name,
+            "commit_with_changelog",
             f"Commit creado: '{message}'{extras_str}",
             data={"stdout": commit_result.stdout, "changelog_updated": bool(changelog_result.success and changelog_result.data)},
             warnings=warnings,
         )
 
-    def commit_feature(self, *, id: str = "", title: str = "", message: str = "",
-                       dry_run: bool = False) -> AgentResult:
+    def commit_atomic(self, *, dry_run: bool = False, subjects: str | None = None) -> AgentResult:
+        """
+        Divide los cambios sin commitear en commits atómicos por área.
+
+        Los lock files (`uv.lock`, `package-lock.json`...) no entran en ningún
+        commit — se reportan aparte. El plan se ordena por dependencias (código
+        antes que tests, tests antes que docs). Si un área temprana depende de
+        una tardía (ciclo), el plan se RECHAZA antes de escribir nada y se
+        sugiere commitear a mano.
+
+        Con `dry_run=True` solo propone el plan (y nunca pide permiso, como
+        toda propuesta). Sin dry-run commitea cada grupo en orden — la puerta
+        de permisos pide confirmación porque escribe en el historial git.
+
+        `subjects` es opcional: mensajes Conventional separados por `;`, uno
+        por grupo, en orden. Sin él se generan mensajes placeholder (`feat:
+        actualiza ...`) que hay que revisar.
+        """
+        guard = self._guard_repo("commit_atomic")
+        if guard:
+            return guard
+
+        changed = [path for _, path in self.git.status_porcelain()]
+        if not changed:
+            return AgentResult(True, self.name, "commit_atomic", "No hay cambios que commitear.", data={"groups": []})
+
+        plan = GitTool.plan_atomic(changed, self.ctx.root)
+        if plan["cycle"]:
+            return AgentResult(
+                False,
+                self.name,
+                "commit_atomic",
+                f"Plan rechazado antes de escribir nada: {plan['cycle']}",
+                data={"plan": plan},
+            )
+
+        groups = plan["groups"]
+        if not groups:
+            return AgentResult(
+                True,
+                self.name,
+                "commit_atomic",
+                "Solo hay lock files — no se genera ningún commit atómico.",
+                data={"groups": [], "excluded": plan["excluded"]},
+            )
+
+        subs = [s.strip() for s in subjects.split(";")] if subjects else []
+        for i, group in enumerate(groups):
+            provided = subs[i] if i < len(subs) and subs[i] else None
+            if provided:
+                if not GitTool.parse_conventional_commit(provided):
+                    return AgentResult(
+                        False,
+                        self.name,
+                        "commit_atomic",
+                        f"El mensaje {i + 1} '{provided}' no es Conventional Commits.",
+                        needs=[f"Proporciona un mensaje Conventional para el grupo '{group['area']}' (--subjects)."],
+                    )
+                group["message"] = provided
+            else:
+                preview = ", ".join(group["files"][:2]) + (f" y {len(group['files']) - 2} más" if len(group["files"]) > 2 else "")
+                group["message"] = f"{group['type']}: actualiza {preview}"
+
+        if dry_run:
+            return AgentResult(
+                True,
+                self.name,
+                "commit_atomic",
+                f"{len(groups)} commit(s) atómico(s) propuesto(s) — nada escrito.",
+                data={"groups": groups, "excluded": plan["excluded"]},
+                warnings=[
+                    "Los subjects por defecto son placeholders — pasa --subjects 'feat: ...; test: ...; docs: ...' (uno por grupo, en orden) para controlarlos.",
+                ],
+            )
+
+        warnings: list[str] = []
+        if plan["excluded"]:
+            warnings.append(f"Lock files fuera del plan: {', '.join(plan['excluded'])}")
+
+        created: list[dict] = []
+        for group in groups:
+            add = self.git.add(*group["files"])
+            if not add.ok:
+                warnings.append(f"'git add' falló para {group['files']}: {add.stderr.strip()}")
+                continue
+            commit_result = self.git.commit_paths(group["message"], group["files"])
+            if not commit_result.ok:
+                warnings.append(f"'git commit' falló: {commit_result.stderr.strip()}")
+                continue
+            created.append({"area": group["area"], "message": group["message"]})
+
+        return AgentResult(
+            True,
+            self.name,
+            "commit_atomic",
+            f"{len(created)}/{len(groups)} commit(s) atómico(s) creado(s).",
+            data={"created": created, "excluded": plan["excluded"]},
+            warnings=warnings,
+        )
+
+    def commit_feature(self, *, id: str = "", title: str = "", message: str = "", dry_run: bool = False) -> AgentResult:
         """
         Cierre de una feature del arnés: README y versión al día + commit.
 
@@ -345,7 +475,9 @@ class GitAgent(BaseAgent):
 
         if not id or not title:
             return AgentResult(
-                False, self.name, "commit_feature",
+                False,
+                self.name,
+                "commit_feature",
                 "Faltan datos para cerrar la feature.",
                 needs=["¿Qué feature cierro? (--id)", "¿Cuál es su título? (--title)"],
             )
@@ -360,17 +492,18 @@ class GitAgent(BaseAgent):
         if dry_run:
             bump_part = f"bump a '{next_version}'" if next_version else "sin bump (no hay versión)"
             return AgentResult(
-                True, self.name, "commit_feature",
-                f"Propuesta de cierre de {id}: {bump_part}, commit "
-                f"'{suggested}'. Nada escrito todavía.",
+                True,
+                self.name,
+                "commit_feature",
+                f"Propuesta de cierre de {id}: {bump_part}, commit '{suggested}'. Nada escrito todavía.",
                 data={
-                    "id": id, "title": title, "next_version": next_version,
-                    "suggested_message": suggested, "changed_files": changed,
+                    "id": id,
+                    "title": title,
+                    "next_version": next_version,
+                    "suggested_message": suggested,
+                    "changed_files": changed,
                 },
-                warnings=(
-                    ["No se pudo leer la versión en pyproject.toml — se omite el bump."]
-                    if not next_version else []
-                ),
+                warnings=(["No se pudo leer la versión en pyproject.toml — se omite el bump."] if not next_version else []),
             )
 
         warnings: list[str] = []
@@ -382,9 +515,7 @@ class GitAgent(BaseAgent):
         else:
             warnings.append("No se pudo leer la versión en pyproject.toml — se omite el bump.")
 
-        changelog = doc_agent.run(
-            "update_changelog", feature_id=id, feature_title=title, dry_run=False
-        )
+        changelog = doc_agent.run("update_changelog", feature_id=id, feature_title=title, dry_run=False)
         if not changelog.success:
             warnings.append(changelog.message)
 
@@ -395,8 +526,11 @@ class GitAgent(BaseAgent):
         commit_result = self.git.commit(suggested)
         if not commit_result.ok:
             return AgentResult(
-                False, self.name, "commit_feature",
-                f"'git commit' falló: {commit_result.stderr.strip()}", warnings=warnings,
+                False,
+                self.name,
+                "commit_feature",
+                f"'git commit' falló: {commit_result.stderr.strip()}",
+                warnings=warnings,
             )
 
         extras = []
@@ -406,10 +540,15 @@ class GitAgent(BaseAgent):
             extras.append("CHANGELOG.md actualizado")
         extras_str = f" ({', '.join(extras)})" if extras else ""
         return AgentResult(
-            True, self.name, "commit_feature",
+            True,
+            self.name,
+            "commit_feature",
             f"{id} cerrada con commit '{suggested}'{extras_str}.",
             data={
-                "id": id, "title": title, "message": suggested, "next_version": next_version,
+                "id": id,
+                "title": title,
+                "message": suggested,
+                "next_version": next_version,
             },
             warnings=warnings,
         )
@@ -419,8 +558,7 @@ class GitAgent(BaseAgent):
         pyproject = self.ctx.pyproject_file
         if not pyproject.exists():
             return None
-        match = re.search(r'^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"',
-                          pyproject.read_text(encoding="utf-8"), re.MULTILINE)
+        match = re.search(r'^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"', pyproject.read_text(encoding="utf-8"), re.MULTILINE)
         if not match:
             return None
         major, minor, patch = (int(g) for g in match.groups())
@@ -465,8 +603,7 @@ class GitAgent(BaseAgent):
                 warnings.append(f"No se pudo hacer 'git add' de los archivos de versión: {stage.stderr.strip()}")
         else:
             warnings.append(
-                "No se pudo actualizar la versión en pyproject.toml/README.md "
-                "(ver warnings de bump_version) — se continúa igualmente con el commit y el tag."
+                "No se pudo actualizar la versión en pyproject.toml/README.md (ver warnings de bump_version) — se continúa igualmente con el commit y el tag."
             )
 
         # CI/CD: si el proyecto generado todavía no tiene ningún workflow, se
@@ -484,10 +621,7 @@ class GitAgent(BaseAgent):
             if generate_result.success:
                 stage_ci = self.git.add(".github/workflows")
                 if stage_ci.ok:
-                    warnings.append(
-                        "No había ningún workflow de CI — se generó '.github/workflows/ci.yml' "
-                        "y se incluyó en este mismo commit de release."
-                    )
+                    warnings.append("No había ningún workflow de CI — se generó '.github/workflows/ci.yml' y se incluyó en este mismo commit de release.")
                 else:
                     warnings.append(f"Se generó el workflow de CI pero 'git add' falló: {stage_ci.stderr.strip()}")
             else:
@@ -503,19 +637,27 @@ class GitAgent(BaseAgent):
         warnings.extend(commit_result.warnings)
         if not commit_result.success:
             return AgentResult(
-                False, self.name, "tag_release",
-                f"No se pudo crear el commit de release: {commit_result.message}", warnings=warnings,
+                False,
+                self.name,
+                "tag_release",
+                f"No se pudo crear el commit de release: {commit_result.message}",
+                warnings=warnings,
             )
 
         tag_result = self.git.create_tag(version, message=commit_message)
         if not tag_result.ok:
             return AgentResult(
-                False, self.name, "tag_release",
-                f"El commit se creó pero 'git tag' falló: {tag_result.stderr.strip()}", warnings=warnings,
+                False,
+                self.name,
+                "tag_release",
+                f"El commit se creó pero 'git tag' falló: {tag_result.stderr.strip()}",
+                warnings=warnings,
             )
 
         return AgentResult(
-            True, self.name, "tag_release",
+            True,
+            self.name,
+            "tag_release",
             f"Tag '{version}' creado — versión, CHANGELOG.md y el commit de release quedaron todos juntos.",
             data={"version": version, "changelog_updated": commit_result.data.get("changelog_updated", False)},
             warnings=warnings,
@@ -540,7 +682,9 @@ class GitAgent(BaseAgent):
             return AgentResult(False, self.name, "create_branch", f"No se pudo crear la rama: {result.stderr.strip()}")
 
         return AgentResult(
-            True, self.name, "create_branch",
+            True,
+            self.name,
+            "create_branch",
             f"Rama '{branch_name}' creada desde '{base}' y activada.",
             data={"branch": branch_name, "base": base},
         )
@@ -559,12 +703,16 @@ class GitAgent(BaseAgent):
         result = self._git("merge", source_branch, "--no-ff")
         if not result.ok:
             return AgentResult(
-                False, self.name, "merge_branch",
+                False,
+                self.name,
+                "merge_branch",
                 f"Conflicto al fusionar '{source_branch}' en '{target}': {result.stderr.strip()}",
             )
 
         return AgentResult(
-            True, self.name, "merge_branch",
+            True,
+            self.name,
+            "merge_branch",
             f"'{source_branch}' fusionado en '{target}' (--no-ff).",
             data={"source": source_branch, "target": target},
         )
@@ -575,6 +723,7 @@ class GitAgent(BaseAgent):
         if env_path.exists():
             try:
                 from dotenv import load_dotenv
+
                 load_dotenv(env_path)
             except ImportError:
                 pass
@@ -613,7 +762,8 @@ class GitAgent(BaseAgent):
 
         hook_result = run_command(
             [python_bin, "-m", "graphify", "hook", "status"],
-            cwd=self.ctx.root, timeout=30,
+            cwd=self.ctx.root,
+            timeout=30,
         )
         if hook_result.ok and "not installed" in hook_result.stdout.lower():
             warnings.append(
@@ -624,7 +774,8 @@ class GitAgent(BaseAgent):
 
         result = run_command(
             [python_bin, "-m", "graphify", str(self.ctx.root), "--update"],
-            cwd=self.ctx.root, timeout=120,
+            cwd=self.ctx.root,
+            timeout=120,
         )
         if result.ok:
             print(f"    graphify: grafo actualizado ({result.stdout.strip()[:100]})")
@@ -645,19 +796,19 @@ class GitAgent(BaseAgent):
         warnings: list[str] = []
         try:
             import subprocess
+
             result = subprocess.run(
                 ["obsidian-cli", "index", str(self.ctx.root)],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode == 0:
                 print(f"    obsidian: bóveda indexada ({result.stdout.strip()[:100]})")
             else:
                 warnings.append(f"obsidian-cli index falló: {result.stderr.strip()[:200]}")
         except FileNotFoundError:
-            warnings.append(
-                ".obsidian/ detectado pero obsidian-cli no está instalado. "
-                "Instálalo con: npm install -g @obsidian/cli"
-            )
+            warnings.append(".obsidian/ detectado pero obsidian-cli no está instalado. Instálalo con: npm install -g @obsidian/cli")
         except Exception as exc:
             warnings.append(f"obsidian sync falló: {exc}")
         return warnings

@@ -29,8 +29,16 @@ class MLAgent(BaseAgent):
         "Es consciente del tipo de ML (supervisado/no_supervisado/redes/híbrido)."
     )
     capabilities = [
-        "modelo", "overfitting", "underfitting", "hiperparametros", "importancia",
-        "metricas", "algoritmo", "entrenamiento", "optuna", "comparar modelos",
+        "modelo",
+        "overfitting",
+        "underfitting",
+        "hiperparametros",
+        "importancia",
+        "metricas",
+        "algoritmo",
+        "entrenamiento",
+        "optuna",
+        "comparar modelos",
     ]
 
     def action_aliases(self) -> dict:
@@ -72,21 +80,31 @@ class MLAgent(BaseAgent):
         importances = SklearnTool.feature_importances(estimator, feature_names)
         if importances is None:
             return AgentResult(
-                True, self.name, "feature_importance",
+                True,
+                self.name,
+                "feature_importance",
                 f"'{model_name}' no expone feature_importances_ ni coef_ (¿es KNN u otro modelo sin esa propiedad?).",
                 data=None,
             )
         top = dict(list(importances.items())[:15])
         return AgentResult(
-            True, self.name, "feature_importance",
-            f"Top {len(top)} variables por importancia en '{model_name}'.", data=top,
+            True,
+            self.name,
+            "feature_importance",
+            f"Top {len(top)} variables por importancia en '{model_name}'.",
+            data=top,
         )
 
     def check_overfitting(self, *, train_score: float, test_score: float, gap_threshold: float = 0.1) -> AgentResult:
         verdict = SklearnTool.detect_overfitting(train_score, test_score, gap_threshold=gap_threshold)
         warnings = [] if verdict["verdict"] == "ok" else [verdict["note"]]
         return AgentResult(
-            True, self.name, "check_overfitting", verdict["note"], data=verdict, warnings=warnings,
+            True,
+            self.name,
+            "check_overfitting",
+            verdict["note"],
+            data=verdict,
+            warnings=warnings,
         )
 
     def list_models(self) -> AgentResult:
@@ -101,12 +119,17 @@ class MLAgent(BaseAgent):
 
         if not models:
             return AgentResult(
-                True, self.name, "list_models",
+                True,
+                self.name,
+                "list_models",
                 "No hay modelos en models/ todavía (ejecuta 'make train' primero).",
                 data=[],
             )
         return AgentResult(
-            True, self.name, "list_models", f"{len(models)} modelo(s) encontrado(s).",
+            True,
+            self.name,
+            "list_models",
+            f"{len(models)} modelo(s) encontrado(s).",
             data=[p.name for p in models],
         )
 
@@ -133,17 +156,21 @@ class MLAgent(BaseAgent):
                 for name in study_names:
                     study = optuna.load_study(storage=storage, study_name=name)
                     if study.best_trial:
-                        results.append({
-                            "study_name": name,
-                            "best_value": study.best_value,
-                            "best_params": study.best_params,
-                            "n_trials": len(study.trials),
-                        })
+                        results.append(
+                            {
+                                "study_name": name,
+                                "best_value": study.best_value,
+                                "best_params": study.best_params,
+                                "n_trials": len(study.trials),
+                            }
+                        )
             except Exception as exc:
                 results.append({"file": db_path.name, "error": str(exc)})
 
         return AgentResult(
-            True, self.name, "analyze_optuna",
+            True,
+            self.name,
+            "analyze_optuna",
             f"{len(results)} estudio(s) analizado(s).",
             data=results,
         )
@@ -164,19 +191,23 @@ class MLAgent(BaseAgent):
                 estimator = SklearnTool.load(path)
                 info = SklearnTool.inspect(estimator)
                 size_kb = round(path.stat().st_size / 1024, 1)
-                comparison.append({
-                    "name": path.stem,
-                    "type": info.get("estimator_type", "?"),
-                    "params": info.get("n_params", "?"),
-                    "features": info.get("n_features", "?"),
-                    "size_kb": size_kb,
-                })
+                comparison.append(
+                    {
+                        "name": path.stem,
+                        "type": info.get("estimator_type", "?"),
+                        "params": info.get("n_params", "?"),
+                        "features": info.get("n_features", "?"),
+                        "size_kb": size_kb,
+                    }
+                )
             except Exception:
                 comparison.append({"name": path.stem, "error": "no se pudo cargar"})
 
         comparison.sort(key=lambda x: x.get("size_kb", 0))
         return AgentResult(
-            True, self.name, "model_comparison",
+            True,
+            self.name,
+            "model_comparison",
             f"{len(comparison)} modelo(s) comparados. El más ligero: {comparison[0]['name']} ({comparison[0].get('size_kb', '?')} KB).",
             data=comparison,
         )

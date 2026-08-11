@@ -37,10 +37,7 @@ class ToolRegistry:
         from agents.exceptions import ToolNotFoundError
 
         if name not in self._tools:
-            raise ToolNotFoundError(
-                f"No existe ninguna herramienta registrada como '{name}'. "
-                f"Disponibles: {sorted(self._tools)}"
-            )
+            raise ToolNotFoundError(f"No existe ninguna herramienta registrada como '{name}'. Disponibles: {sorted(self._tools)}")
         return self._tools[name]
 
     def all(self) -> dict[str, Any]:

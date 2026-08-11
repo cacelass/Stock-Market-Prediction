@@ -106,12 +106,12 @@ def test_reporta_los_agentes_registrados_sin_prompt(context):
 
 # -- espejo a otros asistentes -------------------------------------------------
 
+
 def _sembrar_opencode(context, nombre: str = "lider") -> None:
     d = context.root / ".opencode" / "agents"
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{nombre}.md").write_text(
-        f"# {nombre.capitalize()} — orquestador del arnés\n\n"
-        "Diriges el ciclo de trabajo del proyecto.\n\n## Protocolo\n\npaso 1\n",
+        f"# {nombre.capitalize()} — orquestador del arnés\n\nDiriges el ciclo de trabajo del proyecto.\n\n## Protocolo\n\npaso 1\n",
         encoding="utf-8",
     )
 

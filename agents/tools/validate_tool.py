@@ -37,7 +37,9 @@ class ValidateTool:
                 info["max"] = float(df[col].max()) if not df[col].isnull().all() else None
             profile_data[col] = info
         return {
-            "rows": rows, "cols": cols, "duplicates": dups,
+            "rows": rows,
+            "cols": cols,
+            "duplicates": dups,
             "duplicate_pct": round(dups / rows, 4) if rows else 0,
             "columns": profile_data,
         }

@@ -34,15 +34,11 @@ class DataFrameAnalysisTool:
         for col in df.columns:
             nunique = df[col].nunique(dropna=True)
             if nunique <= 1:
-                findings.append(
-                    ColumnFinding(col, "constant", f"{nunique} valor(es) único(s) — descártala.")
-                )
+                findings.append(ColumnFinding(col, "constant", f"{nunique} valor(es) único(s) — descártala."))
         return findings
 
     @staticmethod
-    def high_cardinality_columns(
-        df: pd.DataFrame, *, categorical_only: bool = True, threshold_ratio: float = 0.5
-    ) -> list[ColumnFinding]:
+    def high_cardinality_columns(df: pd.DataFrame, *, categorical_only: bool = True, threshold_ratio: float = 0.5) -> list[ColumnFinding]:
         """
         Columnas categóricas donde nunique/nrows supera `threshold_ratio`
         (por defecto 0.5): sugiere un identificador o un campo de texto libre,
@@ -65,10 +61,11 @@ class DataFrameAnalysisTool:
             if ratio > threshold_ratio:
                 findings.append(
                     ColumnFinding(
-                        col, "high_cardinality",
+                        col,
+                        "high_cardinality",
                         f"{df[col].nunique()} valores únicos de {n} filas ({ratio:.0%}). "
                         f"Considera target/frequency encoding en vez de one-hot, "
-                        f"o comprueba si es un ID que deberías excluir."
+                        f"o comprueba si es un ID que deberías excluir.",
                     )
                 )
         return findings
@@ -82,9 +79,7 @@ class DataFrameAnalysisTool:
         missing_ratio = df.isna().mean()
         for col, ratio in missing_ratio.items():
             if ratio > threshold_ratio:
-                findings.append(
-                    ColumnFinding(col, "high_missing", f"{ratio:.0%} de valores nulos.")
-                )
+                findings.append(ColumnFinding(col, "high_missing", f"{ratio:.0%} de valores nulos."))
         return findings
 
     @staticmethod
@@ -104,19 +99,11 @@ class DataFrameAnalysisTool:
             n_outliers = ((series < lower) | (series > upper)).sum()
             if n_outliers > 0:
                 pct = n_outliers / len(series)
-                findings.append(
-                    ColumnFinding(
-                        col, "outliers",
-                        f"{n_outliers} outliers ({pct:.1%}) fuera de [{lower:.3g}, {upper:.3g}] "
-                        f"(IQR × {iqr_factor})."
-                    )
-                )
+                findings.append(ColumnFinding(col, "outliers", f"{n_outliers} outliers ({pct:.1%}) fuera de [{lower:.3g}, {upper:.3g}] (IQR × {iqr_factor})."))
         return findings
 
     @staticmethod
-    def leakage_suspects(
-        df: pd.DataFrame, target_col: str, *, correlation_threshold: float = 0.95
-    ) -> list[ColumnFinding]:
+    def leakage_suspects(df: pd.DataFrame, target_col: str, *, correlation_threshold: float = 0.95) -> list[ColumnFinding]:
         """
         Señala columnas numéricas con correlación de Pearson absoluta muy alta
         con el target. Una correlación así de alta suele significar que la
@@ -135,9 +122,9 @@ class DataFrameAnalysisTool:
             if pd.notna(corr) and abs(corr) >= correlation_threshold:
                 findings.append(
                     ColumnFinding(
-                        col, "leakage_suspect",
-                        f"correlación {corr:.3f} con '{target_col}' — revisa si '{col}' "
-                        f"se calculó usando el target (posible fuga de información).",
+                        col,
+                        "leakage_suspect",
+                        f"correlación {corr:.3f} con '{target_col}' — revisa si '{col}' se calculó usando el target (posible fuga de información).",
                         severity="warning",
                     )
                 )
@@ -154,7 +141,7 @@ class DataFrameAnalysisTool:
         pairs = []
         cols = corr.columns
         for i, col_a in enumerate(cols):
-            for col_b in cols[i + 1:]:
+            for col_b in cols[i + 1 :]:
                 value = corr.loc[col_a, col_b]
                 if pd.notna(value) and abs(value) >= threshold:
                     pairs.append((col_a, col_b, float(value)))

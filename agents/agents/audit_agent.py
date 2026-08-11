@@ -29,23 +29,26 @@ from agents.core.registry import agent_registry, register_agent
 
 # Umbrales de las heurísticas de suggest_improvements. Ajustables aquí,
 # en un solo sitio, si tu proyecto tiene otra tolerancia.
-MIN_RUNS_TO_JUDGE = 3        # menos ejecuciones que esto = no hay datos para juzgar
+MIN_RUNS_TO_JUDGE = 3  # menos ejecuciones que esto = no hay datos para juzgar
 FAILURE_RATE_THRESHOLD = 0.5
 SLOW_ACTION_MS = 30_000
 NOISY_WARNINGS_RATIO = 0.5
+LOW_CERTAINTY = 0.6  # éxito con certeza menor que esto = "dejó pasar una duda"
 
 
 @register_agent
 class AuditAgent(BaseAgent):
     name = "audit"
-    description = (
-        "Audita al resto de agentes con el log de ejecuciones: uso, tasa de éxito, "
-        "duración, fallos recientes y sugerencias de mejora."
-    )
+    description = "Audita al resto de agentes con el log de ejecuciones: uso, tasa de éxito, duración, fallos recientes y sugerencias de mejora."
     capabilities = [
-        "auditoria", "auditoría", "audit", "auditar",
-        "rendimiento de agentes", "historial de ejecuciones",
-        "audita", "equipo de agentes",
+        "auditoria",
+        "auditoría",
+        "audit",
+        "auditar",
+        "rendimiento de agentes",
+        "historial de ejecuciones",
+        "audita",
+        "equipo de agentes",
     ]
 
     def actions(self) -> dict:
@@ -60,7 +63,15 @@ class AuditAgent(BaseAgent):
     def _aggregate(self, last: int) -> dict[str, dict]:
         """Agrega el log por 'agente.acción' → runs/ok/fail/avg_ms/warnings."""
         stats: dict[str, dict] = defaultdict(
-            lambda: {"runs": 0, "ok": 0, "fail": 0, "total_ms": 0.0, "with_warnings": 0}
+            lambda: {
+                "runs": 0,
+                "ok": 0,
+                "fail": 0,
+                "total_ms": 0.0,
+                "with_warnings": 0,
+                "low_cert_ok": 0,
+                "low_cert_samples": [],
+            }
         )
         for entry in audit.read_entries(self.ctx, last=last):
             key = f"{entry.get('agent', '?')}.{entry.get('action', '?')}"
@@ -70,6 +81,11 @@ class AuditAgent(BaseAgent):
             s["total_ms"] += float(entry.get("duration_ms", 0))
             if entry.get("warnings", 0):
                 s["with_warnings"] += 1
+            cert = entry.get("certainty")
+            if cert is not None and entry.get("success") and cert < LOW_CERTAINTY:
+                s["low_cert_ok"] += 1
+                if len(s["low_cert_samples"]) < 3:
+                    s["low_cert_samples"].append(f"{entry.get('timestamp', '?')} (μ.cert {cert:.2f})")
         return stats
 
     # ── acciones ──────────────────────────────────────────────────────────
@@ -79,25 +95,30 @@ class AuditAgent(BaseAgent):
         stats = self._aggregate(last)
         if not stats:
             return AgentResult(
-                True, self.name, "report",
-                "El log de auditoría está vacío — todavía no se ha ejecutado ninguna acción "
-                "vía run()/CLI/pipeline. Usa el sistema y vuelve.",
+                True,
+                self.name,
+                "report",
+                "El log de auditoría está vacío — todavía no se ha ejecutado ninguna acción vía run()/CLI/pipeline. Usa el sistema y vuelve.",
                 data=[],
             )
 
         rows = []
         for key, s in sorted(stats.items()):
-            rows.append({
-                "accion": key,
-                "runs": s["runs"],
-                "exito": f"{s['ok'] / s['runs']:.0%}",
-                "media_ms": round(s["total_ms"] / s["runs"], 1),
-                "con_warnings": s["with_warnings"],
-            })
+            rows.append(
+                {
+                    "accion": key,
+                    "runs": s["runs"],
+                    "exito": f"{s['ok'] / s['runs']:.0%}",
+                    "media_ms": round(s["total_ms"] / s["runs"], 1),
+                    "con_warnings": s["with_warnings"],
+                }
+            )
         total = sum(s["runs"] for s in stats.values())
         total_fail = sum(s["fail"] for s in stats.values())
         return AgentResult(
-            True, self.name, "report",
+            True,
+            self.name,
+            "report",
             f"{total} ejecuciones auditadas ({total_fail} fallidas) en {len(stats)} acciones distintas.",
             data=rows,
         )
@@ -115,9 +136,10 @@ class AuditAgent(BaseAgent):
             if not e.get("success")
         ]
         return AgentResult(
-            True, self.name, "failures",
-            f"{len(failed)} fallo(s) en las últimas {last} ejecuciones."
-            + (" Nada que arreglar por aquí." if not failed else ""),
+            True,
+            self.name,
+            "failures",
+            f"{len(failed)} fallo(s) en las últimas {last} ejecuciones." + (" Nada que arreglar por aquí." if not failed else ""),
             data=failed,
         )
 
@@ -141,15 +163,18 @@ class AuditAgent(BaseAgent):
                 )
             avg = s["total_ms"] / s["runs"]
             if avg >= SLOW_ACTION_MS:
-                suggestions.append(
-                    f"'{key}' tarda {avg / 1000:.1f}s de media ({s['runs']} runs). Candidata a "
-                    f"cachear resultados o reducir el alcance por defecto."
-                )
+                suggestions.append(f"'{key}' tarda {avg / 1000:.1f}s de media ({s['runs']} runs). Candidata a cachear resultados o reducir el alcance por defecto.")
             if s["with_warnings"] / s["runs"] >= NOISY_WARNINGS_RATIO:
                 suggestions.append(
                     f"'{key}' devuelve warnings en el {s['with_warnings'] / s['runs']:.0%} de sus runs — "
                     f"o el aviso es esperado (súbelo a la documentación) o hay un límite del agente "
                     f"que conviene arreglar."
+                )
+            if s["low_cert_ok"]:
+                suggestions.append(
+                    f"'{key}' devolvió éxito con certeza baja ({s['low_cert_ok']}/{s['runs']} runs "
+                    "bajo μ.cert 0.6) — " + "; ".join(s["low_cert_samples"]) + ". Un 'éxito' que nadie avala con seguridad es una ronda que pudo fallar: "
+                    "revisa si el ruteo lo manda al agente correcto o si la acción necesita confirmación."
                 )
 
         agent_registry.discover()
@@ -162,9 +187,10 @@ class AuditAgent(BaseAgent):
             )
 
         return AgentResult(
-            True, self.name, "suggest_improvements",
+            True,
+            self.name,
+            "suggest_improvements",
             f"{len(suggestions)} sugerencia(s) a partir de {sum(s['runs'] for s in stats.values())} "
-            f"ejecuciones auditadas."
-            + (" El equipo está sano — sigue usándolo para acumular datos." if not suggestions else ""),
+            f"ejecuciones auditadas." + (" El equipo está sano — sigue usándolo para acumular datos." if not suggestions else ""),
             data=suggestions,
         )

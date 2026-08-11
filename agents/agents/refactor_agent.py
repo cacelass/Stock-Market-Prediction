@@ -19,14 +19,19 @@ from agents.exceptions import MissingDependencyError
 @register_agent
 class RefactorAgent(BaseAgent):
     name = "refactor"
-    description = (
-        "Refactoriza código Python automáticamente: añade type hints, corrige "
-        "mutables como argumento por defecto, reemplaza except desnudos, y más."
-    )
+    description = "Refactoriza código Python automáticamente: añade type hints, corrige mutables como argumento por defecto, reemplaza except desnudos, y más."
     capabilities = [
-        "refactor", "refactorizar", "type hint", "tipado", "mutable default",
-        "except desnudo", "bare except", "weights_only", "autofix",
-        "refactoriza", "type hints",
+        "refactor",
+        "refactorizar",
+        "type hint",
+        "tipado",
+        "mutable default",
+        "except desnudo",
+        "bare except",
+        "weights_only",
+        "autofix",
+        "refactoriza",
+        "type hints",
     ]
 
     def actions(self) -> dict:
@@ -43,11 +48,26 @@ class RefactorAgent(BaseAgent):
     #: `.venv/` corrompe la copia cacheada y, con ella, TODOS los proyectos que
     #: instalen esa versión después. Un `--within .` descuidado bastaba para
     #: dejar la máquina con un numpy roto y ningún rastro de por qué.
-    FORBIDDEN_DIRS = frozenset({
-        ".venv", "venv", ".env", "env", "site-packages", "dist-packages",
-        "node_modules", "__pycache__", ".git", ".tox", ".mypy_cache",
-        ".pytest_cache", ".ruff_cache", "build", "dist", ".rag-index",
-    })
+    FORBIDDEN_DIRS = frozenset(
+        {
+            ".venv",
+            "venv",
+            ".env",
+            "env",
+            "site-packages",
+            "dist-packages",
+            "node_modules",
+            "__pycache__",
+            ".git",
+            ".tox",
+            ".mypy_cache",
+            ".pytest_cache",
+            ".ruff_cache",
+            "build",
+            "dist",
+            ".rag-index",
+        }
+    )
 
     def _py_files(self, within: str | None) -> list[Path]:
         target = within or self.ctx.config.project_slug
@@ -61,10 +81,7 @@ class RefactorAgent(BaseAgent):
         if self.FORBIDDEN_DIRS.intersection(base.parts):
             return []
 
-        return [
-            p for p in base.rglob("*.py")
-            if not self.FORBIDDEN_DIRS.intersection(p.parts)
-        ]
+        return [p for p in base.rglob("*.py") if not self.FORBIDDEN_DIRS.intersection(p.parts)]
 
     def _apply_and_commit(self, path: Path, old_text: str, new_text: str, kind: str) -> dict:
         """Aplica un cambio y lo reporta."""
@@ -100,17 +117,17 @@ class RefactorAgent(BaseAgent):
                     arg_name = node.args.args[arg_idx].arg
                     start_line = default.lineno - 1
                     end_line = (default.end_lineno or default.lineno) - 1
-                    default_text = source[default.col_offset:(default.end_col_offset or default.col_offset + 1)]
+                    default_text = source[default.col_offset : (default.end_col_offset or default.col_offset + 1)]
                     if start_line == end_line:
                         line = new_lines[start_line]
                         new_lines[start_line] = line.replace(default_text, "None", 1)
                     else:
-                        lines_content = new_lines[start_line:end_line + 1]
+                        lines_content = new_lines[start_line : end_line + 1]
                         full_text = "".join(lines_content)
                         col = default.col_offset
                         eoc = default.end_col_offset or (col + 1)
                         new_full = full_text[:col] + "None" + full_text[eoc:]
-                        new_lines[start_line:end_line + 1] = [new_full]
+                        new_lines[start_line : end_line + 1] = [new_full]
                     # add guard after signature
                     body_start = node.body[0].lineno - 1
                     indent = " " * (node.col_offset + 4)
@@ -121,14 +138,18 @@ class RefactorAgent(BaseAgent):
             if new_source != source:
                 if not dry_run:
                     path.write_text(new_source, encoding="utf-8")
-                changes.append({
-                    "file": str(path.relative_to(self.ctx.root)),
-                    "kind": "mutable_default",
-                    "changed": True,
-                })
+                changes.append(
+                    {
+                        "file": str(path.relative_to(self.ctx.root)),
+                        "kind": "mutable_default",
+                        "changed": True,
+                    }
+                )
 
         return AgentResult(
-            True, self.name, "fix_mutable_defaults",
+            True,
+            self.name,
+            "fix_mutable_defaults",
             f"{len(changes)} archivo(s) procesados.",
             data={"changes": changes, "dry_run": dry_run},
             warnings=[] if not dry_run else ["Modo simulación: ningún archivo fue modificado."],
@@ -156,7 +177,7 @@ class RefactorAgent(BaseAgent):
                 lineno = node.lineno
                 lines = new_source.splitlines(keepends=True)
                 line = lines[lineno - 1]
-                indent = line[:len(line) - len(line.lstrip())]
+                indent = line[: len(line) - len(line.lstrip())]
 
                 new_line = f"{indent}except Exception:\n"
                 lines[lineno - 1] = new_line
@@ -167,7 +188,9 @@ class RefactorAgent(BaseAgent):
                 changes.append(self._apply_and_commit(path, source, new_source, "bare_except"))
 
         return AgentResult(
-            True, self.name, "fix_bare_excepts",
+            True,
+            self.name,
+            "fix_bare_excepts",
             f"{len(changes)} archivo(s) corregido(s).",
             data={"changes": changes, "dry_run": dry_run},
         )
@@ -211,7 +234,9 @@ class RefactorAgent(BaseAgent):
                 changes.append(self._apply_and_commit(path, source, new_source, "type_hints"))
 
         return AgentResult(
-            True, self.name, "add_type_hints",
+            True,
+            self.name,
+            "add_type_hints",
             f"{len(changes)} archivo(s) actualizado(s).",
             data={"changes": changes, "dry_run": dry_run},
         )
@@ -230,17 +255,16 @@ class RefactorAgent(BaseAgent):
             except (OSError, UnicodeDecodeError):
                 continue
 
-            pattern = r'torch\.load\([^,)]+,\s*[^)]*weights_only=False\b'
+            pattern = r"torch\.load\([^,)]+,\s*[^)]*weights_only=False\b"
             if re.search(pattern, source):
                 warnings_list.append(str(path.relative_to(self.ctx.root)))
 
         dry_msg = " [dry-run]" if dry_run else ""
         return AgentResult(
-            True, self.name, "fix_weights_only",
+            True,
+            self.name,
+            "fix_weights_only",
             f"{len(warnings_list)} archivo(s) usan weights_only=False.{dry_msg}",
             data={"files": warnings_list, "dry_run": dry_run},
-            warnings=(
-                [f"{f}: reemplazar por try/except como en predict_model.py" for f in warnings_list]
-                if warnings_list else []
-            ),
+            warnings=([f"{f}: reemplazar por try/except como en predict_model.py" for f in warnings_list] if warnings_list else []),
         )

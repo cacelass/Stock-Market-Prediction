@@ -32,8 +32,13 @@ class NotebookAgent(BaseAgent):
         "interpretaciones como celdas markdown. No interpreta nada él mismo — ver docstring del módulo."
     )
     capabilities = [
-        "notebook", "jupyter", "ipynb", "celda", "interpretar resultados",
-        "comentar notebook", "outputs del notebook",
+        "notebook",
+        "jupyter",
+        "ipynb",
+        "celda",
+        "interpretar resultados",
+        "comentar notebook",
+        "outputs del notebook",
     ]
 
     def actions(self) -> dict:
@@ -70,17 +75,18 @@ class NotebookAgent(BaseAgent):
 
         warnings = []
         if result["n_cells_with_output"] == 0:
-            warnings.append(
-                "El notebook no tiene celdas con salida — o no se ejecutó, o no hay nada que interpretar."
-            )
+            warnings.append("El notebook no tiene celdas con salida — o no se ejecutó, o no hay nada que interpretar.")
         n_errored = sum(1 for entry in result["manifest"] if entry["errored"])
         if n_errored:
             warnings.append(f"{n_errored} celda(s) terminaron en error — no interpretes un resultado que nunca se generó.")
 
         return AgentResult(
-            True, self.name, "extract_outputs",
+            True,
+            self.name,
+            "extract_outputs",
             f"{result['n_cells_with_output']} celda(s) con salida, {result['n_images']} imagen(es) extraída(s) a {workdir}.",
-            data=result, warnings=warnings,
+            data=result,
+            warnings=warnings,
         )
 
     def insert_comments(self, *, notebook_path: str, insertions: list[dict], in_place: bool = False) -> AgentResult:
@@ -120,7 +126,10 @@ class NotebookAgent(BaseAgent):
             warnings.append(f"Se sobreescribió '{path}' — sin backup automático.")
 
         return AgentResult(
-            True, self.name, "insert_comments",
+            True,
+            self.name,
+            "insert_comments",
             f"{result['n_inserted']} comentario(s) insertado(s) en {result['output_path']}.",
-            data=result, warnings=warnings,
+            data=result,
+            warnings=warnings,
         )

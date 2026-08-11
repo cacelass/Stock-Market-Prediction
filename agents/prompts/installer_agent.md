@@ -25,14 +25,16 @@ agente externo, ten presente y comunica lo siguiente:
 
 | Acción | Argumentos |
 |--------|------------|
-| `run installer install_from_git` | `--repo_url` (obligatorio) · `--subpath`, `--force` |
-| `run installer install_from_path` | `--local_path` (obligatorio) · `--subpath`, `--force` |
+| `run installer install_from_git` ⚠️ pide confirmación | `--repo_url` (obligatorio) · `--subpath`, `--force` |
+| `run installer install_from_path` ⚠️ pide confirmación | `--local_path` (obligatorio) · `--subpath`, `--force` |
 | `run installer list_installed` | — |
 | `run installer verify` | `--agent_name` (obligatorio) |
 
 ## Límites
 
 **Rol.** Dueño de agents/external/: instala y valida agentes de terceros.
+
+**No se deshacen** (la puerta de permisos las bloquea sin `--yes`; propón, no ejecutes): `install_from_git`, `install_from_path`
 
 **No hace:**
 - garantizar que el código externo es seguro — la validación es estructural, no de seguridad

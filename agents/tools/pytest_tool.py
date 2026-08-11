@@ -47,7 +47,11 @@ class TestRunSummary:
 class PytestTool:
     @staticmethod
     def run(
-        root: Path, *, path: str = "tests/", markers: str | None = None, junit_xml_path: Path | None = None,
+        root: Path,
+        *,
+        path: str = "tests/",
+        markers: str | None = None,
+        junit_xml_path: Path | None = None,
         timeout: int = 600,
     ) -> ProcessResult:
         args = ["uv", "run", "pytest", path, "-v"]
@@ -73,18 +77,23 @@ class PytestTool:
             error = testcase.find("error")
             node = failure if failure is not None else error
             if node is not None:
-                failed_tests.append(TestFailure(
-                    classname=testcase.get("classname", ""),
-                    name=testcase.get("name", ""),
-                    message=(node.get("message") or "").strip()[:500],
-                ))
+                failed_tests.append(
+                    TestFailure(
+                        classname=testcase.get("classname", ""),
+                        name=testcase.get("name", ""),
+                        message=(node.get("message") or "").strip()[:500],
+                    )
+                )
 
         total = int(suite.get("tests", 0))
         failures = int(suite.get("failures", 0))
         errors = int(suite.get("errors", 0))
         skipped = int(suite.get("skipped", 0))
         return TestRunSummary(
-            total=total, failures=failures, errors=errors, skipped=skipped,
+            total=total,
+            failures=failures,
+            errors=errors,
+            skipped=skipped,
             passed=total - failures - errors - skipped,
             duration_seconds=float(suite.get("time", 0.0)),
             failed_tests=failed_tests,
@@ -92,7 +101,12 @@ class PytestTool:
 
     @staticmethod
     def run_with_coverage(
-        root: Path, *, module: str, path: str = "tests/", coverage_json_path: Path | None = None, timeout: int = 600,
+        root: Path,
+        *,
+        module: str,
+        path: str = "tests/",
+        coverage_json_path: Path | None = None,
+        timeout: int = 600,
     ) -> ProcessResult:
         cov_path = coverage_json_path or (root / "coverage.json")
         args = ["uv", "run", "pytest", path, f"--cov={module}", f"--cov-report=json:{cov_path}", "-q"]
@@ -101,8 +115,5 @@ class PytestTool:
     @staticmethod
     def parse_coverage_json(path: Path) -> dict:
         data = json.loads(path.read_text(encoding="utf-8"))
-        per_file = {
-            filename: info["summary"]["percent_covered"]
-            for filename, info in data.get("files", {}).items()
-        }
+        per_file = {filename: info["summary"]["percent_covered"] for filename, info in data.get("files", {}).items()}
         return {"total_percent_covered": data.get("totals", {}).get("percent_covered"), "per_file": per_file}

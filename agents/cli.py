@@ -25,15 +25,23 @@ from agents.orchestrator import Orchestrator, RoutingDecision
 
 def _print_result(result: AgentResult, *, json_mode: bool = False) -> None:
     if json_mode:
-        print(json.dumps({
+        payload = {
             "success": result.success,
             "agent": result.agent,
             "action": result.action,
-            "message": result.message,
-            "data": result.data,
             "warnings": result.warnings,
             "needs": result.needs,
-        }, indent=2, ensure_ascii=False, default=str))
+            "certainty": round(result.certainty, 3),
+        }
+        # La prosa solo viaja cuando no hay estructura que la sustituya: si
+        # `data` codifica el resultado, `message` lo duplica (el consumidor
+        # es una herramienta/agente, y pagar tokens dos veces por lo mismo
+        # es tirar contexto — ver protocolo §1 en prompts/harness_workflow.md).
+        if result.data is None:
+            payload["message"] = result.message
+        else:
+            payload["data"] = result.data
+        print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
         return
     status = "✔" if result.success else "✘"
     print(f"{status} [{result.agent}.{result.action}] {result.message}")
@@ -48,15 +56,20 @@ def _print_result(result: AgentResult, *, json_mode: bool = False) -> None:
 
 def _print_routing(decision: RoutingDecision, *, json_mode: bool = False) -> None:
     if json_mode:
-        print(json.dumps({
-            "query": decision.query,
-            "selected_agent": decision.agent_name,
-            "confidence": round(decision.confidence, 3),
-            "candidates": [(name, round(score, 3)) for name, score in decision.candidates],
-        }, indent=2, ensure_ascii=False))
+        print(
+            json.dumps(
+                {
+                    "query": decision.query,
+                    "selected_agent": decision.agent_name,
+                    "confidence": round(decision.confidence, 3),
+                    "candidates": [(name, round(score, 3)) for name, score in decision.candidates],
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
         return
-    print(f"  Ruteo: '{decision.query}' → {decision.agent_name or 'ninguno'} "
-          f"(confianza {decision.confidence:.2f})")
+    print(f"  Ruteo: '{decision.query}' → {decision.agent_name or 'ninguno'} (confianza {decision.confidence:.2f})")
     print(f"  Candidatos: {[(n, f'{s:.2f}') for n, s in decision.candidates[:5]]}")
 
 
@@ -76,6 +89,11 @@ def _parse_kwargs(pairs: list[str]) -> dict[str, Any]:
                 value = float(value) if "." in value else int(value)
             kwargs[key] = value
             key = None
+    # `--yes` es el nombre corto de la autorización de la puerta de permisos
+    # (ver agents/permissions.py). Se traduce aquí para que quien escribe en
+    # el terminal no tenga que saber cómo se llama el argumento por dentro.
+    if kwargs.pop("yes", False):
+        kwargs["confirm"] = True
     return kwargs
 
 
@@ -107,13 +125,16 @@ def build_parser() -> argparse.ArgumentParser:
     plan_p = subparsers.add_parser(
         "plan",
         help="Describe un encargo: el agente 'plan' lo descompone, pregunta lo que falte y delega. "
-             "(atajo de `run plan intake --brief ...`; responde/ejecuta con `run plan answer/execute`)",
+        "(atajo de `run plan intake --brief ...`; responde/ejecuta con `run plan answer/execute`)",
     )
     plan_p.add_argument("brief", help="El encargo en lenguaje natural (un paso por línea o separado por ';')")
 
     audit_p = subparsers.add_parser("audit", help="Audita al equipo de agentes con el log de ejecuciones.")
     audit_p.add_argument(
-        "what", nargs="?", default="report", choices=["report", "failures", "suggest"],
+        "what",
+        nargs="?",
+        default="report",
+        choices=["report", "failures", "suggest"],
         help="report (uso y tasas de éxito) | failures (fallos recientes) | suggest (mejoras propuestas)",
     )
 
@@ -167,14 +188,21 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "pipeline":
         from agents.gstack.pipelines import run_pipeline
+
         pipe_kwargs = _parse_kwargs(args.params)
         result = run_pipeline(args.name, **pipe_kwargs)
         if json_mode:
-            print(json.dumps({
-                "success": result.success,
-                "summary": result.summary,
-                "steps": result.steps if hasattr(result, 'steps') else [],
-            }, indent=2, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {
+                        "success": result.success,
+                        "summary": result.summary,
+                        "steps": result.steps if hasattr(result, "steps") else [],
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
         else:
             print(result.summary)
         return 0 if result.success else 1
@@ -182,16 +210,24 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "doctor":
         if args.fix:
             from agents.gstack.pipelines import auto_fix
+
             result = auto_fix(auto_commit=True)
         else:
             from agents.gstack.pipelines import auto_analyze
+
             result = auto_analyze()
         if json_mode:
-            print(json.dumps({
-                "success": result.success,
-                "summary": result.summary,
-                "sections": result.sections if hasattr(result, 'sections') else [],
-            }, indent=2, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {
+                        "success": result.success,
+                        "summary": result.summary,
+                        "sections": result.sections if hasattr(result, "sections") else [],
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
         else:
             print(result.summary)
         return 0 if result.success else 1
@@ -213,6 +249,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "tools":
         from agents.tools.registry import tool_registry
+
         agent_registry.discover()
         names = sorted(tool_registry.all())
         if json_mode:

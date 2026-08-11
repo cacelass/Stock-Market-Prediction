@@ -18,12 +18,15 @@ from agents.tools.dependency_tool import DependencyTool, parse_dependency_name, 
 class DependencyAgent(BaseAgent):
     name = "dependency"
     description = (
-        "Detecta versiones de paquetes desactualizadas respecto a PyPI, vulnerabilidades conocidas "
-        "(OSV) y estima cadencia de releases. Necesita acceso a internet."
+        "Detecta versiones de paquetes desactualizadas respecto a PyPI, vulnerabilidades conocidas (OSV) y estima cadencia de releases. Necesita acceso a internet."
     )
     capabilities = [
-        "dependencias", "paquetes obsoletos", "versiones desactualizadas", "vulnerabilidad",
-        "pypi", "actualizar dependencias",
+        "dependencias",
+        "paquetes obsoletos",
+        "versiones desactualizadas",
+        "vulnerabilidad",
+        "pypi",
+        "actualizar dependencias",
     ]
 
     def action_aliases(self) -> dict:
@@ -73,8 +76,10 @@ class DependencyAgent(BaseAgent):
         warnings = []
         for spec in specs:
             status = DependencyTool.check_package(
-                spec, locked_version=locked.get(parse_dependency_name(spec)),
-                include_vulnerabilities=False, include_cadence=include_cadence,
+                spec,
+                locked_version=locked.get(parse_dependency_name(spec)),
+                include_vulnerabilities=False,
+                include_cadence=include_cadence,
             )
             results.append(status.__dict__)
             if status.error:
@@ -88,9 +93,12 @@ class DependencyAgent(BaseAgent):
 
         n_outdated = sum(1 for r in results if r["is_outdated"] is True)
         return AgentResult(
-            True, self.name, "check_outdated",
+            True,
+            self.name,
+            "check_outdated",
             f"{len(results)} dependencia(s) revisada(s), {n_outdated} desactualizada(s) (según lo que se pudo determinar).",
-            data=results, warnings=warnings,
+            data=results,
+            warnings=warnings,
         )
 
     def check_vulnerabilities(self) -> AgentResult:
@@ -102,9 +110,10 @@ class DependencyAgent(BaseAgent):
         locked = self._locked_versions()
         if not locked:
             return AgentResult(
-                False, self.name, "check_vulnerabilities",
-                "No se encontró uv.lock — sin la versión exacta instalada no se puede consultar "
-                "vulnerabilidades de forma fiable. Ejecuta 'uv lock' primero.",
+                False,
+                self.name,
+                "check_vulnerabilities",
+                "No se encontró uv.lock — sin la versión exacta instalada no se puede consultar vulnerabilidades de forma fiable. Ejecuta 'uv lock' primero.",
             )
 
         findings = []
@@ -120,9 +129,12 @@ class DependencyAgent(BaseAgent):
                 findings.append({"name": name, "version": version, "vulnerabilities": vulns})
 
         return AgentResult(
-            True, self.name, "check_vulnerabilities",
+            True,
+            self.name,
+            "check_vulnerabilities",
             f"{len(findings)} paquete(s) con vulnerabilidades conocidas de {len(specs)} revisado(s).",
-            data=findings, warnings=warnings,
+            data=findings,
+            warnings=warnings,
         )
 
     def check_lock_sync(self) -> AgentResult:
@@ -145,7 +157,9 @@ class DependencyAgent(BaseAgent):
         if result.ok:
             return AgentResult(True, self.name, "check_lock_sync", "uv.lock está sincronizado con pyproject.toml.")
         return AgentResult(
-            False, self.name, "check_lock_sync",
+            False,
+            self.name,
+            "check_lock_sync",
             "uv.lock está desactualizado respecto a pyproject.toml — ejecuta 'uv lock'.",
             data={"stderr": result.stderr},
         )

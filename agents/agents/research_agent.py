@@ -40,9 +40,20 @@ class ResearchAgent(BaseAgent):
         "devuelve una lista de papers rankeada por relevancia."
     )
     capabilities = [
-        "research", "papers", "paper", "articulos", "artículos", "bibliografia",
-        "bibliografía", "investigacion", "investigación", "arxiv", "openalex",
-        "estado del arte", "literatura", "citas",
+        "research",
+        "papers",
+        "paper",
+        "articulos",
+        "artículos",
+        "bibliografia",
+        "bibliografía",
+        "investigacion",
+        "investigación",
+        "arxiv",
+        "openalex",
+        "estado del arte",
+        "literatura",
+        "citas",
     ]
 
     def action_aliases(self) -> dict:
@@ -89,22 +100,27 @@ class ResearchAgent(BaseAgent):
         text = self._gather_project_text()
         if not text.strip():
             return AgentResult(
-                False, self.name, "project_keywords",
+                False,
+                self.name,
+                "project_keywords",
                 "No encontré README ni pyproject.toml de los que extraer keywords.",
             )
         keywords = ResearchTool.extract_keywords(text, top=top)
         return AgentResult(
-            True, self.name, "project_keywords",
+            True,
+            self.name,
+            "project_keywords",
             f"{len(keywords)} palabra(s) clave del proyecto: {', '.join(keywords)}",
             data={"keywords": keywords},
         )
 
-    def search(self, *, query: str, backend: str = "openalex", max_results: int = 10,
-               no_cache: bool = False) -> AgentResult:
+    def search(self, *, query: str, backend: str = "openalex", max_results: int = 10, no_cache: bool = False) -> AgentResult:
         """Busca papers para una consulta concreta en un backend (arxiv|openalex)."""
         if backend not in _BACKENDS:
             return AgentResult(
-                False, self.name, "search",
+                False,
+                self.name,
+                "search",
                 f"Backend '{backend}' desconocido. Disponibles: {sorted(_BACKENDS)}.",
             )
         self._cache_dir()
@@ -124,13 +140,14 @@ class ResearchAgent(BaseAgent):
         keywords = ResearchTool.extract_keywords(query, top=8) or query.split()
         ranked = ResearchTool.rank(ResearchTool.dedupe(papers), keywords)
         return AgentResult(
-            True, self.name, "search",
+            True,
+            self.name,
+            "search",
             f"{len(ranked)} paper(s) en {backend} para '{query}'.",
             data={"backend": backend, "query": query, "papers": ranked},
         )
 
-    def find_papers(self, *, backend: str = "openalex", max_results: int = 10,
-                    top_keywords: int = 8) -> AgentResult:
+    def find_papers(self, *, backend: str = "openalex", max_results: int = 10, top_keywords: int = 8) -> AgentResult:
         """
         Busca papers relacionados con el PROYECTO: deriva sus keywords y consulta
         el backend con ellas. Es la acción principal del agente.
@@ -147,7 +164,9 @@ class ResearchAgent(BaseAgent):
 
         papers = ResearchTool.rank(search_result.data["papers"], keywords)
         return AgentResult(
-            True, self.name, "find_papers",
+            True,
+            self.name,
+            "find_papers",
             f"{len(papers)} paper(s) relacionados con el proyecto (backend {backend}).",
             data={"backend": backend, "keywords": keywords, "papers": papers},
         )

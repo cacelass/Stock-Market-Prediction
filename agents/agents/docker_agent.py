@@ -34,22 +34,25 @@ class DockerAgent(BaseAgent):
     def lint_dockerfile(self) -> AgentResult:
         if not self.ctx.dockerfile.exists():
             return AgentResult(
-                False, self.name, "lint_dockerfile",
+                False,
+                self.name,
+                "lint_dockerfile",
                 "No existe Dockerfile en la raíz del proyecto (¿generaste el proyecto con use_docker=false?).",
             )
         findings = self.docker.lint_dockerfile(self.ctx.dockerfile)
         warnings = [f"L{f.line_number}: {f.message}" for f in findings if f.severity == "warning"]
         return AgentResult(
-            True, self.name, "lint_dockerfile",
+            True,
+            self.name,
+            "lint_dockerfile",
             f"{len(findings)} hallazgo(s) en Dockerfile.",
-            data=[f.__dict__ for f in findings], warnings=warnings,
+            data=[f.__dict__ for f in findings],
+            warnings=warnings,
         )
 
     def validate_compose(self) -> AgentResult:
         if not self.ctx.docker_compose_file.exists():
-            return AgentResult(
-                False, self.name, "validate_compose", "No existe docker-compose.yml en la raíz del proyecto."
-            )
+            return AgentResult(False, self.name, "validate_compose", "No existe docker-compose.yml en la raíz del proyecto.")
         try:
             result = self.docker.compose_config()
         except MissingDependencyError as exc:
@@ -57,8 +60,11 @@ class DockerAgent(BaseAgent):
 
         if not result.ok:
             return AgentResult(
-                False, self.name, "validate_compose",
-                "docker-compose.yml no es válido.", data=result.stderr,
+                False,
+                self.name,
+                "validate_compose",
+                "docker-compose.yml no es válido.",
+                data=result.stderr,
             )
         return AgentResult(True, self.name, "validate_compose", "docker-compose.yml es válido.", data=result.stdout)
 
