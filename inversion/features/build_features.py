@@ -14,7 +14,11 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     Columnas generadas:
       - return       : retorno diario (pct_change)
       - volatility   : desv. estándar móvil 20d del retorno
-      - rsi          : RSI 14 días
+      - volatility_21: desv. estándar móvil 21d del retorno (TRADE-005)
+      - rsi          : RSI 14 días (aproximación simple, ver nota)
+      - momentum_10 / momentum_21 / momentum_63 : retorno a 10/21/63 días (TRADE-005)
+      - day_of_week  : día de la semana (0=lunes … 4=viernes) (TRADE-005)
+      - quarter      : trimestre del año (1-4) (TRADE-005)
       - hl_range     : (high - low) / close  [normalizado]
       - oc_range     : (open - close) / close [normalizado]
       - ma_50        : media móvil 50 días
@@ -23,20 +27,31 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
       - vwap_ratio   : close / vwap  (si no hay vwap real, usa (H+L+C)/3)
       - lag_1 / lag_5 / lag_20 : lags del retorno diario
 
+    Nota RSI: se usa la aproximación simple (media móvil de ganancias y
+    pérdidas a 14 días), no la suavización de Wilder; es la versión más común
+    en librerías ligeras y evita el bucle recursivo de Wilder.
+
     El cálculo es determinista: mismo input → mismo output. Las features son
     derivadas por construcción de los precios (close~vwap, ma_50~close), por
     lo que hay colinealidad esperada; el modelo RandomForest es tolerante a
     ella y no se intenta "arreglar" aquí.
+
+    Sin fuga: momentum, volatilidad y RSI usan solo ventanas pasadas
+    (pct_change/rolling miran hacia atrás) y las features de calendario se
+    derivan de la fecha del propio día t, nunca de precios futuros.
     """
     df = df.sort_values("timestamp").copy()
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
 
     # Retorno diario
     df["return"] = df["close"].pct_change()
 
-    # Volatilidad 20 días
+    # Volatilidad 20 días (original) y 21 días (TRADE-005)
     df["volatility"] = df["return"].rolling(window=20).std()
+    df["volatility_21"] = df["return"].rolling(window=21).std()
 
-    # RSI 14 días (con protección contra división por cero)
+    # RSI 14 días (aproximación simple: media de ganancias/pérdidas, no Wilder)
+    # con protección contra división por cero
     delta = df["close"].diff()
     gain = delta.where(delta > 0, 0).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -63,6 +78,17 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     df["lag_1"] = df["return"].shift(1)
     df["lag_5"] = df["return"].shift(5)
     df["lag_20"] = df["return"].shift(20)
+
+    # Momentum (TRADE-005): retorno acumulado a 10/21/63 días. pct_change(n)
+    # usa SOLO precios hasta t (close[t] vs close[t-n]), nunca t+k.
+    df["momentum_10"] = df["close"].pct_change(10)
+    df["momentum_21"] = df["close"].pct_change(21)
+    df["momentum_63"] = df["close"].pct_change(63)
+
+    # Estacionalidad (TRADE-005): día de la semana (0=lunes..4=viernes) y
+    # trimestre (1-4), derivados de la fecha del día t.
+    df["day_of_week"] = df["timestamp"].dt.dayofweek
+    df["quarter"] = df["timestamp"].dt.quarter
 
     return df
 

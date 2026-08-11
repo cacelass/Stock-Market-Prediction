@@ -18,7 +18,11 @@ from inversion.features.build_features import (
 EXPECTED_COLS = [
     "return",
     "volatility",
+    "volatility_21",
     "rsi",
+    "momentum_10",
+    "momentum_21",
+    "momentum_63",
     "hl_range",
     "oc_range",
     "ma_50",
@@ -28,6 +32,8 @@ EXPECTED_COLS = [
     "lag_1",
     "lag_5",
     "lag_20",
+    "day_of_week",
+    "quarter",
 ]
 
 
@@ -58,6 +64,39 @@ def test_return_is_pct_change(sample_df):
     result = add_derived_features(sample_df)
     expected = sample_df["close"].pct_change()
     pd.testing.assert_series_equal(result["return"], expected, check_names=False)
+
+
+def test_rsi_bounded_0_100(sample_df):
+    """RSI(14) debe quedar acotado en [0, 100]."""
+    result = add_derived_features(sample_df)
+    rsi = result["rsi"].dropna()
+    assert rsi.min() >= 0.0
+    assert rsi.max() <= 100.0
+
+
+def test_momentum_no_future_leakage(sample_df):
+    """Sin fuga (TRADE-005): el momentum del día t no usa precios posteriores a t."""
+    result = add_derived_features(sample_df)
+    # momentum_10[t] = close[t] / close[t-10] - 1 → solo datos hasta t
+    expected = sample_df["close"].pct_change(10)
+    pd.testing.assert_series_equal(result["momentum_10"], expected, check_names=False)
+
+    # Alterar el precio futuro no cambia el momentum de los días anteriores
+    tampered = sample_df.copy()
+    tampered.loc[tampered.index[-1], "close"] *= 100.0
+    result_t = add_derived_features(tampered)
+    pd.testing.assert_series_equal(
+        result["momentum_10"].iloc[:-1],
+        result_t["momentum_10"].iloc[:-1],
+        check_names=False,
+    )
+
+
+def test_calendar_features(sample_df):
+    """day_of_week ∈ [0, 4] y quarter ∈ [1, 4], derivados de la fecha del día t."""
+    result = add_derived_features(sample_df)
+    assert result["day_of_week"].between(0, 4).all()
+    assert result["quarter"].between(1, 4).all()
 
 
 def test_fit_and_save_scaler_returns_scaler(sample_df):

@@ -1,32 +1,36 @@
 # Evaluación de viabilidad — ¿la estrategia supera a buy&hold? (TRADE-003)
 
-Generado: 2026-08-02 16:17
+Generado: 2026-08-11 15:49
 
 Backtest **out-of-sample**: por ticker se re-entrena el modelo con el primer 70% cronológico de la serie y se simula SOLO sobre el último 30% (segmento test, nunca visto por el modelo). Las métricas las calcula `run_backtest` (TRADE-001) sobre ese segmento; buy&hold se mide en el MISMO segmento test, no sobre todo el histórico.
 
+La simulación aplica **0.1% de comisión + 0.05% de slippage** por operación (entrada y salida), y el umbral de señal se **calibra por ticker** en el último 20% del train (rejilla 0.51-0.70, se elige el de mayor Sharpe). El segmento test nunca participa en la calibración.
+
 ## Conclusión
 
-**La estrategia NO supera a buy&hold en el segmento test (out-of-sample):** la cartera (pesos iguales) rinde 124.69% frente a 281.70% de comprar y mantener, y solo 2 de 7 tickers superan a su buy&hold.
+**La estrategia NO supera a buy&hold en el segmento test (out-of-sample):** la cartera (pesos iguales) rinde 77.50% frente a 281.70% de comprar y mantener, y solo 3 de 7 tickers superan a su buy&hold.
 
 Los retornos espectaculares del backtest in-sample de TRADE-002 (p. ej. AAPL 1.7M%, cartera 251k%) eran sobreajuste: el modelo se evaluaba sobre los mismos datos con los que se entrenó. Con evaluación honesta desaparecen. **No invertir capital real**; la estrategia queda como ejercicio académico y, como mucho, paper trading para seguir aprendiendo.
 
+**Impacto de los costes:** con costes realistas (0.1% comisión + 0.05% slippage por operación) y el umbral calibrado por ticker, el retorno de la cartera baja de 88.85% a 77.50%.
+
 ## Resultados por ticker (segmento test)
 
-| ticker | retorno estrategia | retorno buy&hold | CAGR | Sharpe | maxDD | win rate | operaciones | ventana test |
-|---|---|---|---|---|---|---|---|---|
-| AAPL | 113.30% | 111.28% | 15.42% | 0.66 | -33.36% | 4.94% | 1 | 2020-12-03 → 2026-03-25 |
-| MSFT | 67.08% | 80.90% | 10.21% | 0.51 | -37.15% | 10.00% | 1 | 2020-12-03 → 2026-03-25 |
-| GOOGL | 51.10% | 222.02% | 8.13% | 0.45 | -43.63% | 38.03% | 8 | 2020-12-03 → 2026-03-25 |
-| AMZN | 48.42% | 32.87% | 7.76% | 0.39 | -51.68% | 0.00% | 1 | 2020-12-03 → 2026-03-25 |
-| META | 32.85% | 258.52% | 8.05% | 0.42 | -50.85% | 58.67% | 7 | 2022-07-18 → 2026-03-25 |
-| TSLA | -10.93% | 28.66% | -2.69% | 0.24 | -71.69% | 35.71% | 2 | 2021-12-20 → 2026-03-25 |
-| NVDA | 571.00% | 1237.65% | 43.39% | 1.01 | -60.80% | 45.45% | 2 | 2020-12-03 → 2026-03-25 |
-| CARTERA | 124.69% | 281.70% | 12.89% | 0.52 | -49.88% | 27.54% | 22 | 2020-12-03 → 2026-03-25 |
+| ticker | retorno estrategia | retorno buy&hold | umbral | CAGR | Sharpe | maxDD | win rate | operaciones | ventana test |
+|---|---|---|---|---|---|---|---|---|---|
+| AAPL | 112.98% | 111.28% | 0.58 | 15.39% | 0.65 | -33.36% | 32.28% | 1 | 2020-12-03 → 2026-03-25 |
+| MSFT | 43.95% | 80.90% | 0.55 | 7.14% | 0.41 | -32.06% | 46.51% | 19 | 2020-12-03 → 2026-03-25 |
+| GOOGL | 77.64% | 222.02% | 0.56 | 11.49% | 0.55 | -42.09% | 49.39% | 17 | 2020-12-03 → 2026-03-25 |
+| AMZN | 84.18% | 32.87% | 0.68 | 12.26% | 0.53 | -43.49% | 33.33% | 1 | 2020-12-03 → 2026-03-25 |
+| META | 37.73% | 258.52% | 0.57 | 9.11% | 0.45 | -51.46% | 55.01% | 10 | 2022-07-18 → 2026-03-25 |
+| TSLA | 186.03% | 28.66% | 0.51 | 28.14% | 0.77 | -61.14% | 51.76% | 61 | 2021-12-20 → 2026-03-25 |
+| NVDA | 0.00% | 1237.65% | 0.64 | 0.00% | 0.00 | 0.00% | 0.00% | 0 | 2020-12-03 → 2026-03-25 |
+| CARTERA | 77.50% | 281.70% |  | 11.93% | 0.48 | -37.66% | 38.33% | 109 | 2020-12-03 → 2026-03-25 |
 
 ## Limitaciones
 
-- **Costes de transacción (comisiones y spread)**: la simulación entra y sale sin pagar comisiones ni spread. Con un coste de 0.1-0.3% por operación (típico en brokers retail), una estrategia con muchas operaciones pierde gran parte de su ventaja; la columna 'operaciones' permite estimar el impacto.
-- **Slippage**: el backtest opera al precio de cierre exacto. En la práctica la ejecución se desplaza contra el operador, más cuanto menos líquido sea el activo y mayor el tamaño de la orden.
+- **Costes de transacción (comisiones y spread)**: la simulación aplica un coste fijo del 0.1% de comisión + 0.05% de slippage por operación (entrada y salida). Es representativo de brokers retail, pero no modela comisiones fijas por orden ni spreads que varían con la liquidez: un activo poco líquido o un capital pequeño cambiarían materialmente el resultado.
+- **Slippage**: el backtest aplica un slippage fijo del 0.05% por operación. En la práctica el slippage se desplaza contra el operador y crece cuanto menos líquido sea el activo y mayor el tamaño de la orden; un único valor fijo no captura esa variación.
 - **Sobreajuste (overfitting)**: aunque este backtest es out-of-sample, el modelo y las features se eligieron mirando el histórico completo (incluido este segmento test en iteraciones previas). El proceso de selección no es a prueba de sobreajuste: cualquier resultado nuevo debe tratarse como hipótesis hasta validarse en datos realmente no vistos.
 - **Forward-looking bias**: el target (sube >2% en 5 días) usa precios futuros solo para etiquetar el entrenamiento, nunca como feature. Aun así, cualquier fuga no detectada en features o en el split inflaría los resultados.
 - **Cambio de régimen de mercado**: el modelo se entrena con el pasado y se evalúa en una ventana concreta. Un cambio de comportamiento del mercado (crisis, burbuja, liquidez) puede invalidar lo aprendido; el segmento test cubre un solo régimen.

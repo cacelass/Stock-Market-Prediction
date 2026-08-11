@@ -21,7 +21,11 @@ from inversion.features.build_features import add_derived_features
 FEATURE_COLS = [
     "return",
     "volatility",
+    "volatility_21",
     "rsi",
+    "momentum_10",
+    "momentum_21",
+    "momentum_63",
     "ma_50",
     "ma_200",
     "hl_range",
@@ -31,6 +35,8 @@ FEATURE_COLS = [
     "lag_1",
     "lag_5",
     "lag_20",
+    "day_of_week",
+    "quarter",
 ]
 
 # Columnas de sentimiento: el modelo las usa si existen en el dataset (SENT-003).

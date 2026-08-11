@@ -17,7 +17,26 @@ def features_synthetic(tmp_path, monkeypatch):
     """Escribe features_BBB_ml_ready.csv con un shift de media en la última ventana."""
     n = 400
     rng = np.random.default_rng(0)
-    cols = ["return", "volatility", "rsi", "ma_50", "ma_200", "hl_range", "oc_range", "log_volume", "vwap_ratio", "lag_1", "lag_5", "lag_20"]
+    cols = [
+        "return",
+        "volatility",
+        "volatility_21",
+        "rsi",
+        "momentum_10",
+        "momentum_21",
+        "momentum_63",
+        "ma_50",
+        "ma_200",
+        "hl_range",
+        "oc_range",
+        "log_volume",
+        "vwap_ratio",
+        "lag_1",
+        "lag_5",
+        "lag_20",
+        "day_of_week",
+        "quarter",
+    ]
     df = pd.DataFrame(rng.normal(loc=0.0, scale=1.0, size=(n, len(cols))), columns=cols)
     df["timestamp"] = pd.date_range("2020-01-01", periods=n)
     df["target"] = (df["return"] > 0).astype(int)
