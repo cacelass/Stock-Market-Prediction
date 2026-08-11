@@ -18,4 +18,4 @@ year: 1996
 
 Clustering incremental que construye un árbol CF (Clustering Feature) en una sola pasada sobre los datos. Escalable a datasets muy grandes donde KMeans no cabe en memoria.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

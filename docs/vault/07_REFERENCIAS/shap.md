@@ -18,4 +18,4 @@ year: 2017
 
 Explicabilidad basada en Shapley Values. Asigna a cada feature una contribución a la predicción. Único método unificado que cumple propiedades deseables (eficiencia, simetría, aditividad).
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

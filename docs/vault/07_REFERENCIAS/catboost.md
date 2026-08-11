@@ -18,4 +18,4 @@ year: 2018
 
 CatBoost maneja categóricas nativamente con Ordered Target Statistics. Poco tuning necesario. Ideal cuando hay muchas columnas categóricas.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

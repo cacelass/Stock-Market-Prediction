@@ -18,4 +18,4 @@ year: 1995
 
 Máximo margen con kernel RBF. Proyecta los datos a un espacio de mayor dimensión para encontrar el hiperplano separador óptimo. Muy efectivo en datasets pequeños y medianos.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

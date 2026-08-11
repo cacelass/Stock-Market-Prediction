@@ -18,4 +18,4 @@ year: 2019
 
 Framework de optimización de hiperparámetros con búsqueda basada en TPE (Tree-structured Paramed Estimation), pruning automático y visualización de historiales.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

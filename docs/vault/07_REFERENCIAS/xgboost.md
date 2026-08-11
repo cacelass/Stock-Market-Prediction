@@ -18,4 +18,4 @@ year: 2016
 
 XGBoost es gradient boosting optimizado con regularización nativa (L1/L2), soporte para GPU y manejo de valores nulos. Referencia dominante en Kaggle y competiciones.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

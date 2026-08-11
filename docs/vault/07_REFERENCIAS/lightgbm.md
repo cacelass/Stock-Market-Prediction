@@ -18,4 +18,4 @@ year: 2017
 
 LightGBM usa crecimiento leaf-wise (vs level-wise de XGBoost), lo que lo hace más rápido en datasets grandes. Manejo nativo de features categóricas.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

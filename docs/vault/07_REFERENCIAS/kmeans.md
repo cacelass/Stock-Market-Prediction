@@ -18,4 +18,4 @@ year: 1982
 
 Algoritmo de clustering por particionamiento: asigna cada punto al centroide más cercano, luego recalcula centroides. Rápido y escalable, pero asume clusters esféricos.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

@@ -18,4 +18,4 @@ year: 2001
 
 Ensemble de árboles de decisión con bagging y selección aleatoria de features. Robustez generalista, feature importances, y mínimo tuning. Ideal como baseline.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

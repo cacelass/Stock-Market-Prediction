@@ -18,4 +18,4 @@ year: 2001
 
 Clustering basado en grafos: construye un grafo de similitud entre puntos y lo particiona usando los autovectores de la matriz Laplaciana. Captura clusters no convexos que KMeans no puede.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

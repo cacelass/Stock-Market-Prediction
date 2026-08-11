@@ -18,4 +18,4 @@ year: 2016
 
 Bloques residuales con conexiones skip que permiten entrenar redes muy profundas sin degradación. En versión tabular (FC), permite apilar muchas capas densas sin overfitting.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

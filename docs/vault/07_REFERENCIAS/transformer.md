@@ -18,4 +18,4 @@ year: 2017
 
 Arquitectura basada únicamente en mecanismos de atención, sin recurrencia ni convolución. La base de BERT, GPT y la mayoría de LLMs modernos. Para datos tabulares captura interacciones globales entre features.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

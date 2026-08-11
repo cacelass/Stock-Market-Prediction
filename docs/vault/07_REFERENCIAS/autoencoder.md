@@ -19,4 +19,4 @@ year: 2006
 
 Red neuronal que aprende a comprimir (encoder) y reconstruir (decoder) los datos. Útil para reducción de dimensionalidad no lineal, detección de anomalías (alto error de reconstrucción = outlier), y pre-entrenamiento no supervisado.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

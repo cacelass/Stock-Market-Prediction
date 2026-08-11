@@ -19,4 +19,4 @@ year: 2006
 
 Similar a Random Forest pero con más aleatorización: los splits se eligen aleatoriamente en vez de buscar el óptimo. Reduce aún más el overfitting. Suelo tener mejor rendimiento que RF en datasets ruidosos.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

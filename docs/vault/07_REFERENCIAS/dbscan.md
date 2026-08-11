@@ -19,4 +19,4 @@ year: 1996
 
 Clustering basado en densidad: forma clusters donde hay alta concentración de puntos y etiqueta como ruido (-1) los puntos aislados. No requiere número de clusters, detecta formas arbitrarias.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

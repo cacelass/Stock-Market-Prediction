@@ -19,4 +19,4 @@ year: 1997
 
 Red recurrente con puertas de entrada, olvido y salida que controlan el flujo de información. Diseñada para capturar dependencias temporales largas sin sufrir vanishing gradient.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

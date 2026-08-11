@@ -18,4 +18,4 @@ year: 2019
 
 Corrige Adam desacoplando el weight decay de la actualización adaptativa del learning rate. Actualmente el optimizador por defecto para la mayoría de modelos PyTorch.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.

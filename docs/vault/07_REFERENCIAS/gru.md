@@ -19,4 +19,4 @@ year: 2014
 
 Variante de LSTM con menos parámetros (solo 2 puertas: reset y update). Rendimiento similar a LSTM en la mayoría de tareas, pero más rápido de entrenar y menos propenso a overfitting con datasets pequeños.
 
-Ver en [[01_PROYECTO/guiia_modelos|Guía de modelos]] para cuándo usarlo.
+Ver en [[01_PROYECTO/guia_modelos|Guía de modelos]] para cuándo usarlo.
