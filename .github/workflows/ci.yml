@@ -24,14 +24,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      # `run: |` (bloque literal) y no un escalar plano: YAML pliega los saltos
-      # de un escalar plano en espacios, asi que las `\` de continuacion le
-      # llegaban al shell como `\ ` — un espacio escapado — y `uv sync` recibia
-      # argumentos basura. Rompia el CI de cualquier proyecto con algun extra.
+      # El codigo de inversion/ usa modulos de varios extras (api, optuna,
+      # monitoring, rag...): mypy y ruff los recorren enteros, asi que CI
+      # instala todos los extras, no solo el principal.
       - name: Install dependencies
         run: |
-          uv sync --extra dev --extra supervisado \
-            --frozen
+          uv sync --all-extras --frozen
 
       - name: Lint
         run: uv run ruff check inversion/ tests/
