@@ -35,3 +35,9 @@
 ### Añadido
 
 - fix(tests): parchear ARTIFACTS_DIR para que tuning no escriba artefactos reales (IMP-004)
+
+## [Unreleased] — 2026-08-25
+
+### Añadido
+
+- feat(model): modelo global pooled comparado contra por-ticker en walk-forward (IMP-005)

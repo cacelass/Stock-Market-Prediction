@@ -1,0 +1,8 @@
+scope,wf_accuracy,wf_auc,n_test,ticker,ind_accuracy,ind_auc,gana_pool_acc,gana_pool_auc
+AAPL,0.5844,0.5127,1706,AAPL,0.5669,0.5201,True,False
+MSFT,0.6553,0.5606,1706,MSFT,0.5957,0.5758,True,False
+GOOGL,0.6055,0.5796,1706,GOOGL,0.6453,0.6259,False,False
+AMZN,0.5733,0.5519,1706,AMZN,0.5959,0.5731,False,False
+META,0.5492,0.5542,1706,META,0.5815,0.5638,False,False
+TSLA,0.4426,0.4879,1706,TSLA,0.5628,0.5636,False,False
+NVDA,0.5111,0.5386,1706,NVDA,0.491,0.5013,True,True

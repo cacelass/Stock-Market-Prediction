@@ -532,3 +532,19 @@ init.sh: ENTORNO LISTO (170 passed). pytest tests/test_tuning.py: 3 passed. Tras
 ```
 
 </details>
+
+## IMP-005 — Modelo global pooled (todas las tickers) vs modelos por ticker
+
+- **Cerrada:** 2026-08-25
+- **Verificación:** ./init.sh en verde · 170 passed, 24 warnings in 17.36s
+- **Cambios:** notebooks/pooled_model.py (nuevo), reports/pooled_vs_individual.csv, references/05-model-improvement.md (sección F)
+- **Decisiones:** Veredicto: por-ticker sigue siendo la opción correcta (pool gana 1/7 en AUC); NVDA sin señal propia se beneficia del pool (fallback razonable); TSLA idiosincrásico no transfiere; accuracy del pool engaña por desbalance — el AUC manda
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO. notebooks/pooled_model.py ejecutado: pool de 29,855 filas × 34 features scale-free + one-hots; Optuna 15 trials wf_auc=0.5685. Walk-forward comparativo: pool gana AUC solo 1/7 (NVDA 0.539 vs 0.501); TSLA pool AUC 0.488 < azar. → reports/pooled_vs_individual.csv
+```
+
+</details>

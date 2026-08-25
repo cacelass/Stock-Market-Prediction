@@ -484,6 +484,23 @@
       "started": "2026-08-25",
       "review_rounds": 0,
       "closed": "2026-08-25"
+    },
+    {
+      "id": "IMP-005",
+      "title": "Modelo global pooled (todas las tickers) vs modelos por ticker",
+      "description": "Modelo global pooled (todas las tickers) vs modelos por ticker",
+      "acceptance_criteria": [
+        "script del modelo pool con features scale-free + one-hot de ticker",
+        "validación walk-forward honesta con folds temporales globales",
+        "comparación por ticker contra walk_forward.csv actual",
+        "veredicto documentado en references/",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-25",
+      "review_rounds": 0,
+      "closed": "2026-08-25"
     }
   ]
 }

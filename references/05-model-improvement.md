@@ -126,3 +126,39 @@ protocolo, no de más features ni más árboles:
   el número que cuenta es el walk-forward.
 
 CSVs: `walk_forward.csv` (post), `walk_forward_antes_wf_tuning.csv` (pre).
+
+## F) Modelo global pooled vs por-ticker (IMP-005)
+
+Hipótesis: ~29.9k filas de 7 tickers comparten mecánica de mercado; un RF
+global puede generalizar mejor que los individuales. Diseño: solo features
+scale-free (fuera ma_50/ma_200/log_volume: niveles no comparables entre
+tickers), one-hot de ticker, Optuna corto (15 trials sobre wf-AUC), folds
+expanding-window globales ordenados por fecha.
+
+| Ticker | Pool acc | Pool AUC | Indiv acc | Indiv AUC | Gana pool |
+|--------|----------|----------|-----------|-----------|-----------|
+| AAPL | 0.584 | 0.513 | 0.567 | 0.520 | solo acc |
+| MSFT | 0.655 | 0.561 | 0.596 | 0.576 | solo acc |
+| GOOGL | 0.606 | 0.580 | **0.645** | **0.626** | no |
+| AMZN | 0.573 | 0.552 | **0.596** | **0.573** | no |
+| META | 0.549 | 0.554 | **0.582** | **0.564** | no |
+| TSLA | 0.443 | 0.488 | **0.563** | **0.564** | no |
+| NVDA | **0.511** | **0.539** | 0.491 | 0.501 | **sí** |
+
+Global pool: acc 0.560, AUC 0.569.
+
+**Veredicto: los modelos por-ticker siguen siendo la opción correcta** — el
+pool gana en AUC solo 1/7. Dos hallazgos útiles:
+
+1. **NVDA es la excepción**: con datos propios no hay señal (AUC 0.501), pero
+   el pool le presta la dinámica de las otras (AUC 0.539). Para tickers sin
+   señal propia, el modelo global es un fallback razonable.
+2. **TSLA es idiosincrásico**: el pool le va mal (AUC 0.488 < azar). Su
+   comportamiento no transfiere — refuerza mantenerlo con modelo propio.
+3. La accuracy del pool a veces gana pero con AUC perdiendo: está explotando
+   el desbalance de clases, no señal. El AUC manda para decidir.
+
+Siguiente experimento natural (no ejecutado): híbrido por ticker — usar el
+modelo individual cuando su wf-AUC > 0.55 y el pool como respaldo en caso
+contrario. CSVs: `reports/pooled_vs_individual.csv`, script
+`notebooks/pooled_model.py`.
