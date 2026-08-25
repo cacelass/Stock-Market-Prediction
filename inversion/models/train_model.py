@@ -4,13 +4,14 @@ from typing import Any
 import joblib
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 
 from inversion.features.build_features import fit_and_save_scaler
 from inversion.utils import paths
 
 # Features usadas por el modelo — deben coincidir con predict_model.py
 FEATURE_COLS = [
+    # Técnicas base
     "return",
     "volatility",
     "volatility_21",
@@ -29,10 +30,43 @@ FEATURE_COLS = [
     "lag_20",
     "day_of_week",
     "quarter",
+    # Bollinger
+    "bb_position",
+    "bb_width",
+    # ATR
+    "atr_ratio",
+    # OBV
+    "obv_change",
+    # Volume
+    "volume_ratio",
+    # RSI derivados
+    "rsi_change",
+    "rsi_ma",
+    # Volatilidad
+    "vol_ratio",
+    # Calendar
+    "week_of_year",
+    # Drawdown
+    "drawdown",
 ]
 
 # Features de sentimiento (SENT-003) — se usan solo si el dataset las trae
 SENTIMENT_COLS = ["sentiment_score", "sentiment_ma5", "sentiment_vol"]
+
+
+def available_feature_cols(df: pd.DataFrame) -> list[str]:
+    """FEATURE_COLS presentes en el dataset + sentimiento si existe.
+
+    Única fuente de verdad para seleccionar columnas: los datasets pueden traer
+    subconjuntos (tests sintéticos, datos antiguos) y un modelo solo consume
+    exactamente las columnas con las que fue entrenado. Todos los módulos que
+    cargan features (predict, backtest, tuning, drift, shap, api) deben pasar
+    por aquí en vez de copiar el filtro.
+    """
+    cols = [c for c in FEATURE_COLS if c in df.columns]
+    if all(c in df.columns for c in SENTIMENT_COLS):
+        cols += SENTIMENT_COLS
+    return cols
 
 
 def train_rf_model(
@@ -114,9 +148,9 @@ def train_ticker(ticker: str, csv_path: Path, random_state: int = 42, with_senti
     guardar el baseline aparte (suffix="_base").
     """
     df = pd.read_csv(csv_path, parse_dates=["timestamp"])
-    feature_cols = list(FEATURE_COLS)
-    if with_sentiment and all(c in df.columns for c in SENTIMENT_COLS):
-        feature_cols += SENTIMENT_COLS
+    feature_cols = available_feature_cols(df)
+    if not with_sentiment:
+        feature_cols = [c for c in feature_cols if c not in SENTIMENT_COLS]
     df = df.dropna(subset=[*feature_cols, "target"]).sort_values("timestamp")
 
     split = int(len(df) * 0.8)

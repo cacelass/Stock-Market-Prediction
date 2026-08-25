@@ -122,11 +122,27 @@ class DocumentationAgent(BaseAgent):
         return self._insert_changelog(entry)
 
     def _insert_changelog(self, entry: str) -> AgentResult:
-        """Inserta `entry` en CHANGELOG.md tras la cabecera del archivo."""
+        """Inserta `entry` en CHANGELOG.md tras la cabecera del archivo.
+
+        Idempotente: si la entrada ya está en el fichero (p.ej. un intento de
+        commit anterior la insertó y los hooks abortaron), no duplica — solo
+        avisa. Sin esta guarda, cada reintento de commit_feature añade otra
+        copia de la misma entrada.
+        """
         if not self.ctx.changelog_file.exists():
             new_content = f"# Changelog\n\n{entry}\n"
         else:
             current = self.ctx.changelog_file.read_text(encoding="utf-8")
+            core = entry.strip()
+            if core and core in current:
+                return AgentResult(
+                    True,
+                    self.name,
+                    "update_changelog",
+                    "CHANGELOG.md ya contenía esta entrada; no se duplica.",
+                    data=entry,
+                    warnings=["Entrada de changelog duplicada omitida (ya presente en el fichero)."],
+                )
             # Inserta tras la primera línea en blanco que sigue al título (cabecera del archivo),
             # que es donde ya viven las notas introductorias de CHANGELOG.md en este template.
             marker = "\n---\n"

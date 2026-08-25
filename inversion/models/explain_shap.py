@@ -17,8 +17,8 @@ import joblib
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from inversion.models.train_model import available_feature_cols
 from inversion.utils import paths
-from inversion.models.train_model import FEATURE_COLS, SENTIMENT_COLS
 
 FIGURES_DIR = paths.PROJECT_DIR / "reports" / "figures"
 
@@ -33,9 +33,7 @@ def shap_summary(ticker: str, max_display: int = 15) -> str:
         raise FileNotFoundError(f"No hay modelo para '{ticker}': {model_path}. Ejecuta make train.")
 
     df = pd.read_csv(paths.INTERIM_DATA_DIR / f"features_{ticker}_ml_ready.csv")
-    feature_cols = list(FEATURE_COLS)
-    if all(c in df.columns for c in SENTIMENT_COLS):
-        feature_cols += SENTIMENT_COLS
+    feature_cols = available_feature_cols(df)
     X = df[feature_cols].dropna()
     # Muestra acotada: SHAP en RF es exacto con TreeExplainer pero lento en 3.7k filas.
     sample = X.sample(n=min(300, len(X)), random_state=42)

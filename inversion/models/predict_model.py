@@ -14,33 +14,14 @@ from typing import Any
 
 import joblib
 import pandas as pd
-from inversion.utils import paths
+
 from inversion.features.build_features import add_derived_features
 
-# Features que deben estar presentes (deben coincidir con train_model.py)
-FEATURE_COLS = [
-    "return",
-    "volatility",
-    "volatility_21",
-    "rsi",
-    "momentum_10",
-    "momentum_21",
-    "momentum_63",
-    "ma_50",
-    "ma_200",
-    "hl_range",
-    "oc_range",
-    "log_volume",
-    "vwap_ratio",
-    "lag_1",
-    "lag_5",
-    "lag_20",
-    "day_of_week",
-    "quarter",
-]
-
-# Columnas de sentimiento: el modelo las usa si existen en el dataset (SENT-003).
-SENTIMENT_COLS = ["sentiment_score", "sentiment_ma5", "sentiment_vol"]
+# Una sola fuente de verdad: las features y su selección viven en train_model.py.
+# Duplicarlas aquí provocó desincronización (modelos entrenados con features
+# que el predictor no conocía).
+from inversion.models.train_model import FEATURE_COLS, SENTIMENT_COLS, available_feature_cols
+from inversion.utils import paths
 
 
 def _load_model_and_scaler(ticker: str) -> tuple[Any, Any]:
@@ -86,9 +67,7 @@ def predict_future(df: pd.DataFrame, ticker: str = "NVDA") -> tuple[int | None, 
     if any(c not in df_feat.columns for c in FEATURE_COLS):
         df_feat = add_derived_features(df.copy())
 
-    feature_cols = list(FEATURE_COLS)
-    if all(c in df_feat.columns for c in SENTIMENT_COLS):
-        feature_cols += SENTIMENT_COLS
+    feature_cols = available_feature_cols(df_feat)
 
     # Coger la última fila que no tenga NaN en las features
     last = df_feat.dropna(subset=feature_cols).iloc[[-1]][feature_cols]

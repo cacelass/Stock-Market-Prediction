@@ -22,8 +22,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from inversion.models.train_model import available_feature_cols
 from inversion.utils import paths
-from inversion.models.train_model import FEATURE_COLS, SENTIMENT_COLS
 
 MONITORING_DIR = paths.PROJECT_DIR / "reports" / "monitoring"
 
@@ -69,9 +69,7 @@ def detect_drift(ticker: str, recent_window: int = RECENT_WINDOW) -> dict[str, A
         raise FileNotFoundError(f"No hay features para '{ticker}': {csv}. Ejecuta make features.")
 
     df = pd.read_csv(csv, parse_dates=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
-    feature_cols = list(FEATURE_COLS)
-    if all(c in df.columns for c in SENTIMENT_COLS):
-        feature_cols += SENTIMENT_COLS
+    feature_cols = available_feature_cols(df)
 
     split = int(len(df) * 0.8)
     reference = df.iloc[:split]
@@ -123,9 +121,7 @@ def performance_vs_baseline(ticker: str) -> dict[str, Any]:
         raise FileNotFoundError(f"Falta modelo o baseline para '{ticker}'. Ejecuta make train.")
 
     df = pd.read_csv(paths.INTERIM_DATA_DIR / f"features_{ticker}_ml_ready.csv")
-    feature_cols = list(FEATURE_COLS)
-    if all(c in df.columns for c in SENTIMENT_COLS):
-        feature_cols += SENTIMENT_COLS
+    feature_cols = available_feature_cols(df)
     df = df.dropna(subset=[*feature_cols, "target"])
     split = int(len(df) * 0.8)
     X_test = df.iloc[split:][feature_cols]

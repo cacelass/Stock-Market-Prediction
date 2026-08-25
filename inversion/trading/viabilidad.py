@@ -39,7 +39,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 
-from inversion.models.predict_model import FEATURE_COLS, SENTIMENT_COLS, _load_ticker_data
+from inversion.models.predict_model import _load_ticker_data, available_feature_cols
 from inversion.trading.backtest import run_backtest
 from inversion.trading.portfolio import load_catalog
 from inversion.trading.signals import DEFAULT_THRESHOLD, Signal, signal_from_probability_sentiment
@@ -136,11 +136,8 @@ def _hybrid_signal_fn(sentiment: pd.Series) -> Callable[[int, float, float], Sig
 
 
 def _feature_cols(df: pd.DataFrame) -> list[str]:
-    """Features del modelo: las técnicas + sentimiento si el dataset lo trae."""
-    cols = list(FEATURE_COLS)
-    if all(c in df.columns for c in SENTIMENT_COLS):
-        cols += SENTIMENT_COLS
-    return cols
+    """Features del modelo: delega en la fuente única (train_model)."""
+    return available_feature_cols(df)
 
 
 def _train_oos_model(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestClassifier:

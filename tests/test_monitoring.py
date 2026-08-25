@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from inversion.monitoring.drift import detect_drift, monitor_all, performance_vs_baseline, psi
 from inversion.utils import paths
-from inversion.monitoring.drift import detect_drift, performance_vs_baseline, psi, monitor_all
 
 
 @pytest.fixture
@@ -82,19 +82,19 @@ def test_performance_vs_baseline(patch_paths, sample_df):
     import joblib
 
     from inversion.features.build_features import add_derived_features, fit_and_save_scaler
-    from inversion.models.train_model import train_rf_model
-    from inversion.models.predict_model import FEATURE_COLS
+    from inversion.models.train_model import available_feature_cols, train_rf_model
 
     df = add_derived_features(sample_df.copy())
     df["target"] = (df["return"] > 0).astype(int)
-    feat = df.dropna(subset=[*FEATURE_COLS, "target"])
-    X = feat[FEATURE_COLS].values
+    cols = available_feature_cols(df)
+    feat = df.dropna(subset=[*cols, "target"])
+    X = feat[cols].values
     y = (feat["return"] > 0).astype(int).values
     fit_and_save_scaler(X, filename="scaler_CCC.pkl")
     train_rf_model(X, y, filename="rf_CCC.pkl")
 
     interim = paths.INTERIM_DATA_DIR / "features_CCC_ml_ready.csv"
-    df.dropna(subset=FEATURE_COLS).to_csv(interim, index=False)
+    df.dropna(subset=cols).to_csv(interim, index=False)
     reports = paths.PROJECT_DIR / "reports"
     reports.mkdir(parents=True, exist_ok=True)
     pd.DataFrame([{"accuracy": 0.5, "auc": 0.5}]).to_csv(reports / "resultados_CCC.csv", index=False)

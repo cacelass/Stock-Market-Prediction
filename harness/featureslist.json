@@ -406,6 +406,37 @@
       "status": "done",
       "depends_on": [],
       "closed": "2026-08-11"
+    },
+    {
+      "id": "SENT-004",
+      "title": "Noticias históricas para sentimiento multi-empresa",
+      "description": "Noticias históricas para sentimiento multi-empresa",
+      "acceptance_criteria": [
+        "GDELT o fuente histórica cubra al menos 5 años de noticias por ticker",
+        "el pipeline fetch pueda descargar batch histórico",
+        "data/raw/news_<TICKER>.csv tiene cobertura >50% del histórico de precios"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-25",
+      "review_rounds": 0,
+      "closed": "2026-08-25"
+    },
+    {
+      "id": "IMP-001",
+      "title": "Mejora modelo: importancia de features, umbral de confianza y backtest",
+      "description": "Mejora modelo: importancia de features, umbral de confianza y backtest",
+      "acceptance_criteria": [
+        "Análisis de feature importance por ticker guardado en reports/",
+        "backtest con umbral de confianza que mida precision y retorno simulado",
+        "walk-forward honesto documentado en references/",
+        "init.sh en verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-25",
+      "review_rounds": 0,
+      "closed": "2026-08-25"
     }
   ]
 }

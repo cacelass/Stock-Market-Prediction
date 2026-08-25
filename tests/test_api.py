@@ -14,8 +14,7 @@ from fastapi.testclient import TestClient
 
 from inversion.api.main import app
 from inversion.features.build_features import add_derived_features, fit_and_save_scaler
-from inversion.models.train_model import train_rf_model
-from inversion.models.predict_model import FEATURE_COLS
+from inversion.models.train_model import available_feature_cols, train_rf_model
 
 
 @pytest.fixture
@@ -28,8 +27,9 @@ def _setup_ticker_models(sample_df, patch_paths, ticker: str = "NVDA"):
     from inversion.utils import paths
 
     df = add_derived_features(sample_df.copy())
-    feat = df.dropna(subset=FEATURE_COLS)
-    X = feat[FEATURE_COLS].values
+    cols = available_feature_cols(df)
+    feat = df.dropna(subset=cols)
+    X = feat[cols].values
     y = (feat["return"] > 0).astype(int).values
     fit_and_save_scaler(X, filename=f"scaler_{ticker}.pkl")
     train_rf_model(X, y, filename=f"rf_{ticker}.pkl")
@@ -86,4 +86,4 @@ def test_process_input_returns_expected_shape(client, patch_paths, sample_df):
 
     _setup_ticker_models(sample_df, patch_paths, "NVDA")
     X = process_input("NVDA")
-    assert X.shape[1] == len(FEATURE_COLS)
+    assert X.shape[1] == len(available_feature_cols(add_derived_features(sample_df.copy())))

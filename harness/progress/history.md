@@ -452,3 +452,35 @@ pytest producto: 162 passed, 24 warnings; pytest arnés: 638 passed, 1 skipped; 
 ```
 
 </details>
+
+## SENT-004 — Noticias históricas para sentimiento multi-empresa
+
+- **Cerrada:** 2026-08-25
+- **Verificación:** ./init.sh en verde · 170 passed, 24 warnings in 13.97s
+- **Cambios:** inversion/sentiment/fetch.py, tests/test_sentiment_historical.py
+- **Decisiones:** GDELT como fuente historica (gratis, sin API key), chunks de 1 anio, backoff exponencial
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO, 170/170 tests pasan, 8/8 tests historicos pasan, GDELT API con chunking 2021-2026
+```
+
+</details>
+
+## IMP-001 — Mejora modelo: importancia de features, umbral de confianza y backtest
+
+- **Cerrada:** 2026-08-25
+- **Verificación:** ./init.sh en verde · 170 passed, 24 warnings in 16.30s
+- **Cambios:** inversion/models/train_model.py (helper available_feature_cols); predict_model.py, tune_model.py, drift.py, explain_shap.py, api/main.py, trading/backtest.py, trading/viabilidad.py (usan el helper); tests/test_predict_model.py, test_api.py, test_backtest.py, test_monitoring.py (fixtures con helper); notebooks/model_improvement.py (nuevo); references/05-model-improvement.md (nuevo)
+- **Decisiones:** FEATURE_COLS duplicado en 6 módulos causó desync (modelos con 32 features vs predictores con 18); una sola fuente de verdad con filtro dinámico; walk-forward revela que split único 80/20 era optimista (56.6%→52.8%) y NVDA no tiene señal real
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: 170 passed, 24 warnings in 15.16s — ENTORNO LISTO. reports/walk_forward.csv: accuracy media 0.528, auc media 0.545 (5 folds expanding window). reports/confianza_precision.csv + confianza_thresholds.csv + importancia_features.csv generados por notebooks/model_improvement.py
+```
+
+</details>

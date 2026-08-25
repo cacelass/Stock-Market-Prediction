@@ -10,15 +10,9 @@ from __future__ import annotations
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 
-from inversion.models.predict_model import (
-    FEATURE_COLS,
-    SENTIMENT_COLS,
-    _load_model_and_scaler,
-    _load_ticker_data,
-    predict_future,
-)
-from inversion.utils import paths
 from inversion.api.schemas import HealthResponse, InfoResponse, PredictRequest, PredictResponse
+from inversion.models.predict_model import FEATURE_COLS, SENTIMENT_COLS, _load_model_and_scaler, _load_ticker_data, available_feature_cols, predict_future
+from inversion.utils import paths
 
 PROJECT = "Stock Market Prediction"
 ML_TYPE = "supervisado"
@@ -58,9 +52,7 @@ def process_input(ticker: str) -> pd.DataFrame:
     """
     df = _load_ticker_data(ticker)
     model, scaler = _load_model_and_scaler(ticker)
-    feature_cols = list(FEATURE_COLS)
-    if all(c in df.columns for c in SENTIMENT_COLS):
-        feature_cols += SENTIMENT_COLS
+    feature_cols = available_feature_cols(df)
     last = df.dropna(subset=feature_cols).iloc[[-1]][feature_cols].copy()
     return pd.DataFrame(scaler.transform(last), columns=feature_cols)
 

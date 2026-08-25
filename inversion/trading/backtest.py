@@ -18,12 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from inversion.models.predict_model import (
-    FEATURE_COLS,
-    SENTIMENT_COLS,
-    _load_model_and_scaler,
-    _load_ticker_data,
-)
+from inversion.models.predict_model import _load_model_and_scaler, _load_ticker_data, available_feature_cols
 from inversion.trading.risk import max_drawdown
 from inversion.trading.signals import DEFAULT_THRESHOLD, Signal, signal_from_probability
 
@@ -176,9 +171,7 @@ def backtest_ticker(
         df = _load_ticker_data(ticker)
 
     model, scaler = _load_model_and_scaler(ticker)
-    feature_cols = list(FEATURE_COLS)
-    if all(c in df.columns for c in SENTIMENT_COLS):
-        feature_cols += SENTIMENT_COLS
+    feature_cols = available_feature_cols(df)
 
     mask = df[feature_cols].notna().all(axis=1)
     X = df.loc[mask, feature_cols]

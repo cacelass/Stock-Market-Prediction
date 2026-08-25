@@ -24,8 +24,8 @@ from typing import Any
 import optuna
 import pandas as pd
 
+from inversion.models.train_model import available_feature_cols
 from inversion.utils import paths
-from inversion.models.train_model import FEATURE_COLS, SENTIMENT_COLS
 
 warnings.filterwarnings("ignore")
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -40,9 +40,7 @@ def _load_ticker_split(ticker: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.Seri
     if not csv.exists():
         raise FileNotFoundError(f"No hay features para '{ticker}': {csv}. Ejecuta make features.")
     df = pd.read_csv(csv)
-    feature_cols = list(FEATURE_COLS)
-    if all(c in df.columns for c in SENTIMENT_COLS):
-        feature_cols += SENTIMENT_COLS
+    feature_cols = available_feature_cols(df)
     X = df[feature_cols]
     y = df["target"]
     cut = int(len(df) * 0.8)

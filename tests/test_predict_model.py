@@ -7,15 +7,16 @@ import numpy as np
 import pytest
 
 from inversion.features.build_features import add_derived_features, fit_and_save_scaler
-from inversion.models.train_model import train_rf_model
-from inversion.models.predict_model import predict_future, FEATURE_COLS
+from inversion.models.predict_model import predict_future
+from inversion.models.train_model import available_feature_cols, train_rf_model
 
 
 def _setup_model(sample_df, patch_paths):
     """Entrena modelo + scaler reales sobre features derivadas y los guarda."""
     df = add_derived_features(sample_df.copy())
-    feat = df.dropna(subset=FEATURE_COLS)
-    X = feat[FEATURE_COLS].values
+    cols = available_feature_cols(df)
+    feat = df.dropna(subset=cols)
+    X = feat[cols].values
     y = (feat["return"] > 0).astype(int).values
     fit_and_save_scaler(X)
     train_rf_model(X, y)
