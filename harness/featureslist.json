@@ -469,6 +469,21 @@
       "started": "2026-08-25",
       "review_rounds": 0,
       "closed": "2026-08-25"
+    },
+    {
+      "id": "IMP-004",
+      "title": "Los tests de tuning no deben escribir artefactos en el directorio real",
+      "description": "Los tests de tuning no deben escribir artefactos en el directorio real",
+      "acceptance_criteria": [
+        "tests/test_tuning.py usa fixture que parchea ARTIFACTS_DIR",
+        "no queda best_params sintético en models/artifacts tras ejecutar la suite",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-25",
+      "review_rounds": 0,
+      "closed": "2026-08-25"
     }
   ]
 }

@@ -29,3 +29,9 @@
 ### Añadido
 
 - feat(tuning): Optuna optimiza sobre walk-forward en vez de split único (IMP-003)
+
+## [Unreleased] — 2026-08-25
+
+### Añadido
+
+- fix(tests): parchear ARTIFACTS_DIR para que tuning no escriba artefactos reales (IMP-004)

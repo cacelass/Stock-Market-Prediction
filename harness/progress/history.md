@@ -516,3 +516,19 @@ init.sh: ENTORNO LISTO, 170 passed. tune_all(n_trials=30) con objetivo wf_mean_a
 ```
 
 </details>
+
+## IMP-004 — Los tests de tuning no deben escribir artefactos en el directorio real
+
+- **Cerrada:** 2026-08-25
+- **Verificación:** ./init.sh en verde · 170 passed, 24 warnings in 16.91s
+- **Cambios:** tests/conftest.py (ARTIFACTS_DIR en dirs parcheados + comentario causal), tests/test_tuning.py (fake_features depende explícitamente de patch_paths)
+- **Decisiones:** Fix en conftest y no en cada test: un solo punto parchea todo; la dependencia de fake_features se hace explícita para documentar que escribe en disco
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO (170 passed). pytest tests/test_tuning.py: 3 passed. Tras la suite: models/artifacts/ contiene solo los 7 tickers reales, 0 ficheros AAA. Causa raíz: patch_paths (conftest) no incluía ARTIFACTS_DIR → best_params sintéticos escribían en el directorio real
+```
+
+</details>

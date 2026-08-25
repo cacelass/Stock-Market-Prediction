@@ -5,10 +5,10 @@ Los fixtures se adaptan automáticamente a la estructura del proyecto
 """
 
 import importlib
+
 import numpy as np
 import pandas as pd
 import pytest
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures de datos sintéticos
@@ -65,6 +65,10 @@ def patch_paths(monkeypatch, tmp_path):
     """
     dirs = {
         "MODELS_DIR": tmp_path / "models",
+        # ARTIFACTS_DIR vive dentro de MODELS_DIR en disco; sin esta entrada,
+        # los tests de tuning escribían best_params sintéticos en el
+        # models/artifacts/ REAL y entraban en commits de producto (IMP-004).
+        "ARTIFACTS_DIR": tmp_path / "models" / "artifacts",
         "PROCESSED_DATA_DIR": tmp_path / "data" / "processed",
         "RAW_DATA_DIR": tmp_path / "data" / "raw",
         "INTERIM_DATA_DIR": tmp_path / "data" / "interim",

@@ -12,13 +12,17 @@ import json
 import pandas as pd
 import pytest
 
-from inversion.utils import paths
 from inversion.tuning.tune_model import load_best_params, tune_ticker
+from inversion.utils import paths
 
 
 @pytest.fixture
-def fake_features(tmp_path, monkeypatch):
-    """Escribe features_AAA_ml_ready.csv sintético en INTERIM_DATA_DIR."""
+def fake_features(patch_paths):
+    """Escribe features_AAA_ml_ready.csv sintético en el INTERIM_DATA_DIR parcheado.
+
+    Depende explícitamente de patch_paths (autouse, pero la dependencia se
+    hace explícita para documentar que este test escribe en disco).
+    """
     import numpy as np
 
     n = 200
