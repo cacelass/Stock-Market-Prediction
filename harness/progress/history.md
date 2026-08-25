@@ -484,3 +484,19 @@ init.sh: 170 passed, 24 warnings in 15.16s — ENTORNO LISTO. reports/walk_forwa
 ```
 
 </details>
+
+## IMP-002 — Re-tuning Optuna con las 32 features actuales y validación walk-forward
+
+- **Cerrada:** 2026-08-25
+- **Verificación:** ./init.sh en verde · 170 passed, 24 warnings in 19.49s
+- **Cambios:** models/best_params_*.json (7), models/rf_*.pkl + scaler_*.pkl reentrenados (14+14), reports/tuning_results.csv, reports/walk_forward*.csv, references/05-model-improvement.md (sección D)
+- **Decisiones:** Los params viejos se ajustaron sobre 18 features → obsoletos con 32; n_trials=50 sobre split único está inflado por diseño, la validación manda en walk-forward; NVDA sin señal confirmado en dos configuraciones
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO, 170 passed. tune_all(n_trials=50) completado para 7 tickers → reports/tuning_results.csv + best_params_<T>.json regenerados. Modelos reentrenados (reports/resultados_<T>.csv). Walk-forward antes/después: accuracy media 0.528→0.541, AUC media 0.545→0.549; GOOGL acc 0.585 auc 0.608. CSVs: walk_forward.csv vs walk_forward_antes_retuning.csv
+```
+
+</details>

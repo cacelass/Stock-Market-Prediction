@@ -1,0 +1,10 @@
+{
+  "ticker": "NVDA",
+  "best_value": 0.5549568965517241,
+  "params": {
+    "n_estimators": 50,
+    "max_depth": 7,
+    "min_samples_leaf": 1,
+    "max_features": "log2"
+  }
+}

@@ -59,3 +59,33 @@ Los únicos tickers con señal real y estable: **GOOGL, MSFT, TSLA**.
 1. Reportar siempre walk-forward; el split único queda como diagnóstico, no como métrica.
 2. El edge está en filtrar por confianza (p≥0.65) en MSFT/GOOGL/TSLA — aceptando poquísimas operaciones.
 3. Siguiente palanca real: sentimiento de noticias verdadero (NewsAPI) y target multi-horizonte; más feature engineering sobre precios tiene rendimientos decrecientes.
+
+## D) Re-tuning con Optuna sobre las features actuales (IMP-002)
+
+Los `best_params_*.json` originales se ajustaron sobre las 18 features viejas;
+con 32 features quedaron obsoletos. Re-optuna: 50 trials/ticker (TPESampler,
+seed 42) → reentrenamiento → mismo walk-forward expanding window.
+
+| Ticker | Acc pre | Acc post | Δacc | AUC pre | AUC post | Δauc |
+|--------|---------|----------|------|---------|----------|------|
+| GOOGL | 0.549 | **0.585** | +0.035 | 0.590 | **0.608** | +0.017 |
+| AAPL | 0.565 | 0.578 | +0.014 | 0.483 | **0.505** | +0.022 |
+| META | 0.490 | 0.508 | +0.019 | 0.541 | 0.532 | -0.009 |
+| MSFT | 0.528 | 0.542 | +0.015 | 0.571 | 0.562 | -0.009 |
+| AMZN | 0.534 | 0.542 | +0.008 | 0.563 | 0.578 | +0.015 |
+| NVDA | 0.468 | 0.471 | +0.003 | 0.503 | 0.496 | -0.007 |
+| TSLA | 0.561 | 0.561 | -0.001 | 0.562 | 0.562 | ±0.000 |
+| **MEDIA** | **0.528** | **0.541** | **+0.013** | **0.545** | **0.549** | **+0.004** |
+
+Lectura honesta:
+
+- La mejora media es real pero modesta (+1.3pp acc). Los mejores valores de
+  Optuna sobre el split único (p.ej. MSFT 0.710) están inflados por diseño:
+  optimizan sobre ese split. El walk-forward es quien manda.
+- **GOOGL** es el gran ganador (acc 58.5%, AUC 0.608): la señal que ya existía
+  se explota mejor con más árboles/profundidad.
+- **AAPL** recupera AUC > 0.5 (0.505): antes su accuracy era puro sesgo de clase.
+- **NVDA** sigue sin señal ni con tuning — confirmado con dos configuraciones.
+
+CSVs: `reports/walk_forward.csv` (post), `reports/walk_forward_antes_retuning.csv` (pre),
+`reports/tuning_results.csv`.

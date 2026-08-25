@@ -1,0 +1,8 @@
+ticker,n_estimators,max_depth,min_samples_leaf,max_features
+AAPL,100,10,10,sqrt
+AMZN,300,3,20,log2
+GOOGL,400,12,16,log2
+META,250,6,20,log2
+MSFT,300,5,17,sqrt
+NVDA,50,7,1,log2
+TSLA,300,9,18,

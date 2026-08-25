@@ -437,6 +437,22 @@
       "started": "2026-08-25",
       "review_rounds": 0,
       "closed": "2026-08-25"
+    },
+    {
+      "id": "IMP-002",
+      "title": "Re-tuning Optuna con las 32 features actuales y validación walk-forward",
+      "description": "Re-tuning Optuna con las 32 features actuales y validación walk-forward",
+      "acceptance_criteria": [
+        "best_params_<T>.json regenerados con features actuales (n_trials>=40)",
+        "modelos reentrenados con nuevos hiperparámetros",
+        "walk-forward comparado antes/después en reports/",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-25",
+      "review_rounds": 0,
+      "closed": "2026-08-25"
     }
   ]
 }

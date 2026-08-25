@@ -1,6 +1,6 @@
 [project]
 name = "inversion"
-version = "0.1.6"
+version = "0.1.8"
 description = "Predicción de tendencia bursátil (sube >2% en 5 días) con RandomForest + sentimiento VADER, multi-ticker."
 authors = [
   { name = "Alejandro Cancelas Chapela" }
