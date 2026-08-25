@@ -501,6 +501,23 @@
       "started": "2026-08-25",
       "review_rounds": 0,
       "closed": "2026-08-25"
+    },
+    {
+      "id": "IMP-006",
+      "title": "Enrutado híbrido: fallback al modelo global para tickers sin señal propia",
+      "description": "Enrutado híbrido: fallback al modelo global para tickers sin señal propia",
+      "acceptance_criteria": [
+        "inversion/models/pooled.py entrena y guarda artefactos globales (modelo+scaler+features+routing)",
+        "predict_future y backtest usan el pool solo cuando el routing lo indica",
+        "sin artefactos globales el comportamiento es idéntico al actual (tests verdes)",
+        "evidencia del enrutado en reports/",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-25",
+      "review_rounds": 0,
+      "closed": "2026-08-25"
     }
   ]
 }

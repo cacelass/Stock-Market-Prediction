@@ -18,6 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from inversion.models import pooled
 from inversion.models.predict_model import _load_model_and_scaler, _load_ticker_data, available_feature_cols
 from inversion.trading.risk import max_drawdown
 from inversion.trading.signals import DEFAULT_THRESHOLD, Signal, signal_from_probability
@@ -170,8 +171,15 @@ def backtest_ticker(
     if df is None:
         df = _load_ticker_data(ticker)
 
-    model, scaler = _load_model_and_scaler(ticker)
-    feature_cols = available_feature_cols(df)
+    # IMP-006: si el routing manda el ticker al pool, se usa el modelo global
+    # con sus columnas (scale-free + one-hots constantes por ticker).
+    route = pooled.resolve_route(ticker)
+    if route == pooled.GLOBAL_TICKER:
+        model, scaler, feature_cols = pooled.load_global_bundle(ticker)
+        df = pooled.add_ticker_dummies(df, ticker, feature_cols)
+    else:
+        model, scaler = _load_model_and_scaler(ticker)
+        feature_cols = available_feature_cols(df)
 
     mask = df[feature_cols].notna().all(axis=1)
     X = df.loc[mask, feature_cols]

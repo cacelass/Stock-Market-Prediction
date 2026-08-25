@@ -2105,7 +2105,7 @@ wheels = [
 
 [[package]]
 name = "inversion"
-version = "0.1.13"
+version = "0.1.15"
 source = { editable = "." }
 dependencies = [
     { name = "joblib" },

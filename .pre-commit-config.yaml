@@ -35,4 +35,8 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
+        # Los artefactos de modelos (models/*.pkl) se versionan a propósito en
+        # este repo (precedente: rf_AMZN.pkl ~2.3MB ya trackeado); fuera de
+        # models/ se mantiene el límite por defecto de 500KB.
+        exclude: ^models/.*\.pkl$
       - id: check-merge-conflict

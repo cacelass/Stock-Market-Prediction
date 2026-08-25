@@ -162,3 +162,27 @@ Siguiente experimento natural (no ejecutado): híbrido por ticker — usar el
 modelo individual cuando su wf-AUC > 0.55 y el pool como respaldo en caso
 contrario. CSVs: `reports/pooled_vs_individual.csv`, script
 `notebooks/pooled_model.py`.
+
+## G) Enrutado híbrido en producción (IMP-006)
+
+El hallazgo de F convertido en mecanismo: `inversion/models/pooled.py`
+entrena el modelo global (cutoff 80/20 temporal, params del Optuna de
+IMP-005; test acc 0.577, AUC 0.564) y **deriva el routing de la evidencia**,
+nunca a mano: ticker→GLOBAL si su wf-AUC individual < 0.55 y el pool le gana.
+Hoy eso ocurre exactamente con NVDA (`reports/enrutado_hibrido.csv`).
+
+- `predict_future` y `backtest_ticker` consultan la ruta antes de cargar
+  modelo: NVDA predice vía pool, los otros 6 con su modelo propio.
+- Sin artefactos globales (tests, repo recién clonado) el enrutado es
+  identidad — comportamiento idéntico al previo; cubierto por
+  `tests/test_pooled.py` (5 tests).
+- Las rutas de artefactos se resuelven en tiempo de llamada, no al importar:
+  lección de esta feature — una constante de módulo capturó la ruta real y
+  el parcheo de tests dejó de aplicarla.
+- Reentrenar el global: `uv run python -m inversion.models.pooled`. El
+  routing se recalcula desde `walk_forward.csv` + `pooled_vs_individual.csv`,
+  así que se mantiene honesto cuando cambian los modelos individuales.
+
+Nota: el monitoring (drift/rendimiento) sigue midiendo los modelos
+individuales; si NVDA pasa a depender del pool, su drift relevante es el del
+pool — pendiente si la señal individual de NVDA cambia.

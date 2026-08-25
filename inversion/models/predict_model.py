@@ -16,6 +16,7 @@ import joblib
 import pandas as pd
 
 from inversion.features.build_features import add_derived_features
+from inversion.models import pooled
 
 # Una sola fuente de verdad: las features y su selección viven en train_model.py.
 # Duplicarlas aquí provocó desincronización (modelos entrenados con features
@@ -57,7 +58,11 @@ def predict_future(df: pd.DataFrame, ticker: str = "NVDA") -> tuple[int | None, 
         ultimo_close : último precio de cierre conocido
     """
     try:
-        model, scaler = _load_model_and_scaler(ticker)
+        route = pooled.resolve_route(ticker)
+        if route == pooled.GLOBAL_TICKER:
+            model, scaler, feature_cols = pooled.load_global_bundle(ticker)
+        else:
+            model, scaler = _load_model_and_scaler(ticker)
     except FileNotFoundError:
         print("Error: Modelo o scaler no encontrados. Ejecuta main.py primero.")
         return None, None, None, None
@@ -67,7 +72,11 @@ def predict_future(df: pd.DataFrame, ticker: str = "NVDA") -> tuple[int | None, 
     if any(c not in df_feat.columns for c in FEATURE_COLS):
         df_feat = add_derived_features(df.copy())
 
-    feature_cols = available_feature_cols(df_feat)
+    if route == pooled.GLOBAL_TICKER:
+        # El pool espera sus columnas (scale-free + one-hots constantes por ticker).
+        df_feat = pooled.add_ticker_dummies(df_feat, ticker, feature_cols)
+    else:
+        feature_cols = available_feature_cols(df_feat)
 
     # Coger la última fila que no tenga NaN en las features
     last = df_feat.dropna(subset=feature_cols).iloc[[-1]][feature_cols]

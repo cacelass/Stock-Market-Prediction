@@ -548,3 +548,19 @@ init.sh: ENTORNO LISTO. notebooks/pooled_model.py ejecutado: pool de 29,855 fila
 ```
 
 </details>
+
+## IMP-006 — Enrutado híbrido: fallback al modelo global para tickers sin señal propia
+
+- **Cerrada:** 2026-08-25
+- **Verificación:** ./init.sh en verde · 175 passed, 24 warnings in 18.71s
+- **Cambios:** inversion/models/pooled.py (nuevo), inversion/models/predict_model.py (routing en predict_future), inversion/trading/backtest.py (routing en backtest_ticker), models/rf_GLOBAL.pkl + scaler_GLOBAL.pkl + global_features_GLOBAL.json + routing_GLOBAL.json, reports/enrutado_hibrido.csv, tests/test_pooled.py (nuevo), references/05-model-improvement.md (sección G)
+- **Decisiones:** Routing conservador y derivado de evidencia (wf_auc individual <0.55 Y pool mejor) nunca codificado a mano; rutas de artefactos dinámicas en tiempo de llamada porque una constante de módulo capturaba la ruta real y rompía el parcheo de tests; monitoring sigue midiendo modelos individuales (documentado como pendiente si cambia NVDA)
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO (175 passed). tests/test_pooled.py: 5 passed. Global entrenado: 23,884 filas × 34 features, test acc=0.577 auc=0.5643. Routing derivado de evidencia: {'NVDA': 'GLOBAL'} → models/routing_GLOBAL.json + reports/enrutado_hibrido.csv. End-to-end verificado: predict NVDA vía GLOBAL, AAPL individual, backtest NVDA funciona
+```
+
+</details>

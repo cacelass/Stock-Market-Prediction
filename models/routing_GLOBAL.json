@@ -1,0 +1,19 @@
+{
+  "threshold_individual_auc": 0.55,
+  "regla": "ticker\u2192GLOBAL si wf_auc individual < umbral y el pool le gana",
+  "routing": {
+    "NVDA": "GLOBAL"
+  },
+  "params": {
+    "n_estimators": 100,
+    "max_depth": 16,
+    "min_samples_leaf": 51,
+    "max_features": "sqrt"
+  },
+  "test_metrics_cutoff80": {
+    "accuracy": 0.577,
+    "auc": 0.5643
+  },
+  "n_train": 23884,
+  "n_test": 5971
+}

@@ -1,0 +1,8 @@
+ticker,modelo_usado,wf_auc_individual,wf_auc_pool,regla
+AAPL,rf_AAPL (individual),0.5201,0.5127,
+MSFT,rf_MSFT (individual),0.5758,0.5606,
+GOOGL,rf_GOOGL (individual),0.6259,0.5796,
+AMZN,rf_AMZN (individual),0.5731,0.5519,
+META,rf_META (individual),0.5638,0.5542,
+TSLA,rf_TSLA (individual),0.5636,0.4879,
+NVDA,GLOBAL (pool),0.5013,0.5386,debil(<0.55) y pool mejor
