@@ -1,10 +1,11 @@
 {
   "ticker": "META",
-  "best_value": 0.6316590563165906,
+  "best_value": 0.5921,
+  "objective": "wf_mean_auc",
   "params": {
-    "n_estimators": 250,
-    "max_depth": 6,
-    "min_samples_leaf": 20,
-    "max_features": "log2"
+    "n_estimators": 400,
+    "max_depth": 13,
+    "min_samples_leaf": 1,
+    "max_features": null
   }
 }

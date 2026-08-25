@@ -500,3 +500,19 @@ init.sh: ENTORNO LISTO, 170 passed. tune_all(n_trials=50) completado para 7 tick
 ```
 
 </details>
+
+## IMP-003 — Tuning honesto: Optuna optimiza sobre walk-forward en vez de un split único
+
+- **Cerrada:** 2026-08-25
+- **Verificación:** ./init.sh en verde · 170 passed, 24 warnings in 17.56s
+- **Cambios:** inversion/tuning/tune_model.py (objetivo walk-forward, _walk_forward_folds, _load_ticker_full), models/best_params_*.json (7), models/rf_*.pkl + scaler_*.pkl reentrenados, reports/walk_forward*.csv, references/05-model-improvement.md (sección E)
+- **Decisiones:** Objetivo cambia de accuracy-en-split-único a media AUC en folds (AUC es threshold-free y estable con desbalance); class_weight balanced en búsqueda para igualar protocolo de entrenamiento; el mayor salto del ciclo vino del protocolo, no de más capacidad
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO, 170 passed. tune_all(n_trials=30) con objetivo wf_mean_auc (3 folds expanding-window) → best_params_<T>.json con objective=wf_mean_auc. Walk-forward antes/después: accuracy media 0.541→0.577 (+3.6pp), AUC 0.549→0.561. GOOGL 0.645/0.626, META 0.582/0.564. CSVs: walk_forward.csv vs walk_forward_antes_wf_tuning.csv
+```
+
+</details>

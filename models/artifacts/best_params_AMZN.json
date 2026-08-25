@@ -1,10 +1,11 @@
 {
   "ticker": "AMZN",
-  "best_value": 0.6627155172413793,
+  "best_value": 0.5674,
+  "objective": "wf_mean_auc",
   "params": {
-    "n_estimators": 300,
-    "max_depth": 3,
-    "min_samples_leaf": 20,
+    "n_estimators": 150,
+    "max_depth": 10,
+    "min_samples_leaf": 10,
     "max_features": "log2"
   }
 }

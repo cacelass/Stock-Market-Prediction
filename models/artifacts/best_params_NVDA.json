@@ -1,10 +1,11 @@
 {
   "ticker": "NVDA",
-  "best_value": 0.5549568965517241,
+  "best_value": 0.5177,
+  "objective": "wf_mean_auc",
   "params": {
-    "n_estimators": 50,
-    "max_depth": 7,
+    "n_estimators": 400,
+    "max_depth": 11,
     "min_samples_leaf": 1,
-    "max_features": "log2"
+    "max_features": "sqrt"
   }
 }

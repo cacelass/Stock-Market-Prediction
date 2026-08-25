@@ -89,3 +89,40 @@ Lectura honesta:
 
 CSVs: `reports/walk_forward.csv` (post), `reports/walk_forward_antes_retuning.csv` (pre),
 `reports/tuning_results.csv`.
+
+## E) Tuning honesto: Optuna sobre walk-forward (IMP-003)
+
+El re-tuning de IMP-002 seguía teniendo un vicio de origen: optimizaba accuracy
+sobre el mismo split 80/20 con el que se reportaba. Fix metodológico: el
+objetivo de Optuna es ahora la **media de AUC sobre 3 folds expanding-window**
+(el mismo protocolo con el que se valida). Cambios en `tune_model.py`:
+objetivo `wf_mean_auc`, `class_weight="balanced"` en búsqueda, folds que
+descartan bloques demasiado pequeños (compatibilidad con fixtures).
+
+30 trials/ticker → reentrenamiento → walk-forward:
+
+| Ticker | Acc pre | Acc post | Δacc | AUC pre | AUC post | Δauc |
+|--------|---------|----------|------|---------|----------|------|
+| GOOGL | 0.585 | **0.645** | +0.061 | 0.608 | **0.626** | +0.018 |
+| META | 0.508 | **0.582** | +0.073 | 0.532 | **0.564** | +0.031 |
+| MSFT | 0.542 | 0.596 | +0.053 | 0.562 | 0.576 | +0.014 |
+| AMZN | 0.542 | 0.596 | +0.054 | 0.578 | 0.573 | -0.005 |
+| TSLA | 0.561 | 0.563 | +0.002 | 0.562 | 0.564 | +0.002 |
+| AAPL | 0.578 | 0.567 | -0.011 | 0.505 | 0.520 | +0.015 |
+| NVDA | 0.471 | 0.491 | +0.020 | 0.496 | 0.501 | +0.005 |
+| **MEDIA** | **0.541** | **0.577** | **+0.036** | **0.549** | **0.561** | **+0.012** |
+
+La mejora más grande de todo el ciclo (+3.6pp acc honesta) vino de arreglar el
+protocolo, no de más features ni más árboles:
+
+- **GOOGL** 64.5% acc / AUC 0.626 y **META** 58.2% / 0.564 — META deja de ser
+  "no generaliza": lo que fallaba era el objetivo del tuning, no los datos.
+- Los hiperparámetros elegidos cambian mucho (GOOGL: 100 árboles/profundidad
+  15 vs 400/12 del tuning inflado): menos árboles, más profundidad, hojas
+  pequeñas.
+- **NVDA** sigue sin señal real (AUC 0.501) — tres configuraciones distintas
+  llegan a lo mismo: sus datos no contienen edge para este target.
+- La accuracy del split único sube a ~62% medio pero esa cifra ya no se usa:
+  el número que cuenta es el walk-forward.
+
+CSVs: `walk_forward.csv` (post), `walk_forward_antes_wf_tuning.csv` (pre).

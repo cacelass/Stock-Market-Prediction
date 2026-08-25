@@ -453,6 +453,22 @@
       "started": "2026-08-25",
       "review_rounds": 0,
       "closed": "2026-08-25"
+    },
+    {
+      "id": "IMP-003",
+      "title": "Tuning honesto: Optuna optimiza sobre walk-forward en vez de un split único",
+      "description": "Tuning honesto: Optuna optimiza sobre walk-forward en vez de un split único",
+      "acceptance_criteria": [
+        "tune_model usa media de folds expanding-window como objetivo",
+        "best_params regenerados para los 7 tickers",
+        "modelos reentrenados y comparados en walk-forward antes/después",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-25",
+      "review_rounds": 0,
+      "closed": "2026-08-25"
     }
   ]
 }

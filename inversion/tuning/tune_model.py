@@ -33,6 +33,14 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 OPTUNA_TRIALS = 30
 RANDOM_STATE = 42
 
+# Walk-forward para el objetivo de tuning (IMP-003): cada trial se evalúa como
+# media de AUC sobre folds expanding-window. Optimizar sobre un único split
+# 80/20 elegía hiperparámetros que sobreajustaban ese tramo de test concreto.
+WF_FOLDS = 3
+WF_START_FRAC = 0.60
+WF_MIN_TRAIN = 100
+WF_MIN_TEST = 15
+
 
 def _load_ticker_split(ticker: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     """Carga features_<T> y devuelve X_train/X_test/y_train/y_test (split temporal 80/20)."""
@@ -47,24 +55,73 @@ def _load_ticker_split(ticker: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.Seri
     return X.iloc[:cut], X.iloc[cut:], y.iloc[:cut], y.iloc[cut:]
 
 
-def tune_ticker(ticker: str, n_trials: int = OPTUNA_TRIALS) -> dict[str, Any]:
-    """Optimiza los hiperparámetros del RF de un ticker y guarda best_params_<T>.json."""
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.metrics import accuracy_score
+def _load_ticker_full(ticker: str) -> tuple[pd.DataFrame, pd.Series]:
+    """Carga features_<T> completas (X, y) con las columnas disponibles."""
+    csv = paths.INTERIM_DATA_DIR / f"features_{ticker}_ml_ready.csv"
+    if not csv.exists():
+        raise FileNotFoundError(f"No hay features para '{ticker}': {csv}. Ejecuta make features.")
+    df = pd.read_csv(csv).dropna(subset=["target"]).reset_index(drop=True)
+    feature_cols = available_feature_cols(df)
+    df = df.dropna(subset=feature_cols)
+    return df[feature_cols], df["target"]
 
-    X_train, X_test, y_train, y_test = _load_ticker_split(ticker)
+
+def _walk_forward_folds(
+    n: int,
+    n_folds: int = WF_FOLDS,
+    start_frac: float = WF_START_FRAC,
+    min_train: int = WF_MIN_TRAIN,
+    min_test: int = WF_MIN_TEST,
+) -> list[tuple[int, int]]:
+    """Fronteras (train_end, test_end) de folds expanding-window sobre n filas.
+
+    El entrenamiento de cada fold es todo el pasado ([0, train_end)) y el test
+    el bloque siguiente. Descarta folds demasiado pequeños (datasets cortos,
+    p.ej. fixtures de test) en vez de fallar.
+    """
+    start = int(n * start_frac)
+    fold_size = max((n - start) // n_folds, 1)
+    folds = []
+    for k in range(n_folds):
+        train_end = start + k * fold_size
+        test_end = start + (k + 1) * fold_size if k < n_folds - 1 else n
+        if train_end >= min_train and (test_end - train_end) >= min_test:
+            folds.append((train_end, test_end))
+    return folds
+
+
+def tune_ticker(ticker: str, n_trials: int = OPTUNA_TRIALS, n_folds: int = WF_FOLDS) -> dict[str, Any]:
+    """Optimiza los hiperparámetros del RF de un ticker y guarda best_params_<T>.json.
+
+    Objetivo (IMP-003): media de AUC sobre `n_folds` expanding-window — el
+    mismo protocolo honesto con el que después se reporta. `best_value` en el
+    JSON es esa media, NO la accuracy de un split único (como antes).
+    """
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.metrics import roc_auc_score
+
+    X, y = _load_ticker_full(ticker)
+    folds = _walk_forward_folds(len(X), n_folds=n_folds)
+    if not folds:
+        raise ValueError(f"'{ticker}': dataset demasiado corto ({len(X)} filas) para walk-forward.")
 
     def objective(trial: optuna.Trial) -> float:
-        model = RandomForestClassifier(
+        model_tpl = dict(
             n_estimators=trial.suggest_int("n_estimators", 50, 400, step=50),
             max_depth=trial.suggest_int("max_depth", 3, 20),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 1, 20),
             max_features=trial.suggest_categorical("max_features", ["sqrt", "log2", None]),
             random_state=RANDOM_STATE,
             n_jobs=-1,
+            class_weight="balanced",
         )
-        model.fit(X_train, y_train)
-        return float(accuracy_score(y_test, model.predict(X_test)))
+        scores = []
+        for train_end, test_end in folds:
+            model = RandomForestClassifier(**model_tpl)
+            model.fit(X.iloc[:train_end], y.iloc[:train_end])
+            proba = model.predict_proba(X.iloc[train_end:test_end])[:, 1]
+            scores.append(roc_auc_score(y.iloc[train_end:test_end], proba))
+        return float(sum(scores) / len(scores))
 
     study = optuna.create_study(
         direction="maximize",
@@ -74,8 +131,8 @@ def tune_ticker(ticker: str, n_trials: int = OPTUNA_TRIALS) -> dict[str, Any]:
 
     best = study.best_params
     path = paths.ARTIFACTS_DIR / f"best_params_{ticker}.json"
-    path.write_text(json.dumps({"ticker": ticker, "best_value": study.best_value, "params": best}, indent=2), encoding="utf-8")
-    print(f"   ✔ {ticker}: best_value={study.best_value:.4f} params={best} → {path.name}")
+    path.write_text(json.dumps({"ticker": ticker, "best_value": round(study.best_value, 4), "objective": "wf_mean_auc", "params": best}, indent=2), encoding="utf-8")
+    print(f"   ✔ {ticker}: wf_auc={study.best_value:.4f} params={best} → {path.name}")
     return best
 
 
