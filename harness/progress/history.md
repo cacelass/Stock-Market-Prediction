@@ -564,3 +564,19 @@ init.sh: ENTORNO LISTO (175 passed). tests/test_pooled.py: 5 passed. Global entr
 ```
 
 </details>
+
+## MOD-001 — Comparación honesta de clases de modelo: RF vs HistGradientBoosting y ensemble de semillas
+
+- **Cerrada:** 2026-08-26
+- **Verificación:** ./init.sh en verde · 175 passed, 24 warnings in 14.00s
+- **Cambios:** notebooks/model_comparison.py (nuevo), notebooks/calibracion.py (nuevo), reports/comparacion_clases_modelo.csv, reports/calibracion.csv, references/05-model-improvement.md (secciones H e I)
+- **Decisiones:** Dos resultados negativos documentados como valor: la clase RF ya es la correcta (7/7) y la calibración isotónica no pasa el criterio predefinido; implicación práctica registrada — usar tasas empíricas por bucket (confianza_precision.csv), no la p cruda, para decidir operar; ejecución con n_jobs=2 y cola con puerta por carga al compartir máquina
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO (175 passed). notebooks/model_comparison.py completado para 7/7 tickers en walk-forward: RF AUC medio 0.5695 vs HistGBM 0.5412 — RF gana 7/7, veredicto MANTENER rf_best. notebooks/calibracion.py: isotónica mejora ECE 0.11→0.08 pero cuesta ΔAUC=-0.0286 > umbral -0.005 → MANTENER sin calibrar. CSVs: comparacion_clases_modelo.csv, calibracion.csv
+```
+
+</details>

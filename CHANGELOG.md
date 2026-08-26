@@ -47,3 +47,9 @@
 ### Añadido
 
 - feat(model): enrutado híbrido — pool como fallback para tickers sin señal propia (IMP-006)
+
+## [Unreleased] — 2026-08-26
+
+### Añadido
+
+- feat(model): comparación de clases de modelo y calibración — veredictos documentados (MOD-001)

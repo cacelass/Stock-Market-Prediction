@@ -186,3 +186,40 @@ Hoy eso ocurre exactamente con NVDA (`reports/enrutado_hibrido.csv`).
 Nota: el monitoring (drift/rendimiento) sigue midiendo los modelos
 individuales; si NVDA pasa a depender del pool, su drift relevante es el del
 pool — pendiente si la señal individual de NVDA cambia.
+
+## H) Clase de modelo: RF vs HistGradientBoosting (MOD-001)
+
+Comparación en los mismos folds walk-forward (protocolo IMP-003), 7 tickers,
+GBM con regularización conservadora (`notebooks/model_comparison.py`):
+
+| Métrica media | RF-best | HistGBM |
+|---------------|---------|---------|
+| AUC | **0.5695** | 0.5412 |
+| Accuracy | 0.5859 | 0.5901 |
+| Precision@top20% | **0.4381** | 0.4128 |
+
+**RF gana en AUC 7/7 tickers (Δ medio +0.028)** y también en la métrica que
+importa para filtrar por confianza. El GBM "gana" en accuracy media otra vez
+por explotar el desbalance de clases. Veredicto con margen predefinido:
+MANTENER RandomForest — la clase de modelo ya es la correcta para estos datos.
+CSV: `reports/comparacion_clases_modelo.csv`.
+
+## I) Calibración isotónica: mejora ECE pero cuesta demasiado AUC (MOD-001)
+
+La probabilidad cruda NO está calibrada (ECE medio 0.11: cuando dice 65%
+acierta menos). La calibración isotónica la corrige (ECE 0.08) pero paga
+0.029 de AUC — sobre ~3k filas de entrenamiento la isotónica sobreajusta.
+Criterio predefinido exige ΔECE ≤ −0.02 sin perder > 0.005 AUC: no se cumple.
+
+**Implicación práctica**: no interpretar la p del modelo como probabilidad
+real. Para decidir operar, usar las tasas empíricas por bucket de
+`reports/confianza_precision.csv` (p≥0.70 en MSFT ≈ 57% real), que son las que
+ya reflejan la calibración observada sin destruir ordenación.
+CSV: `reports/calibracion.csv`.
+
+### Cierre de la línea de modelado
+
+Con H e I cerradas queda explorado el espacio razonable sin datos nuevos:
+clase de modelo correcta (H), protocolo honesto (C/E), fallback global donde
+no hay señal propia (F/G). Las palancas restantes son externas: noticias
+reales, multi-horizonte o más histórico.

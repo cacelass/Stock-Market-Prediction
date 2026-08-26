@@ -518,6 +518,22 @@
       "started": "2026-08-25",
       "review_rounds": 0,
       "closed": "2026-08-25"
+    },
+    {
+      "id": "MOD-001",
+      "title": "Comparación honesta de clases de modelo: RF vs HistGradientBoosting y ensemble de semillas",
+      "description": "Comparación honesta de clases de modelo: RF vs HistGradientBoosting y ensemble de semillas",
+      "acceptance_criteria": [
+        "comparación RF-best vs HistGBM vs RF-5-semillas en los mismos folds walk-forward para los 7 tickers",
+        "precision@top-quintil incluida",
+        "veredicto con margen mínimo predefinido (0.01 AUC)",
+        "si gana otra clase, adopción documentada y suite verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-25",
+      "review_rounds": 0,
+      "closed": "2026-08-26"
     }
   ]
 }
