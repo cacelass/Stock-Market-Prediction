@@ -568,6 +568,21 @@
       "started": "2026-08-26",
       "review_rounds": 0,
       "closed": "2026-08-26"
+    },
+    {
+      "id": "DOC-001",
+      "title": "README y PRD al día con el ciclo IMP/MOD/SENT",
+      "description": "README y PRD al día con el ciclo IMP/MOD/SENT",
+      "acceptance_criteria": [
+        "README refleja sentimiento NewsAPI.ai, resultados walk-forward reales, enrutado híbrido y nuevas lecciones",
+        "PRD regenerado del backlog vía documentation update_prd",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-26",
+      "review_rounds": 0,
+      "closed": "2026-08-26"
     }
   ]
 }

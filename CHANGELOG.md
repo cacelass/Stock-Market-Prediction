@@ -59,3 +59,9 @@
 ### Añadido
 
 - feat(sentiment): fetcher NewsAPI.ai en vivo + puntuación de noticias reales (SENT-006)
+
+## [Unreleased] — 2026-08-26
+
+### Añadido
+
+- docs: README y PRD al día con el ciclo de mejora del modelo (DOC-001)

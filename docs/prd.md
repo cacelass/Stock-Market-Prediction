@@ -1,6 +1,6 @@
 # Product Requirements Document
 
-> Documento **generado** (`documentation update_prd`) desde el estado del proyecto: `references/00-objetivo.md`, `harness/featureslist.json` y `features/*.feature`. No lo edites a mano — se sobrescribe. Actualizado: 2026-08-25
+> Documento **generado** (`documentation update_prd`) desde el estado del proyecto: `references/00-objetivo.md`, `harness/featureslist.json` y `features/*.feature`. No lo edites a mano — se sobrescribe. Actualizado: 2026-08-26
 
 ## Objetivo
 
@@ -8,7 +8,7 @@ _(sin definir — ejecuta la feature SCOPE-001 del backlog, que escribe `referen
 
 ## Alcance
 
-**Backlog:** 28 done
+**Backlog:** 1 blocked · 36 done
 
 | Feature | Estado | Título |
 |---------|--------|--------|
@@ -40,3 +40,12 @@ _(sin definir — ejecuta la feature SCOPE-001 del backlog, que escribe `referen
 | TRADE-006 | done | Señales híbridas modelo+sentimiento |
 | TMPL-006 | done | Sincronizar con dskit 1.16.0: corpus de conocimiento ML y mejoras del arnés |
 | SENT-004 | done | Noticias históricas para sentimiento multi-empresa |
+| IMP-001 | done | Mejora modelo: importancia de features, umbral de confianza y backtest |
+| IMP-002 | done | Re-tuning Optuna con las 32 features actuales y validación walk-forward |
+| IMP-003 | done | Tuning honesto: Optuna optimiza sobre walk-forward en vez de un split único |
+| IMP-004 | done | Los tests de tuning no deben escribir artefactos en el directorio real |
+| IMP-005 | done | Modelo global pooled (todas las tickers) vs modelos por ticker |
+| IMP-006 | done | Enrutado híbrido: fallback al modelo global para tickers sin señal propia |
+| MOD-001 | done | Comparación honesta de clases de modelo: RF vs HistGradientBoosting y ensemble de semillas |
+| SENT-005 | blocked | Noticias reales: fetch NewsAPI.ai en vivo y histórico GDELT |
+| SENT-006 | done | Fetcher NewsAPI.ai en vivo y puntuación de noticias reales |

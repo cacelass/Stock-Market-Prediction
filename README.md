@@ -99,15 +99,30 @@ Recolección y análisis de sentimiento de noticias por ticker:
 
 # 2. Puntúa con VADER + léxico financiero y agrega el score compuesto medio por día
 .venv/bin/python -m inversion.sentiment.analyzer --ticker NVDA
+
+# 3. Noticias reales de NewsAPI.ai — artículos recientes por ticker
+set -a; . ./.env; set +a    # exporta NEWSAPI_KEY desde .env (ignorado por git)
+.venv/bin/python -m inversion.sentiment.fetch --live
+
+# 4. Histórico NewsAPI.ai por ventanas mensuales (plan gratuito ≈ 60 días)
+.venv/bin/python -m inversion.sentiment.fetch --history --since 2026-07-01
 ```
 
-- `fetch.py` (SENT-001): fuente RSS real, sin API key, timeout de 10s y error
-  claro (`FetchError`) si no hay red. Columnas: `fecha, titulo, cuerpo, fuente`.
+- `fetch.py`: tres fuentes — RSS sin clave (SENT-001), GDELT histórico
+  (SENT-004; **bloqueado desde algunas redes** por rate limits) y NewsAPI.ai /
+  Event Registry (SENT-005/006) en modos `--live` y `--history`, con clave solo
+  vía variable de entorno `NEWSAPI_KEY`. Columnas estándar:
+  `fecha, titulo, cuerpo, fuente`.
 - `analyzer.py` (SENT-002): VADER (`nltk.sentiment.vader`) con un léxico
   financiero ligero (`bullish`, `bearish`, `beat`, `miss`, `downgrade`…).
   Scores compuestos en `[-1, 1]`, agregado diario determinista (media simple
   por fecha y ticker). El léxico VADER base viaja embebido en el repo para
   que todo funcione sin internet.
+- Cobertura real documentada en
+  [`reports/cobertura_noticias_reales.csv`](reports/cobertura_noticias_reales.csv):
+  ~4.300 artículos reales puntuados para los 7 tickers. El plan gratuito de
+  NewsAPI.ai limita el archivo a ~60 días — el histórico profundo queda como
+  trabajo pendiente (feature SENT-005 bloqueada con la razón documentada).
 - Tests 100% offline con `tests/fixtures/sample_news.csv` (titulares anotados
   a mano con su dirección esperada).
 
@@ -153,7 +168,32 @@ espectaculares son sobreajuste y no deben usarse para decidir nada.
 
 ## Resultados Honestos
 
-El modelo supera de forma consistente el baseline de clase mayoritaria, pero con margen modesto. Esto es esperado dado el ruido inherente a los mercados.
+La métrica que cuenta es el **walk-forward** (reentrenamiento expanding-window,
+5 folds sobre el último 40% del histórico): el split único 80/20 resultó ser
+optimista (56.6% → 52.8% de accuracy real antes del tuning correcto).
+
+Estado tras el ciclo de mejora (detalle completo en
+[`references/05-model-improvement.md`](references/05-model-improvement.md)):
+
+| Ticker | Accuracy walk-forward | AUC walk-forward | Nota |
+|--------|----------------------|------------------|------|
+| GOOGL | **64.5%** | **0.626** | mejor señal del catálogo |
+| META | 58.2% | 0.564 | el tuning honesto la rescató |
+| MSFT / AMZN | ~59.6% | 0.56-0.58 | señal moderada |
+| TSLA | 56.3% | 0.564 | idiosincrásico: el pool global le falla |
+| AAPL | 56.7% | 0.520 | débil |
+| NVDA | — | — | sin señal propia → predice vía modelo global (pool) |
+
+Decisiones metodológicas validadas con experimentos:
+
+- **Optuna optimiza sobre walk-forward**, no sobre un split único (+3.6pp de
+  accuracy honesta; fue la mayor mejora del ciclo y vino del protocolo).
+- **RandomForest se mantiene** frente a HistGradientBoosting: gana en AUC 7/7
+  tickers. La calibración isotónica se rechazó con criterio predefinido
+  (mejora ECE pero cuesta −0.029 AUC): las probabilidades crudas no son
+  probabilidades reales — para operar, usar las tasas empíricas por bucket.
+- **Enrutado híbrido**: los tickers sin señal propia predicen vía un modelo
+  global entrenado sobre el pool de todos (NVDA hoy).
 
 **Los rendimientos pasados no garantizan rendimientos futuros.**
 Este proyecto es un ejercicio académico, no una herramienta de inversión.
@@ -163,6 +203,8 @@ Este proyecto es un ejercicio académico, no una herramienta de inversión.
 Los papers que inspiran el diseño de features, modelos y sentimiento están en
 [`reports/papers_referencia.md`](reports/papers_referencia.md) (sentimiento
 financiero, features técnicas y modelos ML), generados por el agente `research`.
+El diario de decisiones y veredictos del modelado vive en
+[`references/`](references/).
 
 ---
 
@@ -202,8 +244,9 @@ dueño `memory`) y `docs/vault/` (conocimiento estable, dueño `knowledge`).
 │   ├── data/make_dataset.py  ← Descarga vía yfinance (multi-ticker)
 │   ├── features/build_features.py  ← Indicadores técnicos, lags, scaler
 │   ├── models/
-│   │   ├── train_model.py    ← RandomForestClassifier + evaluación
-│   │   ├── predict_model.py  ← Inferencia multi-ticker (--ticker)
+│   │   ├── train_model.py    ← RandomForestClassifier + evaluación (FEATURE_COLS única)
+│   │   ├── predict_model.py  ← Inferencia multi-ticker (--ticker, respeta enrutado híbrido)
+│   │   ├── pooled.py         ← Modelo global del pool + routing híbrido por señal
 │   │   ├── explain_shap.py   ← Informes SHAP (make shap)
 │   │   └── conformal.py      ← Predicción conformal (sets con cobertura)
 │   ├── sentiment/
@@ -221,7 +264,8 @@ dueño `memory`) y `docs/vault/` (conocimiento estable, dueño `knowledge`).
 ├── agents/                   ← Sistema de agentes (27+): doctor, data, review, rag, knowledge...
 ├── models/                   ← Modelos .pkl + best_params (gitignored)
 ├── docs/vault/                ← Bóveda Obsidian: conocimiento estable por dominios
-├── notebooks/                ← EDA
+├── notebooks/                ← EDA y experimentos: model_improvement, pooled_model, calibración...
+├── references/               ← Diario de decisiones: EDA, veredictos de modelado
 └── reports/                  ← Informes: papers, monitoring, figuras
 ```
 
@@ -277,6 +321,10 @@ UPSIDE_THRESHOLD  = 0.02    # +2% para clasificar como "sube"
 3. **Regresión vs. clasificación**: predecir la dirección (0/1) es más abordable que predecir el precio exacto.
 4. **Baseline primero**: si el modelo no supera "predecir siempre la clase mayoritaria", no sirve de nada.
 5. **Regularización**: `max_depth` y `min_samples_leaf` en Random Forest son más efectivos que aumentar `n_estimators`.
+6. **El split único miente**: optimizar y reportar sobre el mismo tramo de test infla los números; el walk-forward es quien manda — y arreglar el protocolo rindió más que cualquier feature nueva.
+7. **Accuracy engaña con clases desbalanceadas**: un modelo "peor" en accuracy puede tener mejor AUC; decidir siempre mirando la métrica de ordenación.
+8. **Constantes duplicadas se desincronizan**: copiar FEATURE_COLS entre módulos provocó modelos entrenados con columnas que el predictor desconocía; una sola fuente de verdad con filtro dinámico.
+9. **Las probabilidades crudas no están calibradas**: p=0.65 no significa 65% de aciertos; usar tasas empíricas por bucket antes de filtrar operaciones por confianza.
 
 ---
 

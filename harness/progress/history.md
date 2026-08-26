@@ -596,3 +596,19 @@ init.sh: ENTORNO LISTO. Fetch en vivo probado: 7 tickers × 240-354 artículos. 
 ```
 
 </details>
+
+## DOC-001 — README y PRD al día con el ciclo IMP/MOD/SENT
+
+- **Cerrada:** 2026-08-26
+- **Verificación:** ./init.sh en verde · 175 passed, 24 warnings in 19.25s
+- **Cambios:** README.md (4 secciones), docs/prd.md (regenerado)
+- **Decisiones:** PRD regenerado y no editado a mano (documento derivado); resultados presentados solo como walk-forward — el split único queda fuera del README para no propagar la métrica inflada
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO. README: sección de sentimiento con NewsAPI.ai (--live/--history, clave por env), tabla walk-forward real por ticker (GOOGL 64.5%/0.626...NVDA→pool), veredictos RF vs HistGBM y calibración, árbol con pooled.py/notebooks/references, 4 lecciones nuevas. docs/prd.md regenerado del backlog (documentation update_prd success=true)
+```
+
+</details>
