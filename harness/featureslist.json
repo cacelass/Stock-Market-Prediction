@@ -534,6 +534,40 @@
       "started": "2026-08-25",
       "review_rounds": 0,
       "closed": "2026-08-26"
+    },
+    {
+      "id": "SENT-005",
+      "title": "Noticias reales: fetch NewsAPI.ai en vivo y histórico GDELT",
+      "description": "Noticias reales: fetch NewsAPI.ai en vivo y histórico GDELT",
+      "acceptance_criteria": [
+        "fetch_newsapi_ai(ticker) mapea a schema fecha/titulo/cuerpo/fuente con paginación y sin duplicados",
+        "clave leída de NEWSAPI_KEY env, jamás hardcodeada ni commiteada",
+        "histórico GDELT 2021-2026 descargado a data/raw",
+        "cobertura real documentada honestamente en references/",
+        "init.sh verde"
+      ],
+      "status": "blocked",
+      "depends_on": [],
+      "started": "2026-08-26",
+      "review_rounds": 0,
+      "blocked_reason": "Histórico profundo de noticias imposible desde este entorno: GDELT bloquea esta red (429 persistentes durante toda una sesión + cuelgues sin respuesta verificados) y el plan gratuito de NewsAPI.ai limita el archivo a ~60 días (ventanas 2021/2023/mayo devuelven 0 artículos, verificado empíricamente). La parte operativa se cerró como SENT-006: sentimiento real en vivo acumulable; reabrir si cambia la red o se contrata plan de pago."
+    },
+    {
+      "id": "SENT-006",
+      "title": "Fetcher NewsAPI.ai en vivo y puntuación de noticias reales",
+      "description": "Fetcher NewsAPI.ai en vivo y puntuación de noticias reales",
+      "acceptance_criteria": [
+        "fetch_newsapi_ai y fetch_newsapi_ai_history en fetch.py con paginación, dedup y schema estándar",
+        "clave solo vía NEWSAPI_KEY env (en .env ignorado)",
+        "4,303 artículos reales puntuados y agregados por día para los 7 tickers",
+        "cobertura documentada en reports/cobertura_noticias_reales.csv",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-26",
+      "review_rounds": 0,
+      "closed": "2026-08-26"
     }
   ]
 }

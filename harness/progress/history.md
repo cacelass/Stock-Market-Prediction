@@ -580,3 +580,19 @@ init.sh: ENTORNO LISTO (175 passed). notebooks/model_comparison.py completado pa
 ```
 
 </details>
+
+## SENT-006 — Fetcher NewsAPI.ai en vivo y puntuación de noticias reales
+
+- **Cerrada:** 2026-08-26
+- **Verificación:** ./init.sh en verde · 175 passed, 24 warnings in 15.09s
+- **Cambios:** inversion/sentiment/fetch.py (fetch_newsapi_ai, fetch_newsapi_ai_history, _newsapi_ai_request/_rows, CLI --live/--history/--since), data/processed/noticias_puntuadas_*.csv + sentimiento_diario_*.csv (14), data/raw/news_*_live.csv (7), reports/cobertura_noticias_reales.csv
+- **Decisiones:** Clave solo por env var desde .env ignorado (nunca hardcode ni commit); keyword por nombre comercial y no símbolo para reducir ruido; sufijo _live para no pisar históricos; verificado empíricamente que el plan gratuito limita archivo a ~60 días → el histórico profundo queda bloqueado en SENT-005 con la razón documentada
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO. Fetch en vivo probado: 7 tickers × 240-354 artículos. Modo history por ventanas mensuales: 4,303 artículos acumulados (AAPL 754, MSFT 774, GOOGL 427, AMZN 706, META 311, TSLA 602, NVDA 729) puntuados con analyzer.py (compound VADER) y agregados por día. Salidas: data/raw/news_<T>_live.csv, data/processed/noticias_puntuadas_<T>.csv + sentimiento_diario_<T>.csv, reports/cobertura_noticias_reales.csv
+```
+
+</details>

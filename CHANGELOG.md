@@ -53,3 +53,9 @@
 ### Añadido
 
 - feat(model): comparación de clases de modelo y calibración — veredictos documentados (MOD-001)
+
+## [Unreleased] — 2026-08-26
+
+### Añadido
+
+- feat(sentiment): fetcher NewsAPI.ai en vivo + puntuación de noticias reales (SENT-006)
