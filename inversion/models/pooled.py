@@ -172,7 +172,8 @@ def resolve_route(ticker: str) -> str:
     ticker = ticker.upper()
     if ticker == GLOBAL_TICKER or not global_artifacts_available():
         return ticker
-    routing = json.loads(_artifact_paths()["routing"].read_text(encoding="utf-8")).get("routing", {})
+    data: Any = json.loads(_artifact_paths()["routing"].read_text(encoding="utf-8"))
+    routing: dict[str, str] = dict(data.get("routing", {})) if isinstance(data, dict) else {}
     return routing.get(ticker, ticker)
 
 

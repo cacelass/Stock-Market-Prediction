@@ -612,3 +612,19 @@ init.sh: ENTORNO LISTO. README: sección de sentimiento con NewsAPI.ai (--live/-
 ```
 
 </details>
+
+## FIX-001 — mypy estricto en verde para los módulos nuevos (CI rojo tras push)
+
+- **Cerrada:** 2026-08-26
+- **Verificación:** ./init.sh en verde · 175 passed, 24 warnings in 14.51s
+- **Cambios:** inversion/sentiment/fetch.py (dict[str, Any] + cast del body JSON), inversion/models/pooled.py (routing tipado dict[str,str]), imports re-exportados corregidos a la fuente train_model en trading/backtest.py, api/main.py, trading/viabilidad.py
+- **Decisiones:** Los hooks pre-commit de mypy están en stage push que no llega a ejecutarse localmente → el CI es el único gate real de tipos; los imports cruzados van ahora directo a train_model (fuente única) en vez de re-exportarse por predict_model; isort marca 2 ficheros preexistentes pero no es puerta del CI — no se tocan
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+mypy inversion/ tests/: Success, 56 ficheros sin issues (CI fallaba con 11). ruff check: All checks passed. pytest tests/ --cov-fail-under=60: 175 passed, coverage 76.11%. init.sh: ENTORNO LISTO
+```
+
+</details>

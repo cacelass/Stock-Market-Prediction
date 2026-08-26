@@ -22,6 +22,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import yaml
@@ -296,10 +297,8 @@ def _newsapi_ai_key() -> str:
     return key
 
 
-def _newsapi_ai_request(payload: dict) -> list[dict]:
+def _newsapi_ai_request(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Una petición getArticles con reintentos; devuelve la lista de artículos."""
-    import urllib.request
-
     payload = {**payload, "apiKey": _newsapi_ai_key()}
     req = urllib.request.Request(
         NEWSAPI_AI_URL,
@@ -310,7 +309,8 @@ def _newsapi_ai_request(payload: dict) -> list[dict]:
     for attempt in range(NEWSAPI_AI_MAX_RETRIES):
         try:
             with urllib.request.urlopen(req, timeout=NEWSAPI_AI_TIMEOUT) as resp:
-                return json.loads(resp.read()).get("articles", {}).get("results", [])
+                body: Any = json.loads(resp.read())
+                return list(body.get("articles", {}).get("results", []))
         except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
             last_exc = exc
             if attempt < NEWSAPI_AI_MAX_RETRIES - 1:
@@ -318,7 +318,7 @@ def _newsapi_ai_request(payload: dict) -> list[dict]:
     raise FetchError(f"NewsAPI.ai falló tras {NEWSAPI_AI_MAX_RETRIES} intentos: {last_exc}")
 
 
-def _newsapi_ai_rows(articles: list[dict]) -> pd.DataFrame:
+def _newsapi_ai_rows(articles: list[dict[str, Any]]) -> pd.DataFrame:
     """Artículos crudos del API → DataFrame con las columnas estándar."""
     rows = [
         {
@@ -354,7 +354,7 @@ def fetch_newsapi_ai_history(
 
     end_dt = datetime.utcnow().date()
     start_dt = datetime.strptime(since, "%Y-%m-%d").date()
-    all_articles: list[dict] = []
+    all_articles: list[dict[str, Any]] = []
     cur = start_dt
     while cur <= end_dt:
         month_end = min(cur + timedelta(days=31), end_dt)
@@ -411,7 +411,7 @@ def fetch_newsapi_ai(
     if keyword is None:
         raise FetchError(f"Ticker '{ticker}' sin término de búsqueda definido en NEWSAPI_AI_KEYWORDS.")
 
-    articles: list[dict] = []
+    articles: list[dict[str, Any]] = []
     for page in range(1, NEWSAPI_AI_MAX_PAGES + 1):
         batch = _newsapi_ai_request(
             {

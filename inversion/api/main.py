@@ -11,7 +11,8 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 
 from inversion.api.schemas import HealthResponse, InfoResponse, PredictRequest, PredictResponse
-from inversion.models.predict_model import FEATURE_COLS, SENTIMENT_COLS, _load_model_and_scaler, _load_ticker_data, available_feature_cols, predict_future
+from inversion.models.predict_model import _load_model_and_scaler, _load_ticker_data, predict_future
+from inversion.models.train_model import FEATURE_COLS, SENTIMENT_COLS, available_feature_cols
 from inversion.utils import paths
 
 PROJECT = "Stock Market Prediction"

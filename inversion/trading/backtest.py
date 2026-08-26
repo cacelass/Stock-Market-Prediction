@@ -19,7 +19,8 @@ import numpy as np
 import pandas as pd
 
 from inversion.models import pooled
-from inversion.models.predict_model import _load_model_and_scaler, _load_ticker_data, available_feature_cols
+from inversion.models.predict_model import _load_model_and_scaler, _load_ticker_data
+from inversion.models.train_model import available_feature_cols
 from inversion.trading.risk import max_drawdown
 from inversion.trading.signals import DEFAULT_THRESHOLD, Signal, signal_from_probability
 

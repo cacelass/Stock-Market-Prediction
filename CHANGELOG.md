@@ -65,3 +65,9 @@
 ### Añadido
 
 - docs: README y PRD al día con el ciclo de mejora del modelo (DOC-001)
+
+## [Unreleased] — 2026-08-26
+
+### Añadido
+
+- fix(types): mypy estricto en verde para pooled, fetch y re-exports (FIX-001)

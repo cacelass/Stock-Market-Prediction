@@ -583,6 +583,21 @@
       "started": "2026-08-26",
       "review_rounds": 0,
       "closed": "2026-08-26"
+    },
+    {
+      "id": "FIX-001",
+      "title": "mypy estricto en verde para los módulos nuevos (CI rojo tras push)",
+      "description": "mypy estricto en verde para los módulos nuevos (CI rojo tras push)",
+      "acceptance_criteria": [
+        "uv run mypy inversion/ tests/ sin errores",
+        "ruff y pytest con cov>=60 en verde como el CI",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-08-26",
+      "review_rounds": 0,
+      "closed": "2026-08-26"
     }
   ]
 }
