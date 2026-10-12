@@ -133,7 +133,7 @@ def evaluate_model(model: Any, X_test: Any, y_test: Any) -> dict[str, Any]:
 
     acc = accuracy_score(y_test, y_pred)
     auc = roc_auc_score(y_test, y_proba)
-    report = classification_report(y_test, y_pred, target_names=["Baja (0)", "Sube (1)"])
+    report = classification_report(y_test, y_pred, target_names=["Baja (0)", "Sube (1)"], zero_division=0)
 
     return {"accuracy": acc, "auc": auc, "report": report}
 

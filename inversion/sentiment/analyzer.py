@@ -153,10 +153,24 @@ def analyze_ticker(ticker: str) -> pd.DataFrame:
 
     Si data/raw/news_<TICKER>.csv no existe, lo descarga primero con fetch_news.
     """
-    csv_path = paths.RAW_DATA_DIR / f"news_{ticker.upper()}.csv"
-    if not csv_path.exists():
+    # Buscar noticias reales: _live.csv (NewsAPI.ai) y _gdelt.csv (GDELT samples).
+    # Fallback a news_<TICKER>.csv (para tests / retrocompatibilidad).
+    # Si ninguna existe, intenta descargar RSS como último recurso.
+    ticker_upper = ticker.upper()
+    csv_path_live = paths.RAW_DATA_DIR / f"news_{ticker_upper}_live.csv"
+    csv_path_gdelt = paths.RAW_DATA_DIR / f"news_{ticker_upper}_gdelt.csv"
+    csv_path_fallback = paths.RAW_DATA_DIR / f"news_{ticker_upper}.csv"
+    if csv_path_live.exists() and csv_path_gdelt.exists():
+        df = pd.concat([pd.read_csv(csv_path_live), pd.read_csv(csv_path_gdelt)], ignore_index=True).drop_duplicates(subset=["titulo"])
+    elif csv_path_live.exists():
+        df = pd.read_csv(csv_path_live)
+    elif csv_path_gdelt.exists():
+        df = pd.read_csv(csv_path_gdelt)
+    elif csv_path_fallback.exists():
+        df = pd.read_csv(csv_path_fallback)
+    else:
         fetch_news(ticker)
-    df = pd.read_csv(csv_path)
+        df = pd.read_csv(paths.RAW_DATA_DIR / f"news_{ticker_upper}.csv")
     scored = score_news_df(df)
     return daily_sentiment(scored, ticker=ticker.upper())
 

@@ -70,7 +70,13 @@ def plot_feature_importance(model: Any, feature_names: list[str], top_n: int = 1
     sorted_idx = np.argsort(importances)[-top_n:]
 
     plt.figure(figsize=(10, 6))
-    sns.barplot(x=importances[sorted_idx], y=np.array(feature_names)[sorted_idx], palette="viridis")
+    sns.barplot(
+        x=importances[sorted_idx],
+        y=np.array(feature_names)[sorted_idx],
+        hue=np.arange(len(sorted_idx)),
+        palette="viridis",
+        legend=False,
+    )
     plt.title(f"Top {top_n} features por importancia")
     plt.xlabel("Importancia")
     plt.ylabel("Feature")

@@ -120,14 +120,28 @@ def add_sentiment_features(df: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
     el futuro. Si no hay noticias para el ticker, devuelve el DataFrame sin
     columnas de sentimiento.
     """
-    news_csv = paths.RAW_DATA_DIR / f"news_{ticker.upper()}.csv"
-    if not news_csv.exists():
+    ticker_upper = ticker.upper()
+    # Buscar noticias reales: _live.csv (NewsAPI.ai) y _gdelt.csv (GDELT samples).
+    # Fallback a news_<TICKER>.csv (para tests / retrocompatibilidad).
+    # Sin datos → sin features de sentimiento.
+    primary = [
+        paths.RAW_DATA_DIR / f"news_{ticker_upper}_live.csv",
+        paths.RAW_DATA_DIR / f"news_{ticker_upper}_gdelt.csv",
+    ]
+    # Fallback: si no hay _live ni _gdelt, probar news_<TICKER>.csv
+    fallback = paths.RAW_DATA_DIR / f"news_{ticker_upper}.csv"
+    existing = [f for f in primary if f.exists()]
+    if not existing and fallback.exists():
+        existing = [fallback]
+    if not existing:
         return df
 
     from inversion.sentiment.analyzer import daily_sentiment, score_news_df
 
-    scored = score_news_df(pd.read_csv(news_csv))
-    daily = daily_sentiment(scored, ticker=ticker.upper())[["fecha", "compound", "noticias"]]
+    frames = [pd.read_csv(f) for f in existing]
+    all_news = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["titulo"])
+    scored = score_news_df(all_news)
+    daily = daily_sentiment(scored, ticker=ticker_upper)[["fecha", "compound", "noticias"]]
     daily["fecha"] = pd.to_datetime(daily["fecha"]).dt.date
 
     out = df.copy()
