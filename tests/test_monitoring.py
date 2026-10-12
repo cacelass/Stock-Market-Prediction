@@ -88,10 +88,10 @@ def test_performance_vs_baseline(patch_paths, sample_df):
     df["target"] = (df["return"] > 0).astype(int)
     cols = available_feature_cols(df)
     feat = df.dropna(subset=[*cols, "target"])
-    X = feat[cols].values
+    X_df = feat[cols]  # DataFrame → scaler conserva feature names
     y = (feat["return"] > 0).astype(int).values
-    fit_and_save_scaler(X, filename="scaler_CCC.pkl")
-    train_rf_model(X, y, filename="rf_CCC.pkl")
+    fit_and_save_scaler(X_df, filename="scaler_CCC.pkl")
+    train_rf_model(X_df.values, y, filename="rf_CCC.pkl")
 
     interim = paths.INTERIM_DATA_DIR / "features_CCC_ml_ready.csv"
     df.dropna(subset=cols).to_csv(interim, index=False)

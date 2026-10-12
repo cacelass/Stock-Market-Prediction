@@ -121,10 +121,10 @@ def test_backtest_ticker_end_to_end(patch_paths, sample_df):
     df = add_derived_features(sample_df.copy())
     cols = available_feature_cols(df)
     feat = df.dropna(subset=cols)
-    X = feat[cols].values
+    X_df = feat[cols]  # DataFrame → scaler conserva feature names
     y = (feat["return"] > 0).astype(int).values
-    fit_and_save_scaler(X, filename="scaler_AAPL.pkl")
-    train_rf_model(X, y, filename="rf_AAPL.pkl")
+    fit_and_save_scaler(X_df, filename="scaler_AAPL.pkl")
+    train_rf_model(X_df.values, y, filename="rf_AAPL.pkl")
 
     out = patch_paths["INTERIM_DATA_DIR"] / "features_AAPL_ml_ready.csv"
     out.parent.mkdir(parents=True, exist_ok=True)

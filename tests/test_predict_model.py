@@ -16,10 +16,10 @@ def _setup_model(sample_df, patch_paths):
     df = add_derived_features(sample_df.copy())
     cols = available_feature_cols(df)
     feat = df.dropna(subset=cols)
-    X = feat[cols].values
+    X_df = feat[cols]  # DataFrame → scaler conserva feature names
     y = (feat["return"] > 0).astype(int).values
-    fit_and_save_scaler(X)
-    train_rf_model(X, y)
+    fit_and_save_scaler(X_df)
+    train_rf_model(X_df.values, y)
     return df
 
 

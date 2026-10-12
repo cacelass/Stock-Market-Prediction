@@ -29,10 +29,10 @@ def _setup_ticker_models(sample_df, patch_paths, ticker: str = "NVDA"):
     df = add_derived_features(sample_df.copy())
     cols = available_feature_cols(df)
     feat = df.dropna(subset=cols)
-    X = feat[cols].values
+    X_df = feat[cols]  # DataFrame → scaler conserva feature names
     y = (feat["return"] > 0).astype(int).values
-    fit_and_save_scaler(X, filename=f"scaler_{ticker}.pkl")
-    train_rf_model(X, y, filename=f"rf_{ticker}.pkl")
+    fit_and_save_scaler(X_df, filename=f"scaler_{ticker}.pkl")
+    train_rf_model(X_df.values, y, filename=f"rf_{ticker}.pkl")
 
     out = paths.INTERIM_DATA_DIR / f"features_{ticker}_ml_ready.csv"
     df.to_csv(out, index=False)

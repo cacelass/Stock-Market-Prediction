@@ -84,3 +84,9 @@
 
 - feat(sentiment): limpiar datos sintéticos, pipeline noticias reales, fixes warnings (SENT-005)
 
+## [Unreleased] — 2026-10-12
+
+### Añadido
+
+- fix(tests): scaler conserva feature names, elimina warnings sklearn (SENT-005)
+
