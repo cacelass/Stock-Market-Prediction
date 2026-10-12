@@ -19,7 +19,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405: RSS feeds from Google News are trusted XML sources
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -52,7 +52,7 @@ class FetchError(RuntimeError):
 def _parse_rss(xml_bytes: bytes) -> pd.DataFrame:
     """Convierte el XML de un canal RSS en un DataFrame con CSV_COLUMNS."""
     try:
-        root = ET.fromstring(xml_bytes)
+        root = ET.fromstring(xml_bytes)  # nosec B314: RSS feeds from Google News are trusted XML sources
     except ET.ParseError as exc:
         raise FetchError(f"La fuente RSS devolvió XML inválido: {exc}") from exc
 
@@ -86,7 +86,7 @@ def fetch_news(ticker: str, out_path: Path | None = None) -> Path:
     """
     url = RSS_URL.format(ticker=ticker.upper())
     try:
-        with urllib.request.urlopen(url, timeout=RSS_TIMEOUT_SECONDS) as resp:
+        with urllib.request.urlopen(url, timeout=RSS_TIMEOUT_SECONDS) as resp:  # nosec B310: RSS_URL is a constant https URL
             xml_bytes = resp.read()
     except (urllib.error.URLError, OSError) as exc:
         raise FetchError(f"No se pudieron descargar noticias para {ticker.upper()}: sin red o la fuente RSS no responde ({exc}).") from exc
@@ -187,7 +187,7 @@ def _fetch_gdelt_chunk(url: str, ticker: str) -> list[list[str]]:
     """
     for attempt in range(GDELT_MAX_RETRIES):
         try:
-            with urllib.request.urlopen(url, timeout=GDELT_TIMEOUT_SECONDS) as resp:
+            with urllib.request.urlopen(url, timeout=GDELT_TIMEOUT_SECONDS) as resp:  # nosec B310: GDELT_BASE_URL is a constant https URL
                 data = resp.read()
 
             # GDELT devuelve JSON
@@ -308,7 +308,7 @@ def _newsapi_ai_request(payload: dict[str, Any]) -> list[dict[str, Any]]:
     last_exc: Exception | None = None
     for attempt in range(NEWSAPI_AI_MAX_RETRIES):
         try:
-            with urllib.request.urlopen(req, timeout=NEWSAPI_AI_TIMEOUT) as resp:
+            with urllib.request.urlopen(req, timeout=NEWSAPI_AI_TIMEOUT) as resp:  # nosec B310: NEWSAPI_AI_URL is a constant https URL
                 body: Any = json.loads(resp.read())
                 return list(body.get("articles", {}).get("results", []))
         except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:

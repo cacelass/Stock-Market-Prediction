@@ -21,7 +21,7 @@ from inversion.models import pooled
 # Una sola fuente de verdad: las features y su selección viven en train_model.py.
 # Duplicarlas aquí provocó desincronización (modelos entrenados con features
 # que el predictor no conocía).
-from inversion.models.train_model import FEATURE_COLS, SENTIMENT_COLS, available_feature_cols
+from inversion.models.train_model import FEATURE_COLS, available_feature_cols
 from inversion.utils import paths
 
 

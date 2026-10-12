@@ -18,7 +18,9 @@ ARTIFACTS_DIR = MODELS_DIR / "artifacts"
 REPORTS_DIR = PROJECT_DIR / "reports"
 
 # 3. Definir archivos específicos
-# Eliminamos el "import config" y definimos el nombre por defecto aquí
+# RAW_DATA_FILE es un placeholder legacy: load_data() lee un único CSV
+# (data/raw/data.csv). El proyecto moderno usa el catálogo config/tickers.yaml
+# y descarga tickers individuales → *_ml_ready.csv. No se usa en producción.
 RAW_DATA_FILE = RAW_DATA_DIR / "data.csv"
 
 # Nombres genéricos para los modelos (se pueden sobrescribir en el main si es necesario)

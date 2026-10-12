@@ -90,3 +90,9 @@
 
 - fix(tests): scaler conserva feature names, elimina warnings sklearn (SENT-005)
 
+## [Unreleased] — 2026-10-12
+
+### Añadido
+
+- fix(tech-debt): pkl gitignore, bandit CI, dead imports, stale reports (SENT-005)
+

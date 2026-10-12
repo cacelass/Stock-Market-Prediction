@@ -94,3 +94,26 @@ docs/vault/docs/
 docs/vault/media/
 docs/vault/papers/
 docs/vault/references/
+
+# --- Modelos y artefactos ML regenerables (NO se versionan) ---
+# Los .pkl y .json de modelos se regeneran con make train / make tune.
+models/*.pkl
+models/*.json
+models/artifacts/best_params_*.json
+models/routing_*.json
+# Gráficos y reportes regenerables
+reports/figures/
+reports/monitoring/
+reports/backtest/*.csv
+reports/resultados_*.csv
+reports/walk_forward*.csv
+reports/comparacion*.csv
+reports/confianza*.csv
+reports/importancia_*.csv
+reports/pooled_*.csv
+reports/enrutado_*.csv
+reports/tuning_results.csv
+reports/monitoring/rendimiento.csv
+# Datos procesados (regenerables con make data / make features)
+data/processed/*.csv
+data/interim/*.csv
