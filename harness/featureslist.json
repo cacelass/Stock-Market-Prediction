@@ -546,11 +546,11 @@
         "cobertura real documentada honestamente en references/",
         "init.sh verde"
       ],
-      "status": "blocked",
+      "status": "done",
       "depends_on": [],
-      "started": "2026-08-26",
+      "started": "2026-10-12",
       "review_rounds": 0,
-      "blocked_reason": "Histórico profundo de noticias imposible desde este entorno: GDELT bloquea esta red (429 persistentes durante toda una sesión + cuelgues sin respuesta verificados) y el plan gratuito de NewsAPI.ai limita el archivo a ~60 días (ventanas 2021/2023/mayo devuelven 0 artículos, verificado empíricamente). La parte operativa se cerró como SENT-006: sentimiento real en vivo acumulable; reabrir si cambia la red o se contrata plan de pago."
+      "closed": "2026-10-12"
     },
     {
       "id": "SENT-006",

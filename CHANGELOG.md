@@ -71,3 +71,10 @@
 ### Añadido
 
 - fix(types): mypy estricto en verde para pooled, fetch y re-exports (FIX-001)
+
+## [Unreleased] — 2026-10-12
+
+### Añadido
+
+- feat(sentiment): cobertura real de noticias y docs honestas (SENT-005)
+

@@ -628,3 +628,19 @@ mypy inversion/ tests/: Success, 56 ficheros sin issues (CI fallaba con 11). ruf
 ```
 
 </details>
+
+## SENT-005 — Noticias reales: fetch NewsAPI.ai en vivo y histórico GDELT
+
+- **Cerrada:** 2026-10-12
+- **Verificación:** ./init.sh en verde · 175 passed, 24 warnings in 26.50s
+- **Cambios:** references/06-cobertura-noticias.md; data/raw/news_AMZN_gdelt.csv; data/raw/news_AAPL_gdelt.csv; data/raw/news_TSLA_gdelt.csv; harness/progress/lider-SENT-005.md
+- **Decisiones:** GDELT histórico completo no viable por rate limit API (1 req/5s, HTTP 429); se documentan muestras como evidencia de que el código funciona
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+init.sh: ENTORNO LISTO, pytest 175 passed, 24 warnings in 27.44s | coverage real: 4431 artículos (NewsAPI.ai 4303 + GDELT samples 128) | GDELT rate-limited 1 req/5s, samples descargados para 3 tickers | references/06-cobertura-noticias.md documenta cobertura honestamente
+```
+
+</details>

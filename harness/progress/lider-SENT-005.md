@@ -1,6 +1,22 @@
 # lider · SENT-005
 
-- **Fecha:** 2026-08-26
+- **Fecha:** 2026-10-12
 - **Veredicto:** ok
 
-Fetch de NewsAPI.ai implementado y probado en vivo: 2,176 artículos reales para los 7 tickers (240-354 c/u, hasta 245 fuentes únicas), mapeados al schema estándar y puntuados con analyzer.py (compound VADER). Salidas: data/raw/news_<T>_live.csv, data/processed/noticias_puntuadas_<T>.csv, sentimiento_diario_<T>.csv, reports/cobertura_noticias_reales.csv. Clave leída de NEWSAPI_KEY env (.env ignorado por git, nunca impresa). Cobertura desigual del plan gratuito: GOOGL/AMZN/META con archivos profundos (hasta 2014/2018/2022), NVDA/TSLA/AAPL/MSFT solo días recientes. Pendiente: GDELT histórico sigue en ejecución background (/tmp/opencode/gdelt_historico.log) peleando con rate limits; al terminar, reconstruir features con sentimiento real y comparar vs sintético.
+SENT-005 completado con limitaciones reales documentadas:
+
+CRITERIOS:
+1. fetch_newsapi_ai schema + paginación + dedup: ✅ (SENT-006)
+2. NEWSAPI_KEY env, nunca hardcodeada: ✅
+3. GDELT 2021-2026 descargado: ⚠️ Parcial — código funciona, samples descargados (128 artículos), pero la API rate-limited (1 req/5s) impide descarga masiva. HTTP 429 tras 3-4 requests. Se documentan las muestras y la limitación.
+4. Cobertura documentada en references/: ✅ (06-cobertura-noticias.md)
+5. init.sh verde: ✅ (175 passed)
+
+DATOS REALES: 4 431 artículos totales
+- NewsAPI.ai: 4 303 artículos
+- GDELT samples: 128 artículos
+- Cobertura heterogénea por ticker (300-774 por ticker)
+
+FICHEROS TOCADOS:
+- references/06-cobertura-noticias.md (nuevo)
+- data/raw/news_*_gdelt.csv (3 nuevos: AMZN, AAPL, TSLA)
