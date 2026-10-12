@@ -214,10 +214,6 @@ shap: train
 	@echo "▶  Informes SHAP → reports/figures/"
 	$(PY) $(MODULE)/models/explain_shap.py
 
-monitor: features
-	@echo "▶  Monitoring de drift y rendimiento → reports/monitoring/"
-	$(PY) $(MODULE)/monitoring/drift.py
-
 pipeline: predict
 	@echo ""
 	@echo "  Pipeline completo finalizado."
@@ -229,24 +225,12 @@ pipeline: predict
 run:
 	uv run $(PYTHON) main.py
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  Monitoring — drift detection y performance tracking
 # ─────────────────────────────────────────────────────────────────────────────
-monitor:
-	@echo "▶  Ejecutando monitorización de drift y rendimiento..."
-	uv run python -m monitoring.monitor
-
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  Optuna — optimizacion de hiperparametros
-# ─────────────────────────────────────────────────────────────────────────────
-tune:
-	@echo "▶  Lanzando optimizacion Optuna (OPTUNA_TRIALS en main.py)"
-	uv run python -m tuning.tune_model
-
-
+monitor: features
+	@echo "▶  Monitoring de drift y rendimiento → reports/monitoring/"
+	$(PY) $(MODULE)/monitoring/drift.py
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  DuckDB — exploración SQL interactiva sobre data/raw/
@@ -255,16 +239,6 @@ query:
 	@echo "▶  DuckDB shell — escribe .quit para salir"
 	@echo "   Ejemplo: SELECT * FROM read_csv('data/raw/dataset.csv') LIMIT 10;"
 	uv run duckdb
-
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  API REST — servir el modelo con FastAPI
-# ─────────────────────────────────────────────────────────────────────────────
-serve:
-	@echo "▶  Lanzando API REST en http://localhost:8000"
-	@echo "   Documentación interactiva: http://localhost:8000/docs"
-	uv run uvicorn api.main:app --reload --port 8000
 
 
 profile:
