@@ -708,3 +708,19 @@ inversion/models/volatility.py implementado + 7 tests (tests/test_volatility.py)
 ```
 
 </details>
+
+## EXP-006 — Exponer el modelo de riesgo/volatilidad en la API REST (endpoint /risk)
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 214 passed, 25 warnings in 29.20s
+- **Cambios:** inversion/api/main.py,inversion/api/schemas.py,tests/test_api.py
+- **Decisiones:** Endpoint aditivo /risk con PredictRequest. Importa predict_volatility de inversion.models.volatility. No altera /predict ni /health.
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+POST /risk live: NVDA {"vol_daily":0.024671,"vol_annualized":0.391636} y MSFT {"vol_daily":0.018712,"vol_annualized":0.297042}; GET /health ok; POST /predict ok; tests/test_api.py 8 passed; suite 214 passed
+```
+
+</details>

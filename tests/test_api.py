@@ -87,3 +87,31 @@ def test_process_input_returns_expected_shape(client, patch_paths, sample_df):
     _setup_ticker_models(sample_df, patch_paths, "NVDA")
     X = process_input("NVDA")
     assert X.shape[1] == len(available_feature_cols(add_derived_features(sample_df.copy())))
+
+
+def _setup_vol_model(sample_df, patch_paths, ticker: str = "NVDA"):
+    """Entrena vol_<T>.pkl real y deja features_<T> en interim (EXP-005)."""
+    from inversion.models.volatility import train_vol_ticker
+    from inversion.utils import paths
+
+    df = add_derived_features(sample_df.copy())
+    csv = paths.INTERIM_DATA_DIR / f"features_{ticker}_ml_ready.csv"
+    df.to_csv(csv, index=False)
+    train_vol_ticker(ticker, csv, horizon=5)
+
+
+def test_risk_ok(client, patch_paths, sample_df):
+    _setup_vol_model(sample_df, patch_paths, "NVDA")
+    resp = client.post("/risk", json={"ticker": "NVDA"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ticker"] == "NVDA"
+    assert body["vol_daily"] > 0
+    assert body["vol_annualized"] > body["vol_daily"]
+    assert body["model_name"] == "vol_NVDA.pkl"
+    assert len(body["as_of"]) == 10  # YYYY-MM-DD
+
+
+def test_risk_without_model_404(client, patch_paths):
+    resp = client.post("/risk", json={"ticker": "ZZZ"})
+    assert resp.status_code == 404
