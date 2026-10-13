@@ -1,26 +1,27 @@
 # Tarea actual
 
-> Estado vivo de la ejecución en curso. Es la memoria **fuera** de la ventana de
-> contexto: cualquier agente que arranque de cero lee este fichero y sabe dónde
-> está el trabajo sin releer el proyecto entero.
-
-**Feature:** _(ninguna)_
-**Estado:** idle
-**Iniciada:** —
-**Responsable:** —
+**Feature:** EXP-001
+**Estado:** in_progress
+**Iniciada:** 2026-10-13
+**Responsable:** implementer
 
 ## Objetivo
 
-_(sin trabajo en curso)_
+Explorar mejoras RF/HistGBM/Ensemble con walk-forward estricto
 
 ## Criterios de aceptación
 
-_(copiar aquí los `acceptance_criteria` de la feature al empezar)_
+- [ ] Comparar con baseline actual en mismo split
+- [ ] precision@top-quintil
+- [ ] AUC
+- [ ] Sharpe/backtest realista
+- [ ] sin leakage
+- [ ] init.sh verde
 
 ## Bitácora
 
-_(una línea por paso: qué se hizo, qué fichero se tocó, qué verificó)_
+_(pendiente)_
 
 ## Bloqueos
 
-_(qué impide avanzar y qué se necesita para desbloquearlo — vacío si nada)_
+_(ninguno)_
