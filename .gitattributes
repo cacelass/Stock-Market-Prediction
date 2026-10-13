@@ -1,0 +1,12 @@
+# Large CSV files use Git LFS
+data/raw/*.csv filter=lfs diff=lfs merge=lfs -text
+data/processed/*.csv filter=lfs diff=lfs merge=lfs -text
+data/interim/*.csv filter=lfs diff=lfs merge=lfs -text
+
+# Models (already ignored by .gitignore, but for completeness)
+models/*.pkt filter=lfs diff=lfs merge=lfs -text
+models/*.pkl filter=lfs diff=lfs merge=lfs -text
+
+# Figures and images
+reports/*.png filter=lfs diff=lfs merge=lfs -text
+data/processed/*.png filter=lfs diff=lfs merge=lfs -text

@@ -26,6 +26,8 @@ CLI: .venv/bin/python inversion/trading/viabilidad.py [--ticker T [T ...]]
 (make viabilidad → todo el catálogo)
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 from collections.abc import Callable
@@ -56,7 +58,7 @@ SLIPPAGE = 0.0005  # 0.05% degradación de ejecución
 # Umbrales candidatos para calibrar por ticker (señal BUY con p >= umbral).
 THRESHOLD_GRID = np.arange(0.51, 0.71, 0.01)
 
-LIMITATIONS = [
+LIMITATIONS: list[str] = [
     "- **Costes de transacción (comisiones y spread)**: la simulación aplica un coste "
     "fijo del 0.1% de comisión + 0.05% de slippage por operación (entrada y salida). "
     "Es representativo de brokers retail, pero no modela comisiones fijas por orden "
@@ -120,6 +122,9 @@ class OOSResult:
     hybrid_n_trades: int | None = None
 
 
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+
 def _hybrid_signal_fn(sentiment: pd.Series) -> Callable[[int, float, float], Signal]:
     """Señal híbrida por posición: alinea el sentimiento del día i con su probs.
 
@@ -139,7 +144,10 @@ def _feature_cols(df: pd.DataFrame) -> list[str]:
     return available_feature_cols(df)
 
 
-def _train_oos_model(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestClassifier:
+# ── Backtest ─────────────────────────────────────────────────────────────────
+
+
+def _train_oos_model(X_train: np.ndarray, y_train: pd.Series) -> RandomForestClassifier:
     """RandomForest con los mismos parámetros que train_model, sin guardar en disco."""
     model = RandomForestClassifier(
         n_estimators=200,
@@ -193,7 +201,7 @@ def backtest_oos_ticker(
 ) -> OOSResult | None:
     """Backtest out-of-sample de un ticker.
 
-    Entrena con el primer (1 - test_fraction) del histórico y simula SOLO
+    Entrena con el primero (1 - test_fraction) del histórico y simula SOLO
     sobre el último test_fraction (segmento test temporal). El umbral de
     señal se calibra por ticker en el último VALIDATION_FRACTION del train
     (maximizando Sharpe) y nunca toca el test. Reutiliza run_backtest
@@ -278,6 +286,9 @@ def backtest_oos_ticker(
     )
 
 
+# ── Report building ──────────────────────────────────────────────────────────
+
+
 def build_report(
     tickers: list[str] | None = None,
     test_fraction: float = TEST_FRACTION,
@@ -291,32 +302,33 @@ def build_report(
         result = backtest_oos_ticker(ticker, test_fraction, initial_capital, threshold)
         if result is None:
             continue
-        rows.append(
-            {
-                "ticker": result.ticker,
-                "total_return": result.total_return,
-                "total_return_no_costs": result.total_return_no_costs,
-                "cagr": result.cagr,
-                "sharpe": result.sharpe,
-                "max_drawdown": result.max_drawdown,
-                "win_rate": result.win_rate,
-                "buy_hold_return": result.buy_hold_return,
-                "threshold": result.threshold,
-                "n_trades": result.n_trades,
-                "n_test_days": result.n_test_days,
-                "test_start": result.test_start,
-                "test_end": result.test_end,
-                "hybrid_return": result.hybrid_return,
-                "hybrid_sharpe": result.hybrid_sharpe,
-                "hybrid_n_trades": result.hybrid_n_trades,
-            }
-        )
-    return pd.DataFrame(rows)
+        rows.append(_oos_to_row(result))
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    return pd.concat([df, pd.DataFrame([_portfolio_row(df)])], ignore_index=True)
 
 
-def _fmt_threshold(value: float | str) -> str:
-    """Umbral formateado a 2 decimales ('' para la fila CARTERA)."""
-    return "" if isinstance(value, str) else f"{value:.2f}"
+def _oos_to_row(result: OOSResult) -> dict[str, float | int | str | None]:
+    """Convierte un OOSResult en un dict para el DataFrame."""
+    return {
+        "ticker": result.ticker,
+        "total_return": result.total_return,
+        "total_return_no_costs": result.total_return_no_costs,
+        "cagr": result.cagr,
+        "sharpe": result.sharpe,
+        "max_drawdown": result.max_drawdown,
+        "win_rate": result.win_rate,
+        "buy_hold_return": result.buy_hold_return,
+        "threshold": result.threshold,
+        "n_trades": result.n_trades,
+        "n_test_days": result.n_test_days,
+        "test_start": result.test_start,
+        "test_end": result.test_end,
+        "hybrid_return": result.hybrid_return,
+        "hybrid_sharpe": result.hybrid_sharpe,
+        "hybrid_n_trades": result.hybrid_n_trades,
+    }
 
 
 def _portfolio_row(df: pd.DataFrame) -> dict[str, float | int | str]:
@@ -343,6 +355,14 @@ def _portfolio_row(df: pd.DataFrame) -> dict[str, float | int | str]:
         "hybrid_sharpe": float(df["hybrid_sharpe"].mean()),
         "hybrid_n_trades": int(df["hybrid_n_trades"].sum()),
     }
+
+
+def _fmt_threshold(value: float | str) -> str:
+    """Umbral formateado a 2 decimales ('' para la fila CARTERA)."""
+    return "" if isinstance(value, str) else f"{value:.2f}"
+
+
+# ── Markdown report ──────────────────────────────────────────────────────────
 
 
 def _conclusion_lines(df: pd.DataFrame) -> list[str]:
@@ -509,7 +529,22 @@ def write_report(df: pd.DataFrame, out_dir: Path) -> Path:
     return md_path
 
 
+# ── CLI ──────────────────────────────────────────────────────────────────────
+
+
+def _print_results(df: pd.DataFrame) -> None:
+    """Imprime por stdout las métricas de cada ticker."""
+    for _, row in df.iterrows():
+        print(
+            f"   {row['ticker']:<8} retorno={row['total_return']:>8.2%}  "
+            f"buy&hold={row['buy_hold_return']:>8.2%}  umbral={_fmt_threshold(row['threshold']):<5}  "
+            f"Sharpe={row['sharpe']:>6.2f}  maxDD={row['max_drawdown']:>8.2%}  "
+            f"win={row['win_rate']:>7.2%}"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
+    """Entry point: analiza viabilidad out-of-sample y escribe el informe."""
     parser = argparse.ArgumentParser(description="Backtest out-of-sample y evaluación de viabilidad → reports/backtest/VIABILIDAD.md")
     parser.add_argument("--ticker", nargs="*", default=None, help="Ticker(s); por defecto todo el catálogo")
     parser.add_argument("--test-fraction", type=float, default=TEST_FRACTION, help="Fracción final de la serie usada como test")
@@ -526,16 +561,9 @@ def main(argv: list[str] | None = None) -> int:
         print("   No hay datos con features para ningún ticker. Ejecuta make data && make features primero.", file=sys.stderr)
         return 1
 
-    df = pd.concat([df, pd.DataFrame([_portfolio_row(df)])], ignore_index=True)
     md_path = write_report(df, out_dir)
     print(f"   Informe: {md_path}")
-    for _, row in df.iterrows():
-        print(
-            f"   {row['ticker']:<8} retorno={row['total_return']:>8.2%}  "
-            f"buy&hold={row['buy_hold_return']:>8.2%}  umbral={_fmt_threshold(row['threshold']):<5}  "
-            f"Sharpe={row['sharpe']:>6.2f}  maxDD={row['max_drawdown']:>8.2%}  "
-            f"win={row['win_rate']:>7.2%}"
-        )
+    _print_results(df)
     return 0
 
 

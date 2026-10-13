@@ -2199,6 +2199,11 @@ supervisado = [
     { name = "statsmodels" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "bandit", marker = "extra == 'dev'" },
@@ -2276,6 +2281,9 @@ requires-dist = [
     { name = "yfinance" },
 ]
 provides-extras = ["dev", "supervisado", "mlflow-tracking", "no-supervisado", "redes-neuronales", "hibrido", "optuna", "duckdb", "api", "monitoring", "graphify", "rag", "rag-multilingual"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "mypy", specifier = ">=2.3.0" }]
 
 [[package]]
 name = "invoke"
