@@ -5,8 +5,6 @@ dataset de features (data/interim/features_<T>_ml_ready.csv), reutilizando
 la lógica de predicción de inversion/models/predict_model.py.
 """
 
-from __future__ import annotations
-
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 

@@ -13,8 +13,6 @@ PSI (Population Stability Index) es la métrica estándar de drift por feature:
   > 0.25      → cambio significativo (acción)
 """
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any

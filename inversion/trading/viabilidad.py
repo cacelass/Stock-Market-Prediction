@@ -26,8 +26,6 @@ CLI: .venv/bin/python inversion/trading/viabilidad.py [--ticker T [T ...]]
 (make viabilidad → todo el catálogo)
 """
 
-from __future__ import annotations
-
 import argparse
 import sys
 from collections.abc import Callable

@@ -4,8 +4,6 @@ Trabaja con el catálogo de config/tickers.yaml y con cantidades
 fraccionarias de acciones: no se redondea a lotes reales (ver `rebalance`).
 """
 
-from __future__ import annotations
-
 import yaml
 
 from inversion.utils import paths

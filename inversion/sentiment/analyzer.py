@@ -10,8 +10,6 @@ para que los tests sean 100% offline; si ese fichero falta, se usa (o descarga)
 el de nltk en el primer uso.
 """
 
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 

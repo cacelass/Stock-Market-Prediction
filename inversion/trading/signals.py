@@ -4,8 +4,6 @@ Convención del repo: p = probabilidad de que el precio suba (clase 1),
 la que devuelve predict_model.predict_future como prob_sube.
 """
 
-from __future__ import annotations
-
 from enum import Enum
 
 

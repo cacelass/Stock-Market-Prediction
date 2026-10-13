@@ -16,8 +16,6 @@ señal individual está por debajo de ROUTE_AUC_THRESHOLD Y el pool le gana a
 ese ticker. Hoy eso ocurre exactamente con NVDA.
 """
 
-from __future__ import annotations
-
 import json
 from typing import Any
 

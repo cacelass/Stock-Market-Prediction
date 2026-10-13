@@ -15,8 +15,6 @@ cierre) devuelve la valoración de la cartera.
 CLI: .venv/bin/python inversion/trading/paper.py [--ticker T [T ...]]
 """
 
-from __future__ import annotations
-
 import argparse
 import sys
 from dataclasses import dataclass, field

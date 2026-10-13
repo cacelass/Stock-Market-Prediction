@@ -7,8 +7,6 @@ o:
     .venv/bin/python inversion/models/explain_shap.py
 """
 
-from __future__ import annotations
-
 import matplotlib
 
 matplotlib.use("Agg")

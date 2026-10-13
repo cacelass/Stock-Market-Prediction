@@ -5,8 +5,6 @@ CLI: .venv/bin/python inversion/models/predict_model.py --ticker AAPL
 claro con instrucciones de entrenamiento.
 """
 
-from __future__ import annotations
-
 import argparse
 import sys
 from pathlib import Path

@@ -1,7 +1,5 @@
 """schemas.py — Modelos Pydantic para la API REST (TMPL-002)."""
 
-from __future__ import annotations
-
 from pydantic import BaseModel, Field
 
 

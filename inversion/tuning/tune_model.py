@@ -15,8 +15,6 @@ Qué hace:
     4. Guarda un resumen en reports/tuning_results.csv.
 """
 
-from __future__ import annotations
-
 import json
 import warnings
 from typing import Any

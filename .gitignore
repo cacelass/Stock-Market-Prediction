@@ -117,3 +117,5 @@ reports/monitoring/rendimiento.csv
 # Datos procesados (regenerables con make data / make features)
 data/processed/*.csv
 data/interim/*.csv
+data/raw/news_*_live.csv
+data/raw/news_*_gdelt.csv

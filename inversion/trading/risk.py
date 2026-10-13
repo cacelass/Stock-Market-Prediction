@@ -3,8 +3,6 @@
 Sin dependencias del modelo: trabajan sobre capital y series de equity.
 """
 
-from __future__ import annotations
-
 import pandas as pd
 
 

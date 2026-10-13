@@ -10,8 +10,6 @@ Sin red la función no cuelga: aplica un timeout y lanza FetchError con un
 mensaje claro.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import os

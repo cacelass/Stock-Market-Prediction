@@ -9,8 +9,6 @@ CLI: .venv/bin/python inversion/trading/report_backtest.py [--ticker T [T ...]]
 (make backtest → todo el catálogo; make backtest TICKERS=AAPL MSFT → filtro)
 """
 
-from __future__ import annotations
-
 import argparse
 import sys
 from pathlib import Path

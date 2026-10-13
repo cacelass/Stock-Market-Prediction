@@ -8,8 +8,6 @@ buy&hold (mantener el activo todo el periodo).
 CLI: .venv/bin/python inversion/trading/backtest.py --ticker AAPL
 """
 
-from __future__ import annotations
-
 import argparse
 import sys
 from collections.abc import Callable
