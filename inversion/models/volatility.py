@@ -31,6 +31,12 @@ VOL_HORIZON_DAYS = 10
 # Días de trading por año, para anualizar la volatilidad diaria.
 TRADING_DAYS = 252
 
+# Features HAR de varianza realizada (Corsi 2009, EXP-007). El benchmark de la
+# literatura de forecasting de volatilidad: lags diario/semanal/mensual y sus
+# ratios. Christensen et al. (2026) confirma que el ML con lags HAR bate a HAR
+# puro; nuestro RF con HAR mejora en 7/7 tickers (references/06).
+HAR_FEATURES = ["rv_d", "rv_w", "rv_m", "rv_ratio_dw", "rv_ratio_wm"]
+
 
 def make_vol_target(df: pd.DataFrame, horizon: int = VOL_HORIZON_DAYS) -> pd.DataFrame:
     """Añade `vol_target`: std de los retornos de los próximos `horizon` días.
@@ -45,6 +51,33 @@ def make_vol_target(df: pd.DataFrame, horizon: int = VOL_HORIZON_DAYS) -> pd.Dat
     fwd = d["return"].shift(-1).rolling(horizon).std().shift(-(horizon - 1))
     d["vol_target"] = fwd
     return d
+
+
+def add_har_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Añade las features HAR (Corsi 2009) sobre el retorno diario.
+
+    Usa la varianza realizada como proxy (retorno²) en las ventanas estándar
+    del HAR: diaria (1), semanal (5) y mensual (22). Se añaden en escala
+    logarítmica (la vol es aproximadamente log-normal) y los ratios logarítmicos
+    d/w y w/m, que capturan la pendiente de la estructura temporal. Todo es
+    pasado estricto: no hay fuga.
+    """
+    if "return" not in df.columns:
+        raise ValueError("El dataset necesita una columna 'return'.")
+    d = df.copy()
+    rv = d["return"].pow(2)
+    eps = 1e-10  # evita log(0)
+    d["rv_d"] = np.log(rv.rolling(1).mean() + eps)
+    d["rv_w"] = np.log(rv.rolling(5).mean() + eps)
+    d["rv_m"] = np.log(rv.rolling(22).mean() + eps)
+    d["rv_ratio_dw"] = d["rv_d"] - d["rv_w"]
+    d["rv_ratio_wm"] = d["rv_w"] - d["rv_m"]
+    return d
+
+
+def _prepare_frame(df: pd.DataFrame, horizon: int = VOL_HORIZON_DAYS) -> pd.DataFrame:
+    """Target de volatilidad + features HAR (una sola vía, train y predict)."""
+    return add_har_features(make_vol_target(df, horizon))
 
 
 def annualize(vol_daily: float) -> float:
@@ -79,8 +112,8 @@ def _walk_forward_scores(X: np.ndarray, y: np.ndarray, random_state: int) -> tup
 
 def _load_prepared(csv_path: Path, horizon: int, with_sentiment: bool) -> tuple[pd.DataFrame, list[str]]:
     df = pd.read_csv(csv_path, parse_dates=["timestamp"])
-    df = make_vol_target(df, horizon)
-    cols = available_feature_cols(df)
+    df = _prepare_frame(df, horizon)
+    cols = available_feature_cols(df) + HAR_FEATURES
     if not with_sentiment:
         cols = [c for c in cols if not c.startswith("sentiment_")]
     df = df.dropna(subset=[*cols, "vol_target"]).sort_values("timestamp").reset_index(drop=True)
@@ -138,7 +171,8 @@ def predict_volatility(ticker: str, csv_path: Path | None = None) -> dict[str, A
     model, cols = bundle["model"], bundle["features"]
 
     csv = csv_path or (paths.INTERIM_DATA_DIR / f"features_{ticker}_ml_ready.csv")
-    df = pd.read_csv(csv, parse_dates=["timestamp"]).sort_values("timestamp")
+    df = pd.read_csv(csv, parse_dates=["timestamp"])
+    df = _prepare_frame(df, bundle.get("horizon", VOL_HORIZON_DAYS)).sort_values("timestamp")
     row = df.dropna(subset=cols).iloc[[-1]]
     vol_daily = float(model.predict(row[cols].to_numpy())[0])
     return {

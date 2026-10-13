@@ -1,5 +1,6 @@
 """Tests del modelo de riesgo/volatilidad (EXP-005)."""
 
+import joblib
 import numpy as np
 import pandas as pd
 import pytest
@@ -80,3 +81,32 @@ def test_train_vol_ticker_too_short(tmp_path):
     )
     with pytest.raises(ValueError):
         train_vol_ticker("TINY", csv)
+
+
+def test_add_har_features_no_lookahead_and_columns():
+    """Las features HAR usan solo el pasado y llevan las columnas esperadas."""
+    from inversion.models.volatility import HAR_FEATURES, add_har_features
+
+    n = 40
+    ret = np.zeros(n)
+    ret[25] = 0.10  # pico localizado
+    df = pd.DataFrame({"return": ret})
+    out = add_har_features(df)
+    assert set(HAR_FEATURES) <= set(out.columns)
+    # rv_d en t depende solo de return[t] (ventana de 1), no del futuro.
+    assert out["rv_d"].iloc[24] == pytest.approx(np.log(0.0 + 1e-10))
+    assert out["rv_d"].iloc[25] == pytest.approx(np.log(0.01 + 1e-10))
+    # El pico (t=25) no debe influir en filas anteriores.
+    assert out["rv_w"].iloc[20] == pytest.approx(np.log(0.0 + 1e-10))
+
+
+def test_train_vol_ticker_uses_har_features(df_with_features, tmp_path):
+    from inversion.models.volatility import HAR_FEATURES
+
+    csv = tmp_path / "features_TST_ml_ready.csv"
+    df_with_features.to_csv(csv, index=False)
+    train_vol_ticker("TST", csv, horizon=5)
+    from inversion.utils import paths
+
+    bundle = joblib.load(paths.MODELS_DIR / "vol_TST.pkl")
+    assert set(HAR_FEATURES) <= set(bundle["features"])

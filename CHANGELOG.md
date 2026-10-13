@@ -71,3 +71,10 @@
 ### Añadido
 
 - fix(types): mypy estricto en verde para pooled, fetch y re-exports (FIX-001)
+
+## [Unreleased] — 2026-10-13
+
+### Añadido
+
+- HAR features in volatility model (+0.011 R2, 7/7 tickers) (EXP-007)
+

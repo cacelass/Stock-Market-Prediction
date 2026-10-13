@@ -36,7 +36,7 @@ Senales debiles en direccion (probado: AUC~0.55); pocos datos efectivos por tick
 
 ## Alcance
 
-**Backlog:** 45 done
+**Backlog:** 46 done
 
 | Feature | Estado | Título |
 |---------|--------|--------|
@@ -85,4 +85,5 @@ Senales debiles en direccion (probado: AUC~0.55); pocos datos efectivos por tick
 | EXP-004 | done | ¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?) |
 | EXP-005 | done | Modelo de riesgo: forecasting de volatilidad (aditivo al clasificador direccional) |
 | EXP-006 | done | Exponer el modelo de riesgo/volatilidad en la API REST (endpoint /risk) |
+| EXP-007 | done | Modelo de volatilidad: añadir features HAR (Corsi 2009) + régimen (literatura) y medir |
 

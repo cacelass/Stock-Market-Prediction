@@ -701,6 +701,23 @@
       "started": "2026-10-13",
       "review_rounds": 0,
       "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-007",
+      "title": "Modelo de volatilidad: añadir features HAR (Corsi 2009) + régimen (literatura) y medir",
+      "description": "Modelo de volatilidad: añadir features HAR (Corsi 2009) + régimen (literatura) y medir",
+      "acceptance_criteria": [
+        "integracion features HAR en inversion/models/volatility.py",
+        "mejora R2/Spearman walk-forward en 7/7 tickers",
+        "tests",
+        "references/06 con literatura",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
     }
   ]
 }

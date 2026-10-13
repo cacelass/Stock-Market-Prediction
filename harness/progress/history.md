@@ -724,3 +724,20 @@ POST /risk live: NVDA {"vol_daily":0.024671,"vol_annualized":0.391636} y MSFT {"
 ```
 
 </details>
+
+## EXP-007 — Modelo de volatilidad: añadir features HAR (Corsi 2009) + régimen (literatura) y medir
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 216 passed, 25 warnings in 28.12s
+- **Cambios:** inversion/models/volatility.py; tests/test_volatility.py; references/06-volatility-literature.md; notebooks/har_regime_vol.py; models/vol_*.pkl; reports/resultados_volatilidad.csv
+- **Decisiones:** Adoptar solo HAR (robusto 7/7); descartar regimen por terciles (aporta poco, no se suma); no portar regime_detector de edgebet (football-specific)
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+[1;32m━━ ENTORNO LISTO ━━[0m  1 aviso(s)
+Puedes trabajar. Siguiente paso: lee harness/progress/current.md y elige la primera feature pendiente.
+```
+
+</details>
