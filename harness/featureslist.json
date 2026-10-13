@@ -546,7 +546,7 @@
         "cobertura real documentada honestamente en references/",
         "init.sh verde"
       ],
-      "status": "blocked",
+      "status": "done",
       "depends_on": [],
       "started": "2026-08-26",
       "review_rounds": 0,
