@@ -1,0 +1,10 @@
+# Geas — configuración del repositorio
+
+organization: Stock Market Prediction
+organization_id: 5f0fe99f-9753-4116-8596-a220b9448366
+department: 
+repository: repo
+repository_id: da543d86-2162-48c6-8f1f-ca6f8cc59c71
+provider: github
+url: https://github.com/cacelass/Stock-Market-Prediction
+mcp_url: 

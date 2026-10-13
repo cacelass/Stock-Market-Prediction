@@ -1,0 +1,156 @@
+{
+  "features": [
+    {
+      "id": "DEMO-001",
+      "title": "ONNX export + inferencia estable",
+      "description": "ONNX export + inferencia estable",
+      "acceptance_criteria": [
+        "Exporta modelo a models/model.onnx",
+        "Validaci\u00f3n num\u00e9rica dentro de tolerancia",
+        "Tests ONNX pasan",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": []
+    },
+    {
+      "id": "DEMO-002",
+      "title": "An\u00e1lisis de sentimiento financiero (VADER + reglas) e integraci\u00f3n a features",
+      "description": "An\u00e1lisis de sentimiento financiero (VADER + reglas) e integraci\u00f3n a features",
+      "acceptance_criteria": [
+        "M\u00f3dulo sentiment (VADER + reglas) a\u00f1adido",
+        "Features con columnas sentiment_* sin fuga",
+        "Tests sentiment pasan",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-001"
+      ]
+    },
+    {
+      "id": "DEMO-003",
+      "title": "Calidad de se\u00f1ales - SHAP + Conformal + umbral de confianza",
+      "description": "Calidad de se\u00f1ales - SHAP + Conformal + umbral de confianza",
+      "acceptance_criteria": [
+        "SHAP summaries generados",
+        "Conformal calibrado con evidencias",
+        "Umbral de confianza configurable",
+        "Tests pasan",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-002"
+      ]
+    },
+    {
+      "id": "DEMO-004",
+      "title": "Gesti\u00f3n de riesgo de cartera (Markowitz) y sizing (Kelly fraccional)",
+      "description": "Gesti\u00f3n de riesgo de cartera (Markowitz) y sizing (Kelly fraccional)",
+      "acceptance_criteria": [
+        "risk/portfolio.py con Markowitz",
+        "allocate_stakes integra cartera",
+        "L\u00edmites concentraci\u00f3n/exposure",
+        "Tests cartera pasan",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-003"
+      ]
+    },
+    {
+      "id": "DEMO-005",
+      "title": "Monitoring de drift + alertas y backtest realista (costes/slippage)",
+      "description": "Monitoring de drift + alertas y backtest realista (costes/slippage)",
+      "acceptance_criteria": [
+        "Monitor de drift b\u00e1sico",
+        "Backtest realista con costes/slippage",
+        "Reporte con m\u00e9tricas de riesgo",
+        "Tests pasan",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-004"
+      ]
+    },
+    {
+      "id": "DEMO-006",
+      "title": "Ensemble h\u00edbrido RF + HistGBM + votos/stacking con validaci\u00f3n honesta",
+      "description": "Ensemble h\u00edbrido RF + HistGBM + votos/stacking con validaci\u00f3n honesta",
+      "acceptance_criteria": [
+        "Ensemble RF + HistGBM reproducible",
+        "Validaci\u00f3n honesta (walk-forward/folds)",
+        "Veredicto documentado con margen",
+        "Tests ensemble pasan",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-005"
+      ]
+    },
+    {
+      "id": "DEMO-007",
+      "title": "Inferencia ONNX en CLI/API + benchmark latencia",
+      "description": "Inferencia ONNX en CLI/API + benchmark latencia",
+      "acceptance_criteria": [
+        "CLI/API soporta inferencia ONNX",
+        "Benchmark latencia registrado",
+        "Comparativa sklearn vs ONNX",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-006"
+      ]
+    },
+    {
+      "id": "DEMO-008",
+      "title": "Sentimiento real con NewsAPI.ai (vivo) + agregaci\u00f3n diaria",
+      "description": "Sentimiento real con NewsAPI.ai (vivo) + agregaci\u00f3n diaria",
+      "acceptance_criteria": [
+        "NewsAPI.ai fetcher con paginaci\u00f3n/dedup",
+        "Clave solo via NEWSAPI_KEY",
+        "Agregados diarios por ticker",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-007"
+      ]
+    },
+    {
+      "id": "DEMO-009",
+      "title": "Conformal gate + umbral din\u00e1mico por volatilidad",
+      "description": "Conformal gate + umbral din\u00e1mico por volatilidad",
+      "acceptance_criteria": [
+        "Conformal gate activo configurable",
+        "Umbral din\u00e1mico por volatilidad",
+        "Reporte impacto volumen/precisi\u00f3n",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-008"
+      ]
+    },
+    {
+      "id": "DEMO-010",
+      "title": "Backtest con costes reales + slippage + drawdown control",
+      "description": "Backtest con costes reales + slippage + drawdown control",
+      "acceptance_criteria": [
+        "Backtest con comisiones/slippage reales",
+        "Drawdown control + m\u00e9tricas (Sharpe/Sortino/MaxDD)",
+        "Tests backtest realista pasan",
+        "init.sh verde"
+      ],
+      "status": "pending",
+      "depends_on": [
+        "DEMO-009"
+      ]
+    }
+  ]
+}
