@@ -7,7 +7,7 @@ Exploración técnica de Machine Learning aplicado a series temporales financier
 > CI: al publicar el repositorio, sustituye la URL del badge por la de tu fork.
 > [![CI](https://github.com/cacelass/dskit/actions/workflows/ci.yml/badge.svg)](https://github.com/cacelass/dskit/actions/workflows/ci.yml)
 >
-> 🎯 [Demo](https://cacelass.github.io/stock-demo/) — Predicciones interactivas con gráfico de probabilidades
+> [Demo](https://cacelass.github.io/stock-demo/) — Predicciones interactivas con gráfico de probabilidades
 
 ---
 
