@@ -1,14 +1,50 @@
 # Product Requirements Document
 
+<<<<<<< HEAD
 > Documento **generado** (`documentation update_prd`) desde el estado del proyecto: `references/00-objetivo.md`, `harness/featureslist.json` y `features/*.feature`. No lo edites a mano — se sobrescribe. Actualizado: 2026-10-12
+=======
+> Documento **generado** (`documentation update_prd`) desde el estado del proyecto: `references/00-objetivo.md`, `harness/featureslist.json` y `features/*.feature`. No lo edites a mano — se sobrescribe. Actualizado: 2026-10-13
+>>>>>>> origin/desarrollo
 
 ## Objetivo
 
-_(sin definir — ejecuta la feature SCOPE-001 del backlog, que escribe `references/00-objetivo.md` con la pregunta, la métrica de éxito y el criterio de parada)_
+# Objetivo del proyecto
+
+## Pregunta a responder
+
+Con datos de mercado OHLCV+volumen y sentimiento de noticias, se puede predecir el RIESGO (volatilidad realizada a 10 dias) de un activo mejor que la persistencia simple, y servir esa senal para dimensionar posicion? La direccion a 5 dias se mantiene como senal secundaria.
+
+## Métrica de éxito
+
+Modelo de volatilidad: R2 fuera de muestra >= 0.15 y Spearman >= 0.40 en walk-forward de los 7 tickers. Direccion (secundaria): AUC >= 0.55.
+
+## Datos de partida
+
+Precios diarios OHLCV de 7 tickers (20 anos, yfinance) con features tecnicas derivadas; sentimiento de noticias NewsAPI.ai. Sin datos intradia ni fundamentales.
+
+## Criterio de parada
+
+Si el modelo de volatilidad no bate la persistencia en R2 en al menos 5 de 7 tickers, o el backtest con costes no supera a buy&hold, el proyecto se replantea como analitico/educativo.
+
+## Usuarios
+
+Uso personal y de portfolio: gestion de riesgo y dimensionado de posicion. No es asesoramiento financiero.
+
+## Alcance y no-alcance
+
+ENTRA: forecasting de volatilidad/riesgo, intervalos de confianza, serving por API. NO ENTRA: ejecucion de ordenes reales, datos intradia, ni prediccion de direccion como objetivo principal.
+
+## Restricciones y riesgos
+
+Senales debiles en direccion (probado: AUC~0.55); pocos datos efectivos por ticker; no es asesoramiento financiero.
 
 ## Alcance
 
+<<<<<<< HEAD
 **Backlog:** 39 done
+=======
+**Backlog:** 46 done
+>>>>>>> origin/desarrollo
 
 | Feature | Estado | Título |
 |---------|--------|--------|
@@ -51,4 +87,14 @@ _(sin definir — ejecuta la feature SCOPE-001 del backlog, que escribe `referen
 | SENT-006 | done | Fetcher NewsAPI.ai en vivo y puntuación de noticias reales |
 | DOC-001 | done | README y PRD al día con el ciclo IMP/MOD/SENT |
 | FIX-001 | done | mypy estricto en verde para los módulos nuevos (CI rojo tras push) |
+<<<<<<< HEAD
+=======
+| EXP-001 | done | Explorar mejoras RF/HistGBM/Ensemble con walk-forward estricto |
+| EXP-002 | done | Re-verificar palancas internas de mejora del modelo (estacionariedad, contexto de mercado, clase, calibración, selección, recencia) |
+| EXP-003 | done | Sensibilidad al horizonte/target y baselines triviales: ¿el RF bate a momentum? |
+| EXP-004 | done | ¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?) |
+| EXP-005 | done | Modelo de riesgo: forecasting de volatilidad (aditivo al clasificador direccional) |
+| EXP-006 | done | Exponer el modelo de riesgo/volatilidad en la API REST (endpoint /risk) |
+| EXP-007 | done | Modelo de volatilidad: añadir features HAR (Corsi 2009) + régimen (literatura) y medir |
+>>>>>>> origin/desarrollo
 

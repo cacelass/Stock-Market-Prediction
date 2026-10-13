@@ -598,6 +598,126 @@
       "started": "2026-08-26",
       "review_rounds": 0,
       "closed": "2026-08-26"
+    },
+    {
+      "id": "EXP-001",
+      "title": "Explorar mejoras RF/HistGBM/Ensemble con walk-forward estricto",
+      "description": "Explorar mejoras RF/HistGBM/Ensemble con walk-forward estricto",
+      "acceptance_criteria": [
+        "Comparar con baseline actual en mismo split",
+        "precision@top-quintil",
+        "AUC",
+        "Sharpe/backtest realista",
+        "sin leakage",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-002",
+      "title": "Re-verificar palancas internas de mejora del modelo (estacionariedad, contexto de mercado, clase, calibración, selección, recencia)",
+      "description": "Re-verificar palancas internas de mejora del modelo (estacionariedad, contexto de mercado, clase, calibración, selección, recencia)",
+      "acceptance_criteria": [
+        "walk-forward honesto mismo protocolo",
+        "criterio adopción ΔAUC>0.01",
+        "veredicto documentado en references/05",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-003",
+      "title": "Sensibilidad al horizonte/target y baselines triviales: ¿el RF bate a momentum?",
+      "description": "Sensibilidad al horizonte/target y baselines triviales: ¿el RF bate a momentum?",
+      "acceptance_criteria": [
+        "AUC RF por horizonte 1/3/5/10/20d",
+        "AUC de baselines (momentum, reversión, features sueltas)",
+        "veredicto documentado en references/05 sección K",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-004",
+      "title": "¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?)",
+      "description": "¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?)",
+      "acceptance_criteria": [
+        "walk-forward",
+        "target = vol realizada futura",
+        "comparar RF vs baseline persistencia (vol actual)",
+        "Spearman/R2",
+        "veredicto en references/05 sección L",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-005",
+      "title": "Modelo de riesgo: forecasting de volatilidad (aditivo al clasificador direccional)",
+      "description": "Modelo de riesgo: forecasting de volatilidad (aditivo al clasificador direccional)",
+      "acceptance_criteria": [
+        "inversion/models/volatility.py con target vol futura",
+        "evaluacion walk-forward honesta R2+Spearman vs persistencia",
+        "CLI entrena 7 tickers",
+        "tests pytest",
+        "no rompe pipeline direccional",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-006",
+      "title": "Exponer el modelo de riesgo/volatilidad en la API REST (endpoint /risk)",
+      "description": "Exponer el modelo de riesgo/volatilidad en la API REST (endpoint /risk)",
+      "acceptance_criteria": [
+        "POST /risk devuelve vol_daily+vol_annualized",
+        "404 si no hay modelo",
+        "2 tests nuevos",
+        "live smoke test real",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-007",
+      "title": "Modelo de volatilidad: añadir features HAR (Corsi 2009) + régimen (literatura) y medir",
+      "description": "Modelo de volatilidad: añadir features HAR (Corsi 2009) + régimen (literatura) y medir",
+      "acceptance_criteria": [
+        "integracion features HAR en inversion/models/volatility.py",
+        "mejora R2/Spearman walk-forward en 7/7 tickers",
+        "tests",
+        "references/06 con literatura",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
     }
   ]
 }

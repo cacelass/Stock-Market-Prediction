@@ -1,0 +1,4 @@
+# GEAS remoto (portátil -> Raspberry 8792)
+export GEAS_URL=http://192.168.1.145:8792
+export GEAS_TOKEN=taHBDs6M0MIrmqlOW4wVh6KPsLrM1M7x
+export GEAS_ACTOR=Portatil

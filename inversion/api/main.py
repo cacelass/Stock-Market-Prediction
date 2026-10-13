@@ -8,9 +8,16 @@ la lógica de predicción de inversion/models/predict_model.py.
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 
-from inversion.api.schemas import HealthResponse, InfoResponse, PredictRequest, PredictResponse
+from inversion.api.schemas import (
+    HealthResponse,
+    InfoResponse,
+    PredictRequest,
+    PredictResponse,
+    RiskResponse,
+)
 from inversion.models.predict_model import _load_model_and_scaler, _load_ticker_data, predict_future
 from inversion.models.train_model import FEATURE_COLS, SENTIMENT_COLS, available_feature_cols
+from inversion.models.volatility import predict_volatility
 from inversion.utils import paths
 
 PROJECT = "Stock Market Prediction"
@@ -19,7 +26,10 @@ MODEL_NAME = "RandomForest (multi-ticker)"
 
 app = FastAPI(
     title="Stock Market Prediction API",
-    description="API REST para el modelo de ML multi-ticker (rf_<TICKER>.pkl).",
+    description=(
+        "API REST para el modelo de ML multi-ticker: dirección (rf_<TICKER>.pkl) "
+        "y riesgo/volatilidad (vol_<TICKER>.pkl)."
+    ),
     version="0.1.0",
 )
 
@@ -94,4 +104,27 @@ def predict(request: PredictRequest) -> PredictResponse:
         probability_down=round(float(prob_baja or 0.0), 4),
         last_close=round(float(last_close or 0.0), 4),
         model_name=f"rf_{ticker}.pkl",
+    )
+
+
+@app.post("/risk", response_model=RiskResponse, tags=["Predicción"])
+def risk(request: PredictRequest) -> RiskResponse:
+    """Volatilidad prevista (riesgo) del ticker — modelo aditivo EXP-005.
+
+    Predice la volatilidad realizada de los próximos 10 días, que es lo que usa
+    el dimensionado de posición (position sizing) y el VaR. Es el segundo
+    modelo del proyecto: la dirección es casi ruido (AUC ≈ 0.55), pero la
+    volatilidad sí es predecible (R² ≈ 0.2, ver references/05).
+    """
+    ticker = request.ticker.upper()
+    try:
+        pred = predict_volatility(ticker)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return RiskResponse(
+        ticker=ticker,
+        vol_daily=round(pred["vol_daily"], 6),
+        vol_annualized=round(pred["vol_annualized"], 6),
+        as_of=pred["as_of"],
+        model_name=f"vol_{ticker}.pkl",
     )

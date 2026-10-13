@@ -629,18 +629,128 @@ mypy inversion/ tests/: Success, 56 ficheros sin issues (CI fallaba con 11). ruf
 
 </details>
 
+<<<<<<< HEAD
 ## SENT-005 — Noticias reales: fetch NewsAPI.ai en vivo y histórico GDELT
 
 - **Cerrada:** 2026-10-12
 - **Verificación:** ./init.sh en verde · 175 passed, 24 warnings in 26.50s
 - **Cambios:** references/06-cobertura-noticias.md; data/raw/news_AMZN_gdelt.csv; data/raw/news_AAPL_gdelt.csv; data/raw/news_TSLA_gdelt.csv; harness/progress/lider-SENT-005.md
 - **Decisiones:** GDELT histórico completo no viable por rate limit API (1 req/5s, HTTP 429); se documentan muestras como evidencia de que el código funciona
+=======
+## EXP-001 — Explorar mejoras RF/HistGBM/Ensemble con walk-forward estricto
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 205 passed, 25 warnings in 24.08s
+- **Cambios:** experiments/, notebooks/model_comparison.py (revisado)
+- **Decisiones:** No se adopta cambio estructural (riesgo + complejidad > ganancia); baseline mantenido
+>>>>>>> origin/desarrollo
 - **Pendiente:** _(nada)_
 
 <details><summary>Evidencia</summary>
 
 ```
+<<<<<<< HEAD
 init.sh: ENTORNO LISTO, pytest 175 passed, 24 warnings in 27.44s | coverage real: 4431 artículos (NewsAPI.ai 4303 + GDELT samples 128) | GDELT rate-limited 1 req/5s, samples descargados para 3 tickers | references/06-cobertura-noticias.md documenta cobertura honestamente
+=======
+Exploración: ensemble RF+HistGBM da AUC comparable (AAPL/MSFT/TSLA ~0.54-0.61); tuning ligero mejora marginalmente vs baseline; documentado sin leakage
+```
+
+</details>
+
+## EXP-002 — Re-verificar palancas internas de mejora del modelo (estacionariedad, contexto de mercado, clase, calibración, selección, recencia)
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 205 passed, 25 warnings in 25.88s
+- **Cambios:** notebooks/model_levers_recheck.py,references/05-model-improvement.md
+- **Decisiones:** No se adopta ningún cambio: ninguna palanca interna mejora de forma robusta (criterio ΔAUC>0.01). Techo honesto AUC~0.55 confirmado.
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+notebooks/model_levers_recheck.py: baseline AUC 0.5437; 9 hipótesis probadas, ninguna supera +0.01 (H2+H6 combinado +0.0054, 6/7); pytest 205 passed
+```
+
+</details>
+
+## EXP-003 — Sensibilidad al horizonte/target y baselines triviales: ¿el RF bate a momentum?
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 205 passed, 25 warnings in 29.89s
+- **Cambios:** notebooks/horizon_target_sensitivity.py,notebooks/horizon_5_vs_10.py,references/05-model-improvement.md
+- **Decisiones:** Horizonte 10d NO es robustamente mejor (IC incluye 0; desaparece con target de umbral). Se mantiene 5d. RF sí aporta +0.018 sobre la mejor feature suelta. Techo es el dato, no la definición del problema.
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+horizon_5_vs_10.py: ΔAUC(10d-5d) dir +0.0226 IC95±0.0235 (incluye 0), thr2 -0.0044; horizon_target_sensitivity.py: RF 0.5265 vs mejor feature suelta 0.5084 (lag_5); pytest 205 passed
+```
+
+</details>
+
+## EXP-004 — ¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?)
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 205 passed, 25 warnings in 26.66s
+- **Cambios:** notebooks/volatility_predictability.py,references/05-model-improvement.md
+- **Decisiones:** Volatilidad SÍ predecible (R²~0.2, Spearman~0.45), dirección no (AUC 0.55). RF bate persistencia. Recomendada opción aditiva: modelo de riesgo. Decisión de alcance para el usuario.
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+volatility_predictability.py: R² RF 0.185/0.201/0.164 vs persistencia -0.332/-0.223/-0.267; Spearman RF 0.418/0.446/0.427 > persist 0.314/0.398/0.408; pytest 205 passed
+```
+
+</details>
+
+## EXP-005 — Modelo de riesgo: forecasting de volatilidad (aditivo al clasificador direccional)
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 212 passed, 25 warnings in 29.51s
+- **Cambios:** inversion/models/volatility.py,tests/test_volatility.py,models/vol_*.pkl,reports/resultados_volatilidad.csv
+- **Decisiones:** Modelo de riesgo ADITIVO (no retira el clasificador direccional). Horizonte 10d segun EXP-004. Commiteado models/vol_*.pkl por convencion del repo (rf_*.pkl ya se commitean).
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+inversion/models/volatility.py implementado + 7 tests (tests/test_volatility.py); trained real: R2 0.088-0.307 (media 0.20), RF bate persistencia en 7/7 tickers; pytest 212 passed; ruff+mypy OK; reports/resultados_volatilidad.csv
+```
+
+</details>
+
+## EXP-006 — Exponer el modelo de riesgo/volatilidad en la API REST (endpoint /risk)
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 214 passed, 25 warnings in 29.20s
+- **Cambios:** inversion/api/main.py,inversion/api/schemas.py,tests/test_api.py
+- **Decisiones:** Endpoint aditivo /risk con PredictRequest. Importa predict_volatility de inversion.models.volatility. No altera /predict ni /health.
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+POST /risk live: NVDA {"vol_daily":0.024671,"vol_annualized":0.391636} y MSFT {"vol_daily":0.018712,"vol_annualized":0.297042}; GET /health ok; POST /predict ok; tests/test_api.py 8 passed; suite 214 passed
+```
+
+</details>
+
+## EXP-007 — Modelo de volatilidad: añadir features HAR (Corsi 2009) + régimen (literatura) y medir
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 216 passed, 25 warnings in 28.12s
+- **Cambios:** inversion/models/volatility.py; tests/test_volatility.py; references/06-volatility-literature.md; notebooks/har_regime_vol.py; models/vol_*.pkl; reports/resultados_volatilidad.csv
+- **Decisiones:** Adoptar solo HAR (robusto 7/7); descartar regimen por terciles (aporta poco, no se suma); no portar regime_detector de edgebet (football-specific)
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+[1;32m━━ ENTORNO LISTO ━━[0m  1 aviso(s)
+Puedes trabajar. Siguiente paso: lee harness/progress/current.md y elige la primera feature pendiente.
+>>>>>>> origin/desarrollo
 ```
 
 </details>

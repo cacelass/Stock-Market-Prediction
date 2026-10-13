@@ -423,3 +423,17 @@ uv run python -m agents describe <agente>   # acciones y contrato de uno
 
 El gateway (`.opencode/agents/orquestador.md`) lleva el árbol de decisión y
 la lista de skills cargables.
+
+## Sincronización Git antes de tocar tickets GEAS
+
+Para evitar conflictos entre dispositivos (portátil ↔ raspi), **antes de reclamar cualquier ticket GEAS** (start) el líder debe sincronizar el repositorio:
+
+```bash
+git add -A
+git commit -m "wip: <FEATURE_ID> sync $(date +%Y-%m-%dT%H:%M:%S)" 2>/dev/null || true
+git pull --rebase origin $(git branch --show-current)
+git push origin $(git branch --show-current)
+```
+
+- Si hay conflictos tras `pull --rebase`, **PARAR** y resolverlos.
+- Tras `finish`/`commit_feature`, sincronizar (`pull --rebase && push`).

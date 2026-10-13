@@ -217,9 +217,161 @@ real. Para decidir operar, usar las tasas empíricas por bucket de
 ya reflejan la calibración observada sin destruir ordenación.
 CSV: `reports/calibracion.csv`.
 
-### Cierre de la línea de modelado
+## J) Re-verificación de palancas internas (EXP-002)
 
-Con H e I cerradas queda explorado el espacio razonable sin datos nuevos:
-clase de modelo correcta (H), protocolo honesto (C/E), fallback global donde
-no hay señal propia (F/G). Las palancas restantes son externas: noticias
-reales, multi-horizonte o más histórico.
+Fecha: 2026-10-13 · Script: `notebooks/model_levers_recheck.py`
+
+Se re-testean seis palancas clásicas de mejora con el **mismo protocolo
+honesto** (expanding-window, `_walk_forward_folds`, 5 folds, último 60%), RF
+del pipeline, 7 tickers. Criterio de adopción predefinido: **ΔAUC medio > 0.01**
+y consistencia (que gane en la mayoría de tickers). Media baseline RF: 0.5437.
+
+| Hipótesis | AUC media | Δ vs base | Gana en |
+|-----------|-----------|-----------|---------|
+| H1 — ratios ma_50/ma_200 (estacionariedad) | 0.5406 | **−0.0032** | 1/7 |
+| H2 — features de mercado (mkt return/vol, fuerza relativa) | 0.5433 | −0.0004 | 3/7 |
+| H3 — HistGradientBoosting | 0.5331 | **−0.0107** | 2/7 |
+| H3 — Regresión logística | 0.5388 | −0.0049 | 4/7 |
+| H4 — calibración con CV interno | 0.5401 | −0.0037 | 2/7 |
+| H5 — selección top-8 features | 0.5372 | −0.0066 | 1/7 |
+| H5 — selección top-16 features | 0.5466 | +0.0029 | 6/7 |
+| H6 — ponderación por recencia (hl=500d) | 0.5457 | +0.0019 | 5/7 |
+| H2 + H6 combinado | 0.5492 | +0.0054 | 6/7 |
+
+**Ninguna hipótesis alcanza el margen de +0.01.** Las dos leves (top-16,
+recencia) y su combinación mejoran de media pero dentro de ruido de validación
+(se probaron con dos estructuras de folds y el signo es el mismo, pero la
+magnitud queda por debajo del umbral que el propio proyecto fija para adoptar).
+Las que sí tocan el motor —estacionarizar las medias móviles, cambiar de clase
+de modelo, calibrar, podar features— **empeoran** el AUC.
+
+### Conclusión de la línea de modelado (actualizada)
+
+Confirmado con evidencia adicional: el techo honesto del modelo con estos
+datos es **AUC ≈ 0.55** y ninguna transformación interna del RF lo supera de
+forma robusta. Los niveles crudos `ma_50`/`ma_200` no son un lastre (su versión
+estacionaria es peor), el contexto de mercado no aporta, y la clase de modelo
+ya es la correcta (H y J coinciden). Las palancas que quedan son **externas al
+modelo**: más histórico/noticias reales, cambio de horizonte o de target — y
+eso es una decisión de `SCOPE-001`, no una mejora de tuning.
+
+No se adopta ningún cambio: el pipeline se mantiene tal cual, por disciplina de
+evidencia (no tocar lo que no mejora de forma robusta).
+
+## K) Sensibilidad al horizonte y baselines triviales (EXP-003)
+
+Fecha: 2026-10-13 · Scripts: `notebooks/horizon_target_sensitivity.py`,
+`notebooks/horizon_5_vs_10.py`
+
+J dejó una duda abierta: ¿el cuello de botella es el modelo o **la definición
+del problema** (horizonte de 5 días)? Y una comprobación que faltaba: ¿el RF
+bate de verdad a la señal más simple, o solo la está reempaquetando?
+
+### K.1 — ¿Otro horizonte da más señal? (target = dirección pura)
+
+AUC media del RF por horizonte, mismos folds y features (7 tickers):
+
+| Horizonte | AUC RF | momentum (pasado h días) | reversión | volatilidad |
+|-----------|--------|--------------------------|-----------|-------------|
+| 1 d | 0.5121 | 0.4856 | 0.5144 | 0.4897 |
+| 3 d | 0.5166 | 0.4841 | 0.5159 | 0.4853 |
+| 5 d | 0.5265 | 0.4942 | 0.5058 | 0.4757 |
+| **10 d** | **0.5491** | 0.4890 | 0.5110 | 0.4677 |
+| 20 d | 0.5244 | 0.5035 | 0.4965 | 0.4670 |
+
+El 10d *parecía* claramente mejor (0.5491 vs 0.5265). Pero la comparación
+pareada por fold (K.2) lo desmiente.
+
+### K.2 — Comparación pareada 10d vs 5d (21 folds/ticker-target)
+
+| Tipo de target | ΔAUC (10d−5d) | IC95 | gana 10d | Δprec@top-20 | Δbase-rate |
+|----------------|---------------|------|----------|--------------|------------|
+| dirección pura | +0.0226 | ±0.0235 | 14/21 (67%) | +0.0524 | +0.0249 |
+| umbral fijo 2% (el actual) | −0.0044 | ±0.0249 | 9/21 (43%) | +0.0825 | +0.0847 |
+| umbral escalado (p60) | −0.0011 | ±0.0202 | 10/21 (48%) | +0.0017 | +0.0093 |
+
+Veredicto: **el horizonte de 10 días no es robustamente mejor.**
+- Con dirección pura, el IC95 **incluye el 0** (±0.0235 sobre +0.0226) → no significativo.
+- Con target de **umbral** (el que usa el proyecto) la ventaja **desaparece**:
+  ΔAUC negativo y gana en <50% de folds.
+- La precisión@top-quintil sube en el umbral fijo (+0.0825) pero la **tasa base
+  sube casi lo mismo** (+0.0847): a 10 días simplemente hay más días "que
+  suben", no es que el modelo discrimine mejor. Sin mejora operativa real.
+
+### K.3 — ¿El RF aporta edge sobre una feature suelta? (5d)
+
+| score | AUC |
+|-------|-----|
+| return | 0.4927 |
+| lag_1 | 0.4986 |
+| lag_5 | 0.5084 |
+| lag_20 | 0.4994 |
+| rsi | 0.4991 |
+| volatility | 0.4757 |
+| vwap_ratio | 0.4895 |
+| **RF (todas las features)** | **0.5265** |
+
+El RF **sí** añade sobre la mejor feature suelta (+0.018 sobre `lag_5`). No es
+un simple momentum disfrazado: combina señales débiles en una algo mejor. Pero
+el techo sigue siendo bajo — la señal individual más informativa apenas pasa
+de 0.51.
+
+### Conclusión final de la línea de modelado
+
+Con K cerrada, el horizonte y el tipo de target **no son el cuello de botella**
+(probado, no supuesto), y el RF **sí** aporta valor sobre features sueltas pero
+sobre una señal intrínsecamente débil. Se mantienen el horizonte de 5 días y el
+target binario >2%.
+
+Lo único que queda por encima del ruido son datos externos (noticias reales,
+más histórico) o un replanteamiento de producto en `SCOPE-001` (p.ej. dejar de
+predecir dirección diaria y modelar riesgo/volatilidad, que es lo que los datos
+sí parecen contener). Ninguna de las dos es una mejora de tuning: son
+decisiones de alcance.
+
+## L) Lo que los datos SÍ contienen: riesgo/volatilidad (EXP-004)
+
+Fecha: 2026-10-13 · Script: `notebooks/volatility_predictability.py`
+
+K terminó con una hipótesis: *la dirección es ruido, la volatilidad quizá no*.
+Esta sección la convierte en medida. Target = volatilidad realizada futura
+(std de los retornos diarios de los próximos h días); baseline tonto y fuerte =
+**persistencia** (la vol de los últimos h días); modelo = mismo RF que el
+clasificador. Walk-forward, 7 tickers.
+
+| Horizonte | R² RF | R² persistencia | Spearman RF | Spearman persistencia |
+|-----------|-------|-----------------|-------------|------------------------|
+| 5 d | **0.185** | −0.332 | 0.418 | 0.314 |
+| 10 d | **0.201** | −0.223 | **0.446** | 0.398 |
+| 20 d | 0.164 | −0.267 | 0.427 | 0.408 |
+
+**La volatilidad es predecible y la dirección no.** El contraste es tajante:
+
+- Dirección: AUC ≈ 0.55 (apenas por encima del azar, secciones H–K).
+- Volatilidad: **R² fuera de muestra 0.16–0.20** y **Spearman 0.42–0.45**.
+- El RF **bate a la persistencia** (que incluso tiene R² negativo: peor que
+  predecir la media), así que no es que la vol "se repita sola" — el modelo
+  captura estructura de régimen que el baseline simple no.
+- El mejor horizonte es **10d** (R² 0.201, Spearman 0.446), consistente con que
+  la volatilidad se mueve en regímenes de días-semanas.
+
+### Implicación: el producto y el dato están desalineados
+
+El proyecto predice **dirección**, que es lo único que estos datos no permiten
+predecir bien. La misma matriz de features que da AUC 0.55 en dirección da
+R² ≈ 0.2 en volatilidad — dos órdenes de magnitud de diferencia en cuánto
+"explica" el modelo. Esto no es un fallo del modelo: es que se le está pidiendo
+la pregunta equivocada a los datos.
+
+Opciones de alcance (decisión de `SCOPE-001`, no de tuning):
+
+1. **Añadir un modelo de riesgo** (volatilidad/intervalo de confianza) sin
+   retirar el clasificador direccional: es *aditivo*, tiene señal demostrada, y
+   es lo que de verdad usa gestión de carteras (position sizing, VaR, stops).
+2. **Reenfocar el proyecto** a forecasting de riesgo y descartar la dirección
+   como objetivo principal.
+3. **Traer datos externos** (noticias reales, más histórico) para intentar subir
+   el techo de la dirección — con el riesgo de seguir en ~0.55.
+
+La opción 1 es la que maximiza valor con la evidencia actual: aprovecha el
+mismo pipeline y el mismo dato donde sí hay señal. Ver EXP-005.

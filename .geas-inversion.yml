@@ -1,0 +1,42 @@
+# .geas-inversion.yml — configuración instancia GEAS independiente (inversión)
+instance: inversion
+data_dir: /home/cacelas/.local/share/geas-inversion
+db_path: /home/cacelas/.local/share/geas-inversion/geas.db
+
+server:
+  host: 127.0.0.1
+  port: 8793
+
+proxy:
+  host: 0.0.0.0
+  port: 8792
+
+org_id: 5f0fe99f-9753-4116-8596-a220b9448366
+org_name: Stock Market Prediction
+repo_id: da543d86-2162-48c6-8f1f-ca6f8cc59c71
+repo_name: Stock-Market-Prediction
+remote: https://github.com/cacelass/Stock-Market-Prediction
+branch: desarrollo
+
+resources:
+  - path: Makefile
+  - path: agents
+  - path: data
+  - path: docs
+  - path: harness
+  - path: inversion
+  - path: reports
+  - path: tests
+  - path: pyproject.toml
+  - path: README.md
+  - path: AGENTS.md
+  - path: CLAUDE.md
+  - path: init.sh
+  - path: status.sh
+  - path: start.sh
+  - path: finish.sh
+  - path: sync.sh
+  - path: .geas.yml
+  - path: .geas-inversion.yml
+  - path: geas-roster.env
+  - path: geas_features_import.json

@@ -176,3 +176,46 @@ def monitor_all() -> tuple[list[Path], Path | None]:
 
 if __name__ == "__main__":
     monitor_all()
+
+def detect_feature_drift(
+    X_ref: pd.DataFrame | np.ndarray,
+    X_new: pd.DataFrame | np.ndarray,
+    threshold: float = 0.05,
+    max_cols: int = 50,
+) -> "DriftResult":
+    from dataclasses import dataclass
+
+    @dataclass
+    class DriftResult:
+        n_features: int
+        mean_shift: float
+        pvalue_approx: float
+        drift_detected: bool
+
+    if isinstance(X_ref, pd.DataFrame) and isinstance(X_new, pd.DataFrame):
+        common = list(set(X_ref.columns) & set(X_new.columns))
+        if common:
+            Xr, Xn = X_ref[common], X_new[common]
+        else:
+            Xr, Xn = X_ref, X_new
+    else:
+        Xr, Xn = X_ref, X_new
+
+    Xr_arr = Xr.to_numpy() if hasattr(Xr, "to_numpy") else np.asarray(Xr)
+    Xn_arr = Xn.to_numpy() if hasattr(Xn, "to_numpy") else np.asarray(Xn)
+
+    n = min(Xr_arr.shape[1], Xn_arr.shape[1], max_cols)
+    if n <= 0:
+        return DriftResult(0, 0.0, 1.0, False)
+
+    shifts = []
+    for i in range(n):
+        mr, mn = np.nanmean(Xr_arr[:, i]), np.nanmean(Xn_arr[:, i])
+        vr = np.nanvar(Xr_arr[:, i]) + 1e-12
+        vn = np.nanvar(Xn_arr[:, i]) + 1e-12
+        s = (mr - mn) ** 2 / (vr + vn)
+        shifts.append(s)
+
+    mean_shift = float(np.mean(shifts))
+    pval = float(np.exp(-mean_shift)) if mean_shift >= 0 else 1.0
+    return DriftResult(n, mean_shift, pval, pval < float(threshold))
