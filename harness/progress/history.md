@@ -660,3 +660,19 @@ notebooks/model_levers_recheck.py: baseline AUC 0.5437; 9 hipótesis probadas, n
 ```
 
 </details>
+
+## EXP-003 — Sensibilidad al horizonte/target y baselines triviales: ¿el RF bate a momentum?
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 205 passed, 25 warnings in 29.89s
+- **Cambios:** notebooks/horizon_target_sensitivity.py,notebooks/horizon_5_vs_10.py,references/05-model-improvement.md
+- **Decisiones:** Horizonte 10d NO es robustamente mejor (IC incluye 0; desaparece con target de umbral). Se mantiene 5d. RF sí aporta +0.018 sobre la mejor feature suelta. Techo es el dato, no la definición del problema.
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+horizon_5_vs_10.py: ΔAUC(10d-5d) dir +0.0226 IC95±0.0235 (incluye 0), thr2 -0.0044; horizon_target_sensitivity.py: RF 0.5265 vs mejor feature suelta 0.5084 (lag_5); pytest 205 passed
+```
+
+</details>

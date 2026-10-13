@@ -257,3 +257,74 @@ eso es una decisión de `SCOPE-001`, no una mejora de tuning.
 
 No se adopta ningún cambio: el pipeline se mantiene tal cual, por disciplina de
 evidencia (no tocar lo que no mejora de forma robusta).
+
+## K) Sensibilidad al horizonte y baselines triviales (EXP-003)
+
+Fecha: 2026-10-13 · Scripts: `notebooks/horizon_target_sensitivity.py`,
+`notebooks/horizon_5_vs_10.py`
+
+J dejó una duda abierta: ¿el cuello de botella es el modelo o **la definición
+del problema** (horizonte de 5 días)? Y una comprobación que faltaba: ¿el RF
+bate de verdad a la señal más simple, o solo la está reempaquetando?
+
+### K.1 — ¿Otro horizonte da más señal? (target = dirección pura)
+
+AUC media del RF por horizonte, mismos folds y features (7 tickers):
+
+| Horizonte | AUC RF | momentum (pasado h días) | reversión | volatilidad |
+|-----------|--------|--------------------------|-----------|-------------|
+| 1 d | 0.5121 | 0.4856 | 0.5144 | 0.4897 |
+| 3 d | 0.5166 | 0.4841 | 0.5159 | 0.4853 |
+| 5 d | 0.5265 | 0.4942 | 0.5058 | 0.4757 |
+| **10 d** | **0.5491** | 0.4890 | 0.5110 | 0.4677 |
+| 20 d | 0.5244 | 0.5035 | 0.4965 | 0.4670 |
+
+El 10d *parecía* claramente mejor (0.5491 vs 0.5265). Pero la comparación
+pareada por fold (K.2) lo desmiente.
+
+### K.2 — Comparación pareada 10d vs 5d (21 folds/ticker-target)
+
+| Tipo de target | ΔAUC (10d−5d) | IC95 | gana 10d | Δprec@top-20 | Δbase-rate |
+|----------------|---------------|------|----------|--------------|------------|
+| dirección pura | +0.0226 | ±0.0235 | 14/21 (67%) | +0.0524 | +0.0249 |
+| umbral fijo 2% (el actual) | −0.0044 | ±0.0249 | 9/21 (43%) | +0.0825 | +0.0847 |
+| umbral escalado (p60) | −0.0011 | ±0.0202 | 10/21 (48%) | +0.0017 | +0.0093 |
+
+Veredicto: **el horizonte de 10 días no es robustamente mejor.**
+- Con dirección pura, el IC95 **incluye el 0** (±0.0235 sobre +0.0226) → no significativo.
+- Con target de **umbral** (el que usa el proyecto) la ventaja **desaparece**:
+  ΔAUC negativo y gana en <50% de folds.
+- La precisión@top-quintil sube en el umbral fijo (+0.0825) pero la **tasa base
+  sube casi lo mismo** (+0.0847): a 10 días simplemente hay más días "que
+  suben", no es que el modelo discrimine mejor. Sin mejora operativa real.
+
+### K.3 — ¿El RF aporta edge sobre una feature suelta? (5d)
+
+| score | AUC |
+|-------|-----|
+| return | 0.4927 |
+| lag_1 | 0.4986 |
+| lag_5 | 0.5084 |
+| lag_20 | 0.4994 |
+| rsi | 0.4991 |
+| volatility | 0.4757 |
+| vwap_ratio | 0.4895 |
+| **RF (todas las features)** | **0.5265** |
+
+El RF **sí** añade sobre la mejor feature suelta (+0.018 sobre `lag_5`). No es
+un simple momentum disfrazado: combina señales débiles en una algo mejor. Pero
+el techo sigue siendo bajo — la señal individual más informativa apenas pasa
+de 0.51.
+
+### Conclusión final de la línea de modelado
+
+Con K cerrada, el horizonte y el tipo de target **no son el cuello de botella**
+(probado, no supuesto), y el RF **sí** aporta valor sobre features sueltas pero
+sobre una señal intrínsecamente débil. Se mantienen el horizonte de 5 días y el
+target binario >2%.
+
+Lo único que queda por encima del ruido son datos externos (noticias reales,
+más histórico) o un replanteamiento de producto en `SCOPE-001` (p.ej. dejar de
+predecir dirección diaria y modelar riesgo/volatilidad, que es lo que los datos
+sí parecen contener). Ninguna de las dos es una mejora de tuning: son
+decisiones de alcance.

@@ -632,6 +632,22 @@
       "started": "2026-10-13",
       "review_rounds": 0,
       "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-003",
+      "title": "Sensibilidad al horizonte/target y baselines triviales: ¿el RF bate a momentum?",
+      "description": "Sensibilidad al horizonte/target y baselines triviales: ¿el RF bate a momentum?",
+      "acceptance_criteria": [
+        "AUC RF por horizonte 1/3/5/10/20d",
+        "AUC de baselines (momentum, reversión, features sueltas)",
+        "veredicto documentado en references/05 sección K",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
     }
   ]
 }
