@@ -628,3 +628,35 @@ mypy inversion/ tests/: Success, 56 ficheros sin issues (CI fallaba con 11). ruf
 ```
 
 </details>
+
+## EXP-001 — Explorar mejoras RF/HistGBM/Ensemble con walk-forward estricto
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 205 passed, 25 warnings in 24.08s
+- **Cambios:** experiments/, notebooks/model_comparison.py (revisado)
+- **Decisiones:** No se adopta cambio estructural (riesgo + complejidad > ganancia); baseline mantenido
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+Exploración: ensemble RF+HistGBM da AUC comparable (AAPL/MSFT/TSLA ~0.54-0.61); tuning ligero mejora marginalmente vs baseline; documentado sin leakage
+```
+
+</details>
+
+## EXP-002 — Re-verificar palancas internas de mejora del modelo (estacionariedad, contexto de mercado, clase, calibración, selección, recencia)
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 205 passed, 25 warnings in 25.88s
+- **Cambios:** notebooks/model_levers_recheck.py,references/05-model-improvement.md
+- **Decisiones:** No se adopta ningún cambio: ninguna palanca interna mejora de forma robusta (criterio ΔAUC>0.01). Techo honesto AUC~0.55 confirmado.
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+notebooks/model_levers_recheck.py: baseline AUC 0.5437; 9 hipótesis probadas, ninguna supera +0.01 (H2+H6 combinado +0.0054, 6/7); pytest 205 passed
+```
+
+</details>

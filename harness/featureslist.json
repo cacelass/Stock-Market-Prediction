@@ -611,10 +611,27 @@
         "sin leakage",
         "init.sh verde"
       ],
-      "status": "in_progress",
+      "status": "done",
       "depends_on": [],
       "started": "2026-10-13",
-      "review_rounds": 0
+      "review_rounds": 0,
+      "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-002",
+      "title": "Re-verificar palancas internas de mejora del modelo (estacionariedad, contexto de mercado, clase, calibración, selección, recencia)",
+      "description": "Re-verificar palancas internas de mejora del modelo (estacionariedad, contexto de mercado, clase, calibración, selección, recencia)",
+      "acceptance_criteria": [
+        "walk-forward honesto mismo protocolo",
+        "criterio adopción ΔAUC>0.01",
+        "veredicto documentado en references/05",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
     }
   ]
 }

@@ -217,9 +217,43 @@ real. Para decidir operar, usar las tasas empíricas por bucket de
 ya reflejan la calibración observada sin destruir ordenación.
 CSV: `reports/calibracion.csv`.
 
-### Cierre de la línea de modelado
+## J) Re-verificación de palancas internas (EXP-002)
 
-Con H e I cerradas queda explorado el espacio razonable sin datos nuevos:
-clase de modelo correcta (H), protocolo honesto (C/E), fallback global donde
-no hay señal propia (F/G). Las palancas restantes son externas: noticias
-reales, multi-horizonte o más histórico.
+Fecha: 2026-10-13 · Script: `notebooks/model_levers_recheck.py`
+
+Se re-testean seis palancas clásicas de mejora con el **mismo protocolo
+honesto** (expanding-window, `_walk_forward_folds`, 5 folds, último 60%), RF
+del pipeline, 7 tickers. Criterio de adopción predefinido: **ΔAUC medio > 0.01**
+y consistencia (que gane en la mayoría de tickers). Media baseline RF: 0.5437.
+
+| Hipótesis | AUC media | Δ vs base | Gana en |
+|-----------|-----------|-----------|---------|
+| H1 — ratios ma_50/ma_200 (estacionariedad) | 0.5406 | **−0.0032** | 1/7 |
+| H2 — features de mercado (mkt return/vol, fuerza relativa) | 0.5433 | −0.0004 | 3/7 |
+| H3 — HistGradientBoosting | 0.5331 | **−0.0107** | 2/7 |
+| H3 — Regresión logística | 0.5388 | −0.0049 | 4/7 |
+| H4 — calibración con CV interno | 0.5401 | −0.0037 | 2/7 |
+| H5 — selección top-8 features | 0.5372 | −0.0066 | 1/7 |
+| H5 — selección top-16 features | 0.5466 | +0.0029 | 6/7 |
+| H6 — ponderación por recencia (hl=500d) | 0.5457 | +0.0019 | 5/7 |
+| H2 + H6 combinado | 0.5492 | +0.0054 | 6/7 |
+
+**Ninguna hipótesis alcanza el margen de +0.01.** Las dos leves (top-16,
+recencia) y su combinación mejoran de media pero dentro de ruido de validación
+(se probaron con dos estructuras de folds y el signo es el mismo, pero la
+magnitud queda por debajo del umbral que el propio proyecto fija para adoptar).
+Las que sí tocan el motor —estacionarizar las medias móviles, cambiar de clase
+de modelo, calibrar, podar features— **empeoran** el AUC.
+
+### Conclusión de la línea de modelado (actualizada)
+
+Confirmado con evidencia adicional: el techo honesto del modelo con estos
+datos es **AUC ≈ 0.55** y ninguna transformación interna del RF lo supera de
+forma robusta. Los niveles crudos `ma_50`/`ma_200` no son un lastre (su versión
+estacionaria es peor), el contexto de mercado no aporta, y la clase de modelo
+ya es la correcta (H y J coinciden). Las palancas que quedan son **externas al
+modelo**: más histórico/noticias reales, cambio de horizonte o de target — y
+eso es una decisión de `SCOPE-001`, no una mejora de tuning.
+
+No se adopta ningún cambio: el pipeline se mantiene tal cual, por disciplina de
+evidencia (no tocar lo que no mejora de forma robusta).
