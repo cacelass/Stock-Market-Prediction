@@ -676,3 +676,19 @@ horizon_5_vs_10.py: ΔAUC(10d-5d) dir +0.0226 IC95±0.0235 (incluye 0), thr2 -0.
 ```
 
 </details>
+
+## EXP-004 — ¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?)
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 205 passed, 25 warnings in 26.66s
+- **Cambios:** notebooks/volatility_predictability.py,references/05-model-improvement.md
+- **Decisiones:** Volatilidad SÍ predecible (R²~0.2, Spearman~0.45), dirección no (AUC 0.55). RF bate persistencia. Recomendada opción aditiva: modelo de riesgo. Decisión de alcance para el usuario.
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+volatility_predictability.py: R² RF 0.185/0.201/0.164 vs persistencia -0.332/-0.223/-0.267; Spearman RF 0.418/0.446/0.427 > persist 0.314/0.398/0.408; pytest 205 passed
+```
+
+</details>

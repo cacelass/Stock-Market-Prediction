@@ -648,6 +648,24 @@
       "started": "2026-10-13",
       "review_rounds": 0,
       "closed": "2026-10-13"
+    },
+    {
+      "id": "EXP-004",
+      "title": "¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?)",
+      "description": "¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?)",
+      "acceptance_criteria": [
+        "walk-forward",
+        "target = vol realizada futura",
+        "comparar RF vs baseline persistencia (vol actual)",
+        "Spearman/R2",
+        "veredicto en references/05 sección L",
+        "init.sh verde"
+      ],
+      "status": "done",
+      "depends_on": [],
+      "started": "2026-10-13",
+      "review_rounds": 0,
+      "closed": "2026-10-13"
     }
   ]
 }

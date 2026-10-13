@@ -328,3 +328,50 @@ más histórico) o un replanteamiento de producto en `SCOPE-001` (p.ej. dejar de
 predecir dirección diaria y modelar riesgo/volatilidad, que es lo que los datos
 sí parecen contener). Ninguna de las dos es una mejora de tuning: son
 decisiones de alcance.
+
+## L) Lo que los datos SÍ contienen: riesgo/volatilidad (EXP-004)
+
+Fecha: 2026-10-13 · Script: `notebooks/volatility_predictability.py`
+
+K terminó con una hipótesis: *la dirección es ruido, la volatilidad quizá no*.
+Esta sección la convierte en medida. Target = volatilidad realizada futura
+(std de los retornos diarios de los próximos h días); baseline tonto y fuerte =
+**persistencia** (la vol de los últimos h días); modelo = mismo RF que el
+clasificador. Walk-forward, 7 tickers.
+
+| Horizonte | R² RF | R² persistencia | Spearman RF | Spearman persistencia |
+|-----------|-------|-----------------|-------------|------------------------|
+| 5 d | **0.185** | −0.332 | 0.418 | 0.314 |
+| 10 d | **0.201** | −0.223 | **0.446** | 0.398 |
+| 20 d | 0.164 | −0.267 | 0.427 | 0.408 |
+
+**La volatilidad es predecible y la dirección no.** El contraste es tajante:
+
+- Dirección: AUC ≈ 0.55 (apenas por encima del azar, secciones H–K).
+- Volatilidad: **R² fuera de muestra 0.16–0.20** y **Spearman 0.42–0.45**.
+- El RF **bate a la persistencia** (que incluso tiene R² negativo: peor que
+  predecir la media), así que no es que la vol "se repita sola" — el modelo
+  captura estructura de régimen que el baseline simple no.
+- El mejor horizonte es **10d** (R² 0.201, Spearman 0.446), consistente con que
+  la volatilidad se mueve en regímenes de días-semanas.
+
+### Implicación: el producto y el dato están desalineados
+
+El proyecto predice **dirección**, que es lo único que estos datos no permiten
+predecir bien. La misma matriz de features que da AUC 0.55 en dirección da
+R² ≈ 0.2 en volatilidad — dos órdenes de magnitud de diferencia en cuánto
+"explica" el modelo. Esto no es un fallo del modelo: es que se le está pidiendo
+la pregunta equivocada a los datos.
+
+Opciones de alcance (decisión de `SCOPE-001`, no de tuning):
+
+1. **Añadir un modelo de riesgo** (volatilidad/intervalo de confianza) sin
+   retirar el clasificador direccional: es *aditivo*, tiene señal demostrada, y
+   es lo que de verdad usa gestión de carteras (position sizing, VaR, stops).
+2. **Reenfocar el proyecto** a forecasting de riesgo y descartar la dirección
+   como objetivo principal.
+3. **Traer datos externos** (noticias reales, más histórico) para intentar subir
+   el techo de la dirección — con el riesgo de seguir en ~0.55.
+
+La opción 1 es la que maximiza valor con la evidencia actual: aprovecha el
+mismo pipeline y el mismo dato donde sí hay señal. Ver EXP-005.
