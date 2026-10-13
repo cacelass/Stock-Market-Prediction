@@ -1,6 +1,6 @@
 # Product Requirements Document
 
-> Documento **generado** (`documentation update_prd`) desde el estado del proyecto: `references/00-objetivo.md`, `harness/featureslist.json` y `features/*.feature`. No lo edites a mano — se sobrescribe. Actualizado: 2026-08-26
+> Documento **generado** (`documentation update_prd`) desde el estado del proyecto: `references/00-objetivo.md`, `harness/featureslist.json` y `features/*.feature`. No lo edites a mano — se sobrescribe. Actualizado: 2026-10-13
 
 ## Objetivo
 
@@ -8,7 +8,7 @@ _(sin definir — ejecuta la feature SCOPE-001 del backlog, que escribe `referen
 
 ## Alcance
 
-**Backlog:** 1 blocked · 36 done
+**Backlog:** 45 done
 
 | Feature | Estado | Título |
 |---------|--------|--------|
@@ -47,5 +47,14 @@ _(sin definir — ejecuta la feature SCOPE-001 del backlog, que escribe `referen
 | IMP-005 | done | Modelo global pooled (todas las tickers) vs modelos por ticker |
 | IMP-006 | done | Enrutado híbrido: fallback al modelo global para tickers sin señal propia |
 | MOD-001 | done | Comparación honesta de clases de modelo: RF vs HistGradientBoosting y ensemble de semillas |
-| SENT-005 | blocked | Noticias reales: fetch NewsAPI.ai en vivo y histórico GDELT |
+| SENT-005 | done | Noticias reales: fetch NewsAPI.ai en vivo y histórico GDELT |
 | SENT-006 | done | Fetcher NewsAPI.ai en vivo y puntuación de noticias reales |
+| DOC-001 | done | README y PRD al día con el ciclo IMP/MOD/SENT |
+| FIX-001 | done | mypy estricto en verde para los módulos nuevos (CI rojo tras push) |
+| EXP-001 | done | Explorar mejoras RF/HistGBM/Ensemble con walk-forward estricto |
+| EXP-002 | done | Re-verificar palancas internas de mejora del modelo (estacionariedad, contexto de mercado, clase, calibración, selección, recencia) |
+| EXP-003 | done | Sensibilidad al horizonte/target y baselines triviales: ¿el RF bate a momentum? |
+| EXP-004 | done | ¿Los datos predicen volatilidad/riesgo mejor que dirección? (¿pivot de alcance?) |
+| EXP-005 | done | Modelo de riesgo: forecasting de volatilidad (aditivo al clasificador direccional) |
+| EXP-006 | done | Exponer el modelo de riesgo/volatilidad en la API REST (endpoint /risk) |
+
