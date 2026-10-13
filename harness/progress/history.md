@@ -692,3 +692,19 @@ volatility_predictability.py: R² RF 0.185/0.201/0.164 vs persistencia -0.332/-0
 ```
 
 </details>
+
+## EXP-005 — Modelo de riesgo: forecasting de volatilidad (aditivo al clasificador direccional)
+
+- **Cerrada:** 2026-10-13
+- **Verificación:** ./init.sh en verde · 212 passed, 25 warnings in 29.51s
+- **Cambios:** inversion/models/volatility.py,tests/test_volatility.py,models/vol_*.pkl,reports/resultados_volatilidad.csv
+- **Decisiones:** Modelo de riesgo ADITIVO (no retira el clasificador direccional). Horizonte 10d segun EXP-004. Commiteado models/vol_*.pkl por convencion del repo (rf_*.pkl ya se commitean).
+- **Pendiente:** _(nada)_
+
+<details><summary>Evidencia</summary>
+
+```
+inversion/models/volatility.py implementado + 7 tests (tests/test_volatility.py); trained real: R2 0.088-0.307 (media 0.20), RF bate persistencia en 7/7 tickers; pytest 212 passed; ruff+mypy OK; reports/resultados_volatilidad.csv
+```
+
+</details>
