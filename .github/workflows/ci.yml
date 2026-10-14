@@ -73,8 +73,7 @@ jobs:
         run: uv run python -m agents.evals.runner --harness --routing --contracts
 
       - name: Security scan
-        run: uv run bandit -r inversion/ -f txt -x tests || true
-        continue-on-error: true
+        run: uv run bandit -r inversion/ -f txt -x tests
 
       - name: Upload coverage
         uses: codecov/codecov-action@v5
