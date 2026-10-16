@@ -6,6 +6,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 
+from inversion.ensemble.weighted_ensemble import train_weighted_ensemble
 from inversion.features.build_features import fit_and_save_scaler
 from inversion.utils import paths
 
@@ -177,6 +178,130 @@ def train_ticker(ticker: str, csv_path: Path, random_state: int = 42, with_senti
     train_acc = accuracy_score(y_train, model.predict(X_train_s))
     metrics.update(
         {"ticker": ticker, "n_train": int(len(X_train)), "n_test": int(len(X_test)), "train_accuracy": float(train_acc), "with_sentiment": with_sentiment}
+    )
+    return metrics
+
+
+def train_ensemble_ticker(ticker: str, csv_path: Path, random_state: int = 42) -> dict[str, Any]:
+    """Entrena el ensemble de 3 modelos y guarda m\u00e9tricas individuales + conjunto.
+
+    Entrena RF-tech, HGB-tech y RF-sentiment sobre el mismo split, guarda
+    ensemble_rf_<T>.pkl, ensemble_hgb_<T>.pkl, ensemble_rf_sent_<T>.pkl,
+    scaler_<T>.pkl y ensemble_config_<T>.json.
+
+    Returns
+    -------
+    dict con ticker, n_train, n_test, y metrics (per-model + ensemble).
+    """
+    df = pd.read_csv(csv_path, parse_dates=["timestamp"])
+    feature_cols = available_feature_cols(df)
+    df = df.dropna(subset=[*feature_cols, "target"]).sort_values("timestamp")
+
+    split = int(len(df) * 0.8)
+    train_df, test_df = df.iloc[:split], df.iloc[split:]
+
+    X_train = train_df[feature_cols]
+    y_train = train_df["target"]
+    X_test = test_df[feature_cols]
+    y_test = test_df["target"]
+
+    scaler_tech = fit_and_save_scaler(X_train, filename=f"scaler_{ticker}.pkl")
+    X_train_s = scaler_tech.transform(X_train)
+    X_test_s = scaler_tech.transform(X_test)
+
+    has_sentiment = any(c in df.columns for c in SENTIMENT_COLS)
+    scaler_sent = None
+    sent_cols: list[str] = []
+    if has_sentiment:
+        sent_cols = [c for c in SENTIMENT_COLS if c in X_train.columns]
+        if sent_cols:
+            scaler_sent = fit_and_save_scaler(X_train[sent_cols], filename=f"scaler_sent_{ticker}.pkl")
+
+    # Train models
+    from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
+
+    rf_tech = RandomForestClassifier(
+        n_estimators=200, max_depth=5, min_samples_leaf=50, max_features="sqrt",
+        class_weight="balanced", random_state=random_state, n_jobs=-1,
+    )
+    rf_tech.fit(X_train_s, y_train.values)
+    save_path_rf = paths.MODELS_DIR / f"ensemble_rf_{ticker}.pkl"
+    save_path_rf.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(rf_tech, save_path_rf)
+
+    hgb = HistGradientBoostingClassifier(
+        max_iter=100, max_depth=5, learning_rate=0.1,
+        random_state=random_state, class_weight="balanced",
+    )
+    hgb.fit(X_train_s, y_train.values)
+    save_path_hgb = paths.MODELS_DIR / f"ensemble_hgb_{ticker}.pkl"
+    joblib.dump(hgb, save_path_hgb)
+
+    pr = rf_tech.predict_proba(X_test_s)[:, 1]
+    ph = hgb.predict_proba(X_test_s)[:, 1]
+    ens_proba_2 = (pr + ph) / 2.0
+    ens_pred_2 = (ens_proba_2 >= 0.5).astype(int)
+    try:
+        ens_auc_2 = float(roc_auc_score(y_test.values, ens_proba_2))
+    except Exception:
+        ens_auc_2 = 0.0
+    ens_acc_2 = float(accuracy_score(y_test.values, ens_pred_2))
+
+    metrics: dict[str, Any] = {
+        "n_train": int(len(X_train)),
+        "n_test": int(len(X_test)),
+        "rf_tech_auc": float(roc_auc_score(y_test.values, pr)),
+        "rf_tech_accuracy": float(accuracy_score(y_test.values, rf_tech.predict(X_test_s))),
+        "hgb_auc": float(roc_auc_score(y_test.values, ph)),
+        "hgb_accuracy": float(accuracy_score(y_test.values, hgb.predict(X_test_s))),
+        "ensemble_auc": ens_auc_2,
+        "ensemble_accuracy": ens_acc_2,
+    }
+
+    rf_sent = None
+    if has_sentiment and sent_cols:
+        rf_sent = RandomForestClassifier(
+            n_estimators=200, max_depth=5, min_samples_leaf=50, max_features="sqrt",
+            class_weight="balanced", random_state=random_state, n_jobs=-1,
+        )
+        rf_sent.fit(scaler_sent.transform(X_train[sent_cols]), y_train.values)
+        save_path_rfs = paths.MODELS_DIR / f"ensemble_rf_sent_{ticker}.pkl"
+        joblib.dump(rf_sent, save_path_rfs)
+
+        ps = rf_sent.predict_proba(scaler_sent.transform(X_test[sent_cols]))[:, 1]
+        try:
+            metrics["rf_sent_auc"] = float(roc_auc_score(y_test.values, ps))
+        except Exception:
+            metrics["rf_sent_auc"] = 0.0
+        metrics["rf_sent_accuracy"] = float(accuracy_score(y_test.values, rf_sent.predict(scaler_sent.transform(X_test[sent_cols]))))
+
+        ens_proba_3 = (pr + ph + ps) / 3.0
+        ens_pred_3 = (ens_proba_3 >= 0.5).astype(int)
+        try:
+            metrics["ensemble_3model_auc"] = float(roc_auc_score(y_test.values, ens_proba_3))
+        except Exception:
+            metrics["ensemble_3model_auc"] = 0.0
+        metrics["ensemble_3model_accuracy"] = float(accuracy_score(y_test.values, ens_pred_3))
+
+    # Save ensemble config
+    import json as _json
+    config_path = paths.MODELS_DIR / f"ensemble_config_{ticker}.json"
+    config = {
+        "ticker": ticker,
+        "metrics": {k: v for k, v in metrics.items() if k not in ("n_train", "n_test")},
+        "model_files": {
+            "rf_tech": f"ensemble_rf_{ticker}.pkl",
+            "hgb": f"ensemble_hgb_{ticker}.pkl",
+        },
+    }
+    if rf_sent is not None:
+        config["model_files"]["rf_sent"] = f"ensemble_rf_sent_{ticker}.pkl"
+    with open(config_path, "w") as fh:
+        _json.dump(config, fh, indent=2, default=str)
+
+    print(
+        f"   \u2714 {ticker}: ensemble_auc={metrics['ensemble_auc']:.3f} "
+        f"ensemble_acc={metrics['ensemble_accuracy']:.3f}"
     )
     return metrics
 

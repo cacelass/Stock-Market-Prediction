@@ -3,6 +3,8 @@
 CLI: .venv/bin/python inversion/models/predict_model.py --ticker AAPL
 (make predict TICKER=AAPL). Si el ticker no tiene modelo, devuelve un error
 claro con instrucciones de entrenamiento.
+
+Se puede usar el ensemble de 3 modelos con --ensemble.
 """
 
 import argparse
@@ -39,7 +41,11 @@ def _load_model_and_scaler(ticker: str) -> tuple[Any, Any]:
     )
 
 
-def predict_future(df: pd.DataFrame, ticker: str = "NVDA") -> tuple[int | None, float | None, float | None, float | None]:
+def predict_future(
+    df: pd.DataFrame,
+    ticker: str = "NVDA",
+    use_ensemble: bool = False,
+) -> tuple[int | None, float | None, float | None, float | None]:
     """
     Predice la dirección del precio para los próximos días a partir
     de los datos crudos más recientes.
@@ -47,6 +53,7 @@ def predict_future(df: pd.DataFrame, ticker: str = "NVDA") -> tuple[int | None, 
     Args:
         df : DataFrame con columnas OHLCV y 'timestamp'.
         ticker : activo del catálogo (por defecto NVDA).
+        use_ensemble : si True, usa el ensemble de 3 modelos en vez del RF único.
 
     Returns:
         (clase, prob_baja, prob_sube, ultimo_close)
@@ -55,6 +62,12 @@ def predict_future(df: pd.DataFrame, ticker: str = "NVDA") -> tuple[int | None, 
         prob_sube : probabilidad clase 1
         ultimo_close : último precio de cierre conocido
     """
+    if use_ensemble:
+        try:
+            from inversion.models.predict_ensemble import predict_ensemble as predict_ens
+        except ImportError:
+            use_ensemble = False
+
     try:
         route = pooled.resolve_route(ticker)
         if route == pooled.GLOBAL_TICKER:
@@ -78,6 +91,11 @@ def predict_future(df: pd.DataFrame, ticker: str = "NVDA") -> tuple[int | None, 
 
     # Coger la última fila que no tenga NaN en las features
     last = df_feat.dropna(subset=feature_cols).iloc[[-1]][feature_cols]
+
+    if use_ensemble:
+        preds, probas = predict_ens(df, ticker=ticker)
+        if len(preds) > 0:
+            return int(preds[0]), float(1 - probas[0]), float(probas[0]), float(df.iloc[-1]["close"])
 
     last_scaled = scaler.transform(last)
     pred_class = model.predict(last_scaled)[0]
@@ -110,12 +128,13 @@ def _load_ticker_data(ticker: str) -> pd.DataFrame:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Predice la dirección del precio por ticker.")
     parser.add_argument("--ticker", default="NVDA", help="Activo del catálogo (config/tickers.yaml)")
+    parser.add_argument("--ensemble", action="store_true", help="Usar el ensemble de 3 modelos")
     args = parser.parse_args(argv)
 
     ticker = args.ticker.upper()
     try:
         df = _load_ticker_data(ticker)
-        cls, prob_baja, prob_sube, ultimo_close = predict_future(df, ticker=ticker)
+        cls, prob_baja, prob_sube, ultimo_close = predict_future(df, ticker=ticker, use_ensemble=args.ensemble)
     except FileNotFoundError as exc:
         print(f"❌ {exc}")
         return 1
@@ -123,8 +142,9 @@ def main(argv: list[str] | None = None) -> int:
     if cls is None:
         return 1
 
+    prefix = "[ensemble] " if args.ensemble else ""
     direccion = "SUBE" if cls == 1 else "BAJA"
-    print(f"▶ Predicción para {ticker}: {direccion}")
+    print(f"{prefix}▶ Predicción para {ticker}: {direccion}")
     print(f"   Probabilidad de subida: {prob_sube:.2%} | de bajada: {prob_baja:.2%}")
     print(f"   Último cierre conocido: {ultimo_close:.4f}")
     return 0
