@@ -1,4 +1,5 @@
 from inversion.ensemble.weighted_ensemble import (
+    compute_dynamic_weights,
     optimize_weights,
     predict_weighted_ensemble,
     train_weighted_ensemble,
@@ -12,6 +13,7 @@ __all__ = [
     "train_weighted_ensemble",
     "predict_weighted_ensemble",
     "optimize_weights",
+    "compute_dynamic_weights",
     "train_stacking_ensemble",
     "predict_stacking_ensemble",
 ]

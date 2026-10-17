@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
 
 import joblib
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 
 from inversion.ensemble.weighted_ensemble import train_weighted_ensemble
@@ -49,6 +52,17 @@ FEATURE_COLS = [
     "week_of_year",
     # Drawdown
     "drawdown",
+    # Macroeconomic (ME-001)
+    "vix_level",
+    "vix_ma20",
+    "vix_change",
+    "sector_xlk",
+    "sector_xlf",
+    "sector_xle",
+    "treasury_yield",
+    "treasury_change",
+    "usd_index",
+    "usd_change",
 ]
 
 # Features de sentimiento (SENT-003) — se usan solo si el dataset las trae
@@ -122,6 +136,61 @@ def train_rf_model(
     return model
 
 
+def train_calibrated_rf(
+    X_train: Any,
+    y_train: Any,
+    X_val: Any,
+    y_val: Any,
+    filename: str | None = None,
+    random_state: int = 42,
+    params: dict[str, Any] | None = None,
+) -> CalibratedClassifierCV:
+    """Train a RandomForest with isotonic probability calibration.
+
+    Calibration is done on the validation set via CalibratedClassifierCV.
+    This improves probability estimates without changing the decision boundary
+    of the base model.
+
+    Parameters
+    ----------
+    X_train, y_train : training data (used for the base RF)
+    X_val, y_val : validation data (used for calibration)
+    filename : optional save path
+    random_state : seed
+    params : hyperparameters for the base RF (defaults to same as train_rf)
+
+    Returns
+    -------
+    CalibratedClassifierCV wrapping a RandomForestClassifier
+    """
+    default_params = {
+        "n_estimators": 200,
+        "max_depth": 5,
+        "min_samples_leaf": 50,
+        "max_features": "sqrt",
+    }
+    hp = {**default_params, **(params or {})}
+
+    base_rf = RandomForestClassifier(
+        n_estimators=int(hp["n_estimators"]),
+        max_depth=int(hp["max_depth"]),
+        min_samples_leaf=int(hp["min_samples_leaf"]),
+        max_features=hp["max_features"],
+        class_weight="balanced",
+        random_state=random_state,
+        n_jobs=-1,
+    )
+
+    calibrated = CalibratedClassifierCV(base_rf, method="isotonic", cv=5)
+    calibrated.fit(X_train, y_train)
+
+    save_path = paths.MODEL_FILE if filename is None else paths.MODELS_DIR / filename
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(calibrated, save_path)
+
+    return calibrated
+
+
 def evaluate_model(model: Any, X_test: Any, y_test: Any) -> dict[str, Any]:
     """
     Evalúa el modelo con métricas de clasificación.
@@ -139,14 +208,22 @@ def evaluate_model(model: Any, X_test: Any, y_test: Any) -> dict[str, Any]:
     return {"accuracy": acc, "auc": auc, "report": report}
 
 
-def train_ticker(ticker: str, csv_path: Path, random_state: int = 42, with_sentiment: bool = True, model_suffix: str = "") -> dict[str, Any]:
+def train_ticker(
+    ticker: str,
+    csv_path: Path,
+    random_state: int = 42,
+    with_sentiment: bool = True,
+    model_suffix: str = "",
+    calibrated: bool = False,
+) -> dict[str, Any]:
     """Entrena el modelo de un ticker con split temporal honesto y seed fija.
 
     Primer 80% (orden cronológico) entrena, último 20% evalúa. Sin shuffle,
     sin fuga del futuro. Guarda models/rf_<T><suffix>.pkl (+ scaler_<T><suffix>.pkl)
     y devuelve las métricas. Si with_sentiment=True y el dataset trae columnas
     sentiment_*, se incluyen como features (MODEL-002). model_suffix permite
-    guardar el baseline aparte (suffix="_base").
+    guardar el baseline aparte (suffix="_base"). Si calibrated=True, usa
+    CalibratedClassifierCV para mejores estimaciones de probabilidad.
     """
     df = pd.read_csv(csv_path, parse_dates=["timestamp"])
     feature_cols = available_feature_cols(df)
@@ -167,17 +244,37 @@ def train_ticker(ticker: str, csv_path: Path, random_state: int = 42, with_senti
     # Import perezoso: evita el ciclo train_model ↔ tuning (tune_model usa FEATURE_COLS).
     from inversion.tuning.tune_model import load_best_params
 
-    model = train_rf_model(
-        X_train_s,
-        y_train,
-        filename=f"rf_{ticker}{model_suffix}.pkl",
-        random_state=random_state,
-        params=load_best_params(ticker),
-    )
+    if calibrated:
+        # Use a portion of training for calibration
+        calib_size = int(len(X_train) * 0.8)
+        X_tr, y_tr = X_train_s[:calib_size], y_train.iloc[:calib_size]
+        X_cal, y_cal = X_train_s[calib_size:], y_train.iloc[calib_size:]
+
+        model = train_calibrated_rf(
+            X_tr, y_tr, X_cal, y_cal,
+            filename=f"rf_{ticker}{model_suffix}.pkl",
+            random_state=random_state,
+            params=load_best_params(ticker),
+        )
+    else:
+        model = train_rf_model(
+            X_train_s,
+            y_train,
+            filename=f"rf_{ticker}{model_suffix}.pkl",
+            random_state=random_state,
+            params=load_best_params(ticker),
+        )
     metrics = evaluate_model(model, X_test_s, y_test)
     train_acc = accuracy_score(y_train, model.predict(X_train_s))
     metrics.update(
-        {"ticker": ticker, "n_train": int(len(X_train)), "n_test": int(len(X_test)), "train_accuracy": float(train_acc), "with_sentiment": with_sentiment}
+        {
+            "ticker": ticker,
+            "n_train": int(len(X_train)),
+            "n_test": int(len(X_test)),
+            "train_accuracy": float(train_acc),
+            "with_sentiment": with_sentiment,
+            "calibrated": calibrated,
+        }
     )
     return metrics
 

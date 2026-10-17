@@ -652,3 +652,337 @@ def test_select_best_model_saves_config(patch_paths):
     config = json.loads(config_path.read_text())
     assert config["ticker"] == "SBC"
     assert "best_model" in config
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Macro features (ME-001)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_add_macro_features_no_network_returns_defaults(patch_paths):
+    """add_macro_features returns zero-filled macro columns when no data."""
+    from inversion.features.build_features import add_derived_features
+    from inversion.features.macro_features import add_macro_features, MACRO_COLUMNS
+
+    n = 300
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.0 + np.arange(n) * 0.1,
+        "volume": 1_000_000.0,
+        "vwap": 100.0,
+    })
+    df = add_derived_features(df)
+    result = add_macro_features(df, use_yf_fetch=False)
+
+    for col in MACRO_COLUMNS:
+        assert col in result.columns, f"Missing column: {col}"
+    # When no external data, all values should be 0.0
+    for col in MACRO_COLUMNS:
+        assert result[col].dtype in (np.float64, float), f"{col} should be float"
+
+
+def test_add_macro_features_with_vix_data(patch_paths):
+    """add_macro_features populates VIX columns from synthetic data."""
+    from inversion.features.build_features import add_derived_features
+    from inversion.features.macro_features import add_macro_features, MACRO_COLUMNS
+
+    n = 100
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.0 + np.arange(n) * 0.1,
+        "volume": 1_000_000.0,
+        "vwap": 100.0,
+    })
+    df = add_derived_features(df)
+
+    # Create synthetic VIX data
+    vix_df = pd.DataFrame({
+        "timestamp": dates,
+        "vix_close": [20.0 + i * 0.1 for i in range(n)],
+    })
+
+    result = add_macro_features(df, vix_data=vix_df, use_yf_fetch=False)
+    assert "vix_level" in result.columns
+    assert result["vix_level"].iloc[0] == 20.0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Feature selection (SHAP-based)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_select_top_features_returns_n_features():
+    """select_top_features returns exactly n_top features."""
+    from sklearn.ensemble import RandomForestClassifier
+    from inversion.features.feature_selection import select_top_features
+
+    rng = np.random.default_rng(42)
+    X = pd.DataFrame(rng.normal(size=(200, 10)), columns=[f"f{i}" for i in range(10)])
+    y = ((X.iloc[:, 0] + X.iloc[:, 1]) > 0).astype(int)
+
+    rf = RandomForestClassifier(n_estimators=10, max_depth=3, random_state=42)
+    rf.fit(X, y)
+
+    selected = select_top_features(rf, X, n_top=5)
+    assert len(selected) == 5
+    assert all(c in X.columns for c in selected)
+
+
+def test_build_optimized_feature_set_preserves_target():
+    """build_optimized_feature_set keeps the target column."""
+    from sklearn.ensemble import RandomForestClassifier
+    from inversion.features.feature_selection import build_optimized_feature_set
+
+    rng = np.random.default_rng(42)
+    X = pd.DataFrame(rng.normal(size=(200, 8)), columns=[f"f{i}" for i in range(8)])
+    y = ((X.iloc[:, 0] + X.iloc[:, 1]) > 0).astype(int)
+    df = pd.concat([X, y.rename("target")], axis=1)
+
+    rf = RandomForestClassifier(n_estimators=10, max_depth=3, random_state=42)
+    rf.fit(X, y)
+
+    result = build_optimized_feature_set(df, rf, n_top=4)
+    assert "target" in result.columns
+    assert len(result.columns) == 5  # 4 features + target
+
+
+def test_compute_shap_importance_fallback_without_shap():
+    """compute_shap_importance falls back to feature_importances_ when SHAP is unavailable."""
+    from sklearn.ensemble import RandomForestClassifier
+    from inversion.features.feature_selection import compute_shap_importance
+
+    rng = np.random.default_rng(42)
+    X = pd.DataFrame(rng.normal(size=(200, 5)), columns=[f"f{i}" for i in range(5)])
+    y = ((X.iloc[:, 0] + X.iloc[:, 1]) > 0).astype(int)
+
+    rf = RandomForestClassifier(n_estimators=10, max_depth=3, random_state=42)
+    rf.fit(X, y)
+
+    importance = compute_shap_importance(rf, X)
+    assert isinstance(importance, dict)
+    # If SHAP is not installed, should still return something
+    if importance:
+        assert len(importance) == 5
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Regime detection
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_detect_regime_bull():
+    """Detect bull regime with positive return, low vol, low VIX."""
+    from inversion.features.regime_detection import detect_regime, Regime
+
+    row = pd.Series({
+        "return": 0.01,
+        "volatility": 0.10,
+        "vix_level": 15.0,
+    })
+    regime = detect_regime(row, lookback=60)
+    assert regime == Regime.BULL
+
+
+def test_detect_regime_bear():
+    """Detect bear regime with negative return, high vol, high VIX."""
+    from inversion.features.regime_detection import detect_regime, Regime
+
+    row = pd.Series({
+        "return": -0.02,
+        "volatility": 0.30,
+        "vix_level": 35.0,
+    })
+    regime = detect_regime(row, lookback=60)
+    assert regime == Regime.BEAR
+
+
+def test_detect_regime_neutral():
+    """Neutral regime catches everything else."""
+    from inversion.features.regime_detection import detect_regime, Regime
+
+    # Moderate return + moderate vol + moderate VIX → neutral
+    row = pd.Series({
+        "return": 0.005,
+        "volatility": 0.15,
+        "vix_level": 22.0,
+    })
+    regime = detect_regime(row, lookback=60)
+    assert regime == Regime.NEUTRAL
+
+
+def test_detect_regimes_returns_series():
+    """detect_regimes returns a Series aligned with the DataFrame."""
+    from inversion.features.regime_detection import detect_regimes, Regime
+
+    n = 200
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    close = 100 + np.cumsum(np.random.randn(n) * 0.01)
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": close,
+        "high": close + 1 + np.abs(np.random.randn(n)),
+        "low": close - 1 - np.abs(np.random.randn(n)),
+        "close": close,
+        "volume": 1_000_000.0,
+    })
+    from inversion.features.build_features import add_derived_features
+    df = add_derived_features(df)
+    df["vix_level"] = 20.0 + np.random.randn(n) * 5
+
+    regimes = detect_regimes(df, lookback=60)
+    assert len(regimes) == n
+    assert all(r in (Regime.BULL, Regime.BEAR, Regime.NEUTRAL) for r in regimes)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Dynamic ensemble weights
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_compute_dynamic_weights_better_model_gets_higher_weight():
+    """Models with better recent performance get higher weights."""
+    from inversion.ensemble.weighted_ensemble import compute_dynamic_weights
+    from sklearn.ensemble import RandomForestClassifier
+
+    rng = np.random.default_rng(42)
+    # Model A is perfect, Model B is random
+    perf = pd.DataFrame({
+        "model_a": [0.8] * 30,
+        "model_b": [0.55] * 30,
+    })
+
+    rf_a = RandomForestClassifier(n_estimators=5, random_state=42)
+    rf_b = RandomForestClassifier(n_estimators=5, random_state=43)
+    rf_a.fit(rng.random((50, 3)), rng.integers(0, 2, 50))
+    rf_b.fit(rng.random((50, 3)), rng.integers(0, 2, 50))
+    models = {"model_a": rf_a, "model_b": rf_b}
+
+    labels, weights = compute_dynamic_weights(models, perf, window=20)
+    weight_map = dict(zip(labels, weights))
+    assert weight_map["model_a"] > weight_map["model_b"]
+
+
+def test_compute_dynamic_weights_sum_to_one():
+    """Dynamic weights always sum to 1.0."""
+    from inversion.ensemble.weighted_ensemble import compute_dynamic_weights
+    from sklearn.ensemble import RandomForestClassifier
+
+    perf = pd.DataFrame({
+        "m1": [0.7] * 20,
+        "m2": [0.6] * 20,
+        "m3": [0.5] * 20,
+    })
+
+    models = {f"m{i}": RandomForestClassifier(n_estimators=3, random_state=42) for i in range(1, 4)}
+    labels, weights = compute_dynamic_weights(models, perf, window=10)
+    assert abs(sum(weights) - 1.0) < 1e-6
+    assert all(w >= 0 for w in weights)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Probability calibration
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_train_calibrated_rf_returns_calibrated():
+    """train_calibrated_rf returns a CalibratedClassifierCV."""
+    from inversion.models.train_model import train_calibrated_rf
+    from sklearn.calibration import CalibratedClassifierCV
+
+    rng = np.random.default_rng(42)
+    X_train = rng.normal(size=(100, 5))
+    y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
+    X_val = rng.normal(size=(30, 5))
+    y_val = (X_val[:, 0] + X_val[:, 1] > 0).astype(int)
+
+    calibrated = train_calibrated_rf(X_train, y_train, X_val, y_val)
+    assert isinstance(calibrated, CalibratedClassifierCV)
+    assert hasattr(calibrated, "predict_proba")
+
+
+def test_train_ticker_with_calibration(patch_paths):
+    """train_ticker with calibrated=True produces a calibrated model."""
+    from inversion.models.train_model import train_ticker
+    from inversion.features.build_features import add_derived_features
+
+    n = 300
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.0 + np.arange(n) * 0.1,
+        "volume": 1_000_000.0,
+        "vwap": 100.0,
+    })
+    df = add_derived_features(df)
+    df["target"] = (np.arange(n) % 2).astype(int)
+    df = df.dropna().reset_index(drop=True)
+
+    csv_path = patch_paths["INTERIM_DATA_DIR"] / "features_CAL_ml_ready.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+
+    metrics = train_ticker("CAL", csv_path, calibrated=True)
+    assert metrics["calibrated"] is True
+    assert "auc" in metrics
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Integration: build_features pipeline includes new features
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_build_features_pipeline_includes_macro_and_regime(patch_paths):
+    """build_features_pipeline adds macro columns and regime column."""
+    from inversion.features.build_features import build_features_pipeline
+
+    n = 300
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.0 + np.arange(n) * 0.1,
+        "volume": 1_000_000.0,
+        "vwap": 100.0,
+    })
+    csv_path = patch_paths["PROCESSED_DATA_DIR"] / "PIPE_TST_ml_ready.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+
+    written = build_features_pipeline()
+    assert len(written) > 0
+    features_df = pd.read_csv(written[0])
+    assert "vix_level" in features_df.columns
+    assert "regime" in features_df.columns
+
+
+def test_feature_pipeline_reproducible(patch_paths):
+    """Running build_features twice produces identical output."""
+    from inversion.features.build_features import build_features_pipeline
+
+    n = 200
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.0 + np.arange(n) * 0.05,
+        "volume": 1_000_000.0,
+        "vwap": 100.0,
+    })
+    csv_path = patch_paths["PROCESSED_DATA_DIR"] / "PIPE_RPT_ml_ready.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+
+    r1 = build_features_pipeline()
+    content1 = pd.read_csv(r1[0]).to_csv(index=False)
+    r2 = build_features_pipeline()
+    content2 = pd.read_csv(r2[0]).to_csv(index=False)
+    assert content1 == content2

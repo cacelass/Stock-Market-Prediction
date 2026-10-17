@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
 
@@ -6,6 +8,8 @@ import numpy as np
 import joblib
 from sklearn.preprocessing import StandardScaler
 from inversion.utils import paths
+from inversion.features.macro_features import add_macro_features, MACRO_COLUMNS
+from inversion.features.regime_detection import detect_regimes, Regime
 
 
 def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -227,13 +231,26 @@ def add_sentiment_features(df: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
     return out.drop(columns=["_fecha", "fecha", "compound", "noticias"])
 
 
+def add_regime_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Add a 'regime' column (bull/bear/neutral) to the DataFrame.
+
+    Only adds the column if it isn't present already. Uses the global
+    detect_regimes which relies on 'return', 'volatility' and 'vix_level'.
+    """
+    if "regime" not in df.columns:
+        df["regime"] = detect_regimes(df, lookback=60)
+    return df
+
+
 def build_features_pipeline() -> list[Path]:
     """Lee data/processed/*.csv y escribe data/interim/features_<nombre>.csv.
 
     Reproducible por diseño: mismo input → mismo output byte a byte. No hay
     aleatoriedad ni dependencia del orden de diccionarios; el CSV de salida
-    queda ordenado por timestamp. Añade el sentimiento diario del ticker
-    cuando existe data/raw/news_<TICKER>.csv (SENT-003).
+    queda ordenado por timestamp. Añade:
+      - sentimiento diario (SENT-003)
+      - features macroeconómicas (macro_features.py)
+      - columna de régimen (regime_detection.py)
     """
     paths.PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
     paths.INTERIM_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -244,6 +261,8 @@ def build_features_pipeline() -> list[Path]:
         df = pd.read_csv(csv_file, parse_dates=["timestamp"])
         df = add_derived_features(df).sort_values("timestamp").reset_index(drop=True)
         df = add_sentiment_features(df, ticker=ticker)
+        df = add_macro_features(df, use_yf_fetch=False)
+        df = add_regime_column(df)
         out = paths.INTERIM_DATA_DIR / f"features_{csv_file.name}"
         df.to_csv(out, index=False)
         written.append(out)

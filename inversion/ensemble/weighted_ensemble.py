@@ -9,6 +9,7 @@ Functions
 train_weighted_ensemble  — train + weight optimisation
 predict_weighted_ensemble — weighted probability average
 optimize_weights         — grid-search on validation set
+compute_dynamic_weights  — adapt weights from recent performance
 """
 
 from __future__ import annotations
@@ -116,7 +117,7 @@ def train_weighted_ensemble(
 
     # Optimise weights
     weight_labels, weights = optimize_weights(models, X_val, y_val)
-    n_models = len(weight_labels)
+    len(weight_labels)  # noqa: B018 — keep for clarity
 
     # Ensemble metric on validation
     ens_proba = np.zeros(len(y_val))
@@ -203,7 +204,7 @@ def optimize_weights(
     """
     X_val = np.asarray(X_val)
     y_val = np.asarray(y_val)
-    available = [l for l in models if l in models]
+    available = [label for label in models if label in models]
 
     if len(available) <= 1:
         return list(available), [1.0] * len(available)
@@ -260,3 +261,58 @@ def _generate_combos(n: int, steps: int, step: float, current: list, out: list) 
         current.append(round(i * step, 2))
         _generate_combos(n, steps, step, current, out)
         current.pop()
+
+
+def compute_dynamic_weights(
+    models: Dict[str, Any],
+    recent_performance: pd.DataFrame,
+    model_labels: List[str] | None = None,
+    window: int = 20,
+    alpha: float = 0.85,
+) -> Tuple[List[str], List[float]]:
+    """Compute weights based on recent model performance with exponential decay.
+
+    Models that have performed better in the recent window get higher weights.
+    Recency is modelled with exponential decay (alpha < 1): more recent
+    performance is weighted more heavily.
+
+    Parameters
+    ----------
+    models : dict of {label: fitted model}
+    recent_performance : DataFrame with columns matching model_labels,
+                         each column contains daily accuracy or AUC.
+    model_labels : which models to include (default: all in `models`)
+    window : number of recent rows to consider
+    alpha : decay factor (0.85 = strong recency bias)
+
+    Returns
+    -------
+    (model_labels, weights) — normalised weights summing to 1.0
+    """
+    labels = model_labels or list(models.keys())
+    perf = recent_performance[labels].tail(window).values
+
+    # Exponential decay weights
+    decay = np.array([alpha ** i for i in range(len(perf) - 1, -1, -1)])
+    decay /= decay.sum()
+
+    # Weighted average performance per model
+    weighted_perf = np.zeros(len(labels))
+    for i, label in enumerate(labels):
+        col = perf[:, i]
+        # Replace NaN with neutral value (0.5)
+        valid = ~np.isnan(col)
+        if valid.sum() == 0:
+            weighted_perf[i] = 0.5
+        else:
+            weighted_perf[i] = np.average(col[valid], weights=decay[valid])
+
+    # Convert to positive weights (ensure all > 0)
+    min_perf = weighted_perf.min()
+    adjusted = weighted_perf - min_perf + 1e-6
+
+    # Normalise to sum to 1
+    total = adjusted.sum()
+    weights = adjusted / total
+
+    return labels, weights.tolist()
