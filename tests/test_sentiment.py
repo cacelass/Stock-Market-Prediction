@@ -158,10 +158,10 @@ def test_daily_aggregation_reproducible(patch_paths):
 def test_daily_aggregation_matches_manual_mean():
     """El agregado diario es la media simple de los compound del día.
 
-    Valores fijados a mano sobre el sample offline (determinista):
-      - 28-jul: (0.4404 + 0.7184 + 0.0772) / 3 =  0.412000
-      - 29-jul: (-0.3818 - 0.8481 - 0.4215) / 3 = -0.550467
-      - 30-jul: (0.3612 + 0.0000) / 2 =            0.180600
+    Valores recalculados con Loughran-McDonald añadido:
+      - 28-jul: media de 3 noticias con LM lexicon
+      - 29-jul: media de 3 noticias con LM lexicon
+      - 30-jul: media de 2 noticias con LM lexicon
     """
     from inversion.sentiment.analyzer import daily_sentiment, score_news_df
 
@@ -169,9 +169,9 @@ def test_daily_aggregation_matches_manual_mean():
     daily = daily_sentiment(scored, ticker="NVDA")
 
     expected = {
-        datetime.date(2026, 7, 28): (0.412000, 3),
-        datetime.date(2026, 7, 29): (-0.550467, 3),
-        datetime.date(2026, 7, 30): (0.180600, 2),
+        datetime.date(2026, 7, 28): (0.182933, 3),
+        datetime.date(2026, 7, 29): (-0.393433, 3),
+        datetime.date(2026, 7, 30): (0.125000, 2),
     }
     for fecha, (compound, noticias) in expected.items():
         row = daily[(daily["fecha"] == fecha) & (daily["ticker"] == "NVDA")]

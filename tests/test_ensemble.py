@@ -2,9 +2,13 @@
 
 Covers:
   - inversion.ensemble.weighted_ensemble  (train, predict, optimise weights)
+  - inversion.ensemble.stacking_learner   (train + predict stacking)
   - inversion.models.train_ensemble       (train_ensemble + save)
   - inversion.models.train_model          (train_ensemble_ticker wrapper)
   - inversion.models.predict_ensemble     (predict_ensemble + graceful degradation)
+  - inversion.models.select_best          (best-model per ticker)
+  - inversion.features.build_features     (enhanced sentiment features)
+  - inversion.tuning.tune_hgb_model       (HGB Optuna tuning)
 """
 
 from __future__ import annotations
@@ -364,3 +368,287 @@ def test_weighted_ensemble_no_sentiment_features():
     assert "hgb" in r["models"]
     # ensemble should still produce results
     assert "ensemble_auc" in r
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  stacking_learner  — train / predict stacking
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_train_stacking_ensemble_returns_keys():
+    """train_stacking_ensemble returns a dict with required keys."""
+    from inversion.ensemble.stacking_learner import train_stacking_ensemble
+
+    X, y = _make_xy(n=300)
+    X_train, y_train = X[:200], y[:200]
+    X_test, y_test = X[200:], y[200:]
+
+    r = train_stacking_ensemble(X_train, y_train, X_test, y_test)
+    assert "meta_model" in r
+    assert "base_models" in r
+    assert "oos_train_proba" in r
+    assert "ensemble_auc" in r
+    assert "ensemble_accuracy" in r
+
+
+def test_stacking_predict_shape():
+    """predict_stacking_ensemble returns correct shape arrays."""
+    from inversion.ensemble.stacking_learner import train_stacking_ensemble, predict_stacking_ensemble
+
+    X, y = _make_xy(n=300)
+    X_train, y_train = X[:200], y[:200]
+    X_test, y_test = X[200:], y[200:]
+
+    r = train_stacking_ensemble(X_train, y_train, X_test, y_test)
+    preds, probas = predict_stacking_ensemble(X_test, r["base_models"], r["meta_model"])
+    assert len(preds) == len(X_test)
+    assert len(probas) == len(X_test)
+    assert all(p in (0, 1) for p in preds)
+
+
+def test_stacking_uses_oos_predictions():
+    """OOS predictions should have same shape as training set."""
+    from inversion.ensemble.stacking_learner import train_stacking_ensemble
+
+    X, y = _make_xy(n=300)
+    X_train, y_train = X[:200], y[:200]
+    X_test, y_test = X[200:], y[200:]
+
+    r = train_stacking_ensemble(X_train, y_train, X_test, y_test)
+    # oos_train_proba should have 3 base models as columns
+    assert r["oos_train_proba"].shape[0] == len(y_train)
+    assert r["oos_train_proba"].shape[1] == 3  # rf_tech, hgb, rf_sent
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  enhanced sentiment features
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_enhanced_sentiment_features_generated(patch_paths):
+    """add_sentiment_features generates all 15 enhanced columns when news data exists."""
+    from inversion.features.build_features import add_derived_features, add_sentiment_features
+
+    n = 400
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "open": 100 + np.arange(n) * 0.1,
+            "high": 100 + np.arange(n) * 0.1 + 1,
+            "low": 100 + np.arange(n) * 0.1 - 1,
+            "close": 100 + np.arange(n) * 0.1,
+            "volume": 1_000_000.0,
+            "vwap": 100 + np.arange(n) * 0.1,
+        }
+    )
+    df = add_derived_features(df)
+
+    # Create synthetic news data
+    news_path = patch_paths["RAW_DATA_DIR"] / "news_TST_live.csv"
+    news_path.parent.mkdir(parents=True, exist_ok=True)
+    news_dates = pd.date_range("2020-01-01", periods=n, freq="B").date
+    news_df = pd.DataFrame({
+        "fecha": [d.strftime("%Y-%m-%d") for d in news_dates],
+        "titulo": ["This stock is doing great and showing strong growth"] * n,
+        "cuerpo": ["Positive earnings and revenue exceed expectations"] * n,
+        "fuente": ["test"] * n,
+    })
+    news_df.to_csv(news_path, index=False)
+
+    df_with_sent = add_sentiment_features(df, ticker="TST")
+
+    expected_cols = [
+        "sentiment_score", "sentiment_ma5", "sentiment_vol",
+        "sentiment_ma20", "sentiment_ma60", "sentiment_zscore",
+        "sentiment_trend", "sentiment_rsi", "sentiment_vol_ratio",
+        "sentiment_crown", "news_volume", "news_volume_ma5",
+        "sentiment_extreme", "sentiment_change", "sentiment_change_ma5",
+    ]
+    for col in expected_cols:
+        assert col in df_with_sent.columns, f"Missing column: {col}"
+
+
+def test_sentiment_features_no_leakage(patch_paths):
+    """Sentiment features use only past data — no forward-looking."""
+    from inversion.features.build_features import add_derived_features, add_sentiment_features
+
+    n = 300
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "open": [100 + i * 0.1 for i in range(n)],
+            "high": [100 + i * 0.1 + 1 for i in range(n)],
+            "low": [100 + i * 0.1 - 1 for i in range(n)],
+            "close": [100 + i * 0.1 for i in range(n)],
+            "volume": 1_000_000.0,
+            "vwap": [100 + i * 0.1 for i in range(n)],
+        }
+    )
+    df = add_derived_features(df)
+
+    # News data with varied sentiment content so ma5 differs from score
+    rng = np.random.default_rng(42)
+    titles = [
+        "This stock is doing great and showing strong growth" if i % 2 == 0
+        else "This stock crashed and lost value badly"
+        for i in range(n)
+    ]
+    news_df = pd.DataFrame({
+        "fecha": [d.strftime("%Y-%m-%d") for d in dates],
+        "titulo": titles,
+        "cuerpo": ["Mixed body content here"] * n,
+        "fuente": ["test"] * n,
+    })
+    news_path = patch_paths["RAW_DATA_DIR"] / "news_LEAK_live.csv"
+    news_path.parent.mkdir(parents=True, exist_ok=True)
+    news_df.to_csv(news_path, index=False)
+
+    df_with_sent = add_sentiment_features(df, ticker="LEAK")
+
+    # sentiment_ma5 at row 5 should use rows 0-4 (not row 5)
+    assert df_with_sent["sentiment_ma5"].iloc[5] != df_with_sent["sentiment_score"].iloc[5]
+
+
+def test_add_sentiment_features_no_news_returns_unchanged(patch_paths):
+    """If no news data exists, return df without sentiment columns."""
+    from inversion.features.build_features import add_derived_features, add_sentiment_features
+
+    n = 100
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.0,
+        "volume": 1_000_000.0,
+        "vwap": 100.0,
+    })
+
+    result = add_sentiment_features(df, ticker="NONEXIST")
+    assert not any(c.startswith("sentiment_") for c in result.columns if c != "timestamp")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  HGB tuning
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_hgb_tune_ticker_structure(patch_paths):
+    """tune_hgb_ticker returns a dict with tuned params."""
+    from inversion.tuning.tune_hgb_model import tune_hgb_ticker
+
+    n = 500  # More data for walk-forward to work
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.0 + np.arange(n) * 0.01,
+        "volume": 1_000_000.0,
+        "vwap": 100.0,
+    })
+    from inversion.features.build_features import add_derived_features
+    df = add_derived_features(df)
+    # Balanced target so both classes present (needed for AUC)
+    df["target"] = (np.arange(n) % 2).astype(int)
+    df = df.dropna().reset_index(drop=True)
+
+    csv_path = patch_paths["INTERIM_DATA_DIR"] / "features_HGB_ml_ready.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+
+    best = tune_hgb_ticker("HGB", n_trials=5)  # few trials for speed
+    assert isinstance(best, dict)
+    assert "max_iter" in best
+    assert "learning_rate" in best
+    assert "l2_regularization" in best
+
+
+def test_load_best_hgb_params(tmp_path, monkeypatch):
+    """load_best_hgb_params returns None when no file exists, dict when it does."""
+    from inversion.tuning.tune_hgb_model import load_best_hgb_params
+    from inversion.utils import paths as real_paths
+
+    # No file → None
+    result = load_best_hgb_params("NOPE")
+    assert result is None
+
+    # Create a fake params file
+    model_dir = tmp_path / "models" / "artifacts"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    fake_file = model_dir / "best_params_hgb_TST.json"
+    fake_file.write_text(json.dumps({"ticker": "TST", "params": {"max_iter": 100, "learning_rate": 0.1}}))
+    monkeypatch.setattr(real_paths, "ARTIFACTS_DIR", model_dir)
+    result = load_best_hgb_params("TST")
+    assert result is not None
+    assert result["max_iter"] == 100
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  select_best_model
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_select_best_model_returns_dict(patch_paths):
+    """select_best_model returns dict with best_model_name and metrics."""
+    from inversion.models.select_best import select_best_model
+
+    n = 800  # Need enough data for stacking walk-forward
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": [100 + i * 0.01 for i in range(n)],
+        "high": [101 + i * 0.01 for i in range(n)],
+        "low": [99 + i * 0.01 for i in range(n)],
+        "close": [100 + i * 0.01 for i in range(n)],
+        "volume": 1_000_000.0,
+        "vwap": [100 + i * 0.01 for i in range(n)],
+    })
+    from inversion.features.build_features import add_derived_features
+    df = add_derived_features(df)
+    # Balanced target so both classes present (needed for AUC + stacking meta-learner)
+    df["target"] = (np.arange(n) % 2).astype(int)
+    df = df.dropna().reset_index(drop=True)
+
+    csv_path = patch_paths["INTERIM_DATA_DIR"] / "features_SB_ml_ready.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+
+    result = select_best_model("SB", csv_path)
+    assert isinstance(result, dict)
+    assert "best_model_name" in result
+    assert "metrics" in result
+    assert result["best_model_name"] in ("rf_tech", "rf_sent", "hgb", "stacking")
+
+
+def test_select_best_model_saves_config(patch_paths):
+    """select_best_model saves best_model_config_<T>.json."""
+    from inversion.models.select_best import select_best_model
+
+    n = 800  # Need enough data for stacking walk-forward
+    dates = pd.date_range("2020-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": [100 + i * 0.01 for i in range(n)],
+        "high": [101 + i * 0.01 for i in range(n)],
+        "low": [99 + i * 0.01 for i in range(n)],
+        "close": [100 + i * 0.01 for i in range(n)],
+        "volume": 1_000_000.0,
+        "vwap": [100 + i * 0.01 for i in range(n)],
+    })
+    from inversion.features.build_features import add_derived_features
+    df = add_derived_features(df)
+    # Balanced target so both classes present
+    df["target"] = (np.arange(n) % 2).astype(int)
+    df = df.dropna().reset_index(drop=True)
+
+    csv_path = patch_paths["INTERIM_DATA_DIR"] / "features_SBC_ml_ready.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path, index=False)
+
+    result = select_best_model("SBC", csv_path)
+    config_path = patch_paths["MODELS_DIR"] / f"best_model_config_SBC.json"
+    assert config_path.exists()
+    config = json.loads(config_path.read_text())
+    assert config["ticker"] == "SBC"
+    assert "best_model" in config

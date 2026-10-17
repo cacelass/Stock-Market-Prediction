@@ -1,16 +1,22 @@
 """
-analyzer.py — Analizador de sentimiento financiero con VADER (SENT-002).
+analyzer.py — Analizador de sentimiento financiero con VADER + Loughran-McDonald.
 
 Clasifica titulares/cuerpos con nltk VADER (SentimentIntensityAnalyzer) más un
-léxico financiero ligero (jerga de mercados) y agrega el score compuesto medio
-por (fecha, ticker). Sin aleatoriedad: mismo input → mismo output.
+léxico financiero ligero (jerga de mercados) y un léxico Loughran-McDonald
+específico de finanzas. Agrega el score compuesto medio por (fecha, ticker).
+Sin aleatoriedad: mismo input → mismo output.
 
 El léxico VADER base viaja embebido en inversion/sentiment/data/vader_lexicon.txt
 para que los tests sean 100% offline; si ese fichero falta, se usa (o descarga)
 el de nltk en el primer uso.
+
+El léxico Loughran-McDonald (LM) se carga desde loughran_mcdonald.json como
+diccionario {positive: [...], negative: [...]} y se añade al analizador VADER
+como tokens con scores moderados (+1.0 / -1.0) para evitar dominar VADER.
 """
 
 import argparse
+import json
 from pathlib import Path
 
 import nltk
@@ -20,7 +26,7 @@ from nltk.sentiment.vader import SentimentIntensityAnalyzer, VaderConstants
 from inversion.sentiment.fetch import fetch_news
 from inversion.utils import paths
 
-# Léxico financiero ligero: jerga de mercados que el VADER base no conoce.
+# Léxico financiero ligero (heredado): jerga de mercados que el VADER base no conoce.
 # Formato VADER: score en [-4, +4] (positivo = alcista).
 FINANCIAL_LEXICON: dict[str, float] = {
     "bullish": 2.5,
@@ -59,6 +65,13 @@ FINANCIAL_LEXICON: dict[str, float] = {
     "eps": 0.3,
 }
 
+# Ruta al léxico Loughran-McDonald embebido en el repo.
+LM_LEXICON_PATH = Path(__file__).resolve().parent / "loughran_mcdonald.json"
+
+# Scores moderados para LM (no dominan VADER, solo matizan).
+LM_POSITIVE_SCORE = 1.0
+LM_NEGATIVE_SCORE = -1.0
+
 # Léxico VADER base embebido (copia de nltk_data) para uso 100% offline.
 BUNDLED_LEXICON = Path(__file__).resolve().parent / "data" / "vader_lexicon.txt"
 
@@ -66,11 +79,15 @@ _ANALYZER: SentimentIntensityAnalyzer | None = None
 
 
 def _build_analyzer() -> SentimentIntensityAnalyzer:
-    """Devuelve un SentimentIntensityAnalyzer con el léxico financiero añadido.
+    """Devuelve un SentimentIntensityAnalyzer con VADER + LM léxicos añadidos.
 
     Prioridad: léxico embebido en el repo (offline y determinista) → léxico
     VADER de nltk ya descargado → descarga en el primer uso (necesita red).
     Si nada es posible, lanza RuntimeError con un mensaje claro.
+
+    Añade:
+      - FINANCIAL_LEXICON   : jerga de mercados (score ±1.5 a ±3.0)
+      - Loughran-McDonald   : tokens financieros genéricos (score ±1.0)
     """
     if BUNDLED_LEXICON.exists():
         analyzer = SentimentIntensityAnalyzer.__new__(SentimentIntensityAnalyzer)
@@ -90,7 +107,18 @@ def _build_analyzer() -> SentimentIntensityAnalyzer:
                     "(python -m nltk.downloader vader_lexicon)."
                 ) from exc
         analyzer = SentimentIntensityAnalyzer()
+
+    # Léxico financiero ligero (heredado)
     analyzer.lexicon.update(FINANCIAL_LEXICON)
+
+    # Léxico Loughran-McDonald (si existe el fichero en el repo)
+    if LM_LEXICON_PATH.exists():
+        lm_data = json.loads(LM_LEXICON_PATH.read_text(encoding="utf-8"))
+        for word in lm_data.get("positive", []):
+            analyzer.lexicon[word] = LM_POSITIVE_SCORE
+        for word in lm_data.get("negative", []):
+            analyzer.lexicon[word] = LM_NEGATIVE_SCORE
+
     return analyzer
 
 
@@ -123,6 +151,29 @@ def score_news_df(df: pd.DataFrame, text_cols: list[str] | None = None) -> pd.Da
     out["pos"] = scores.map(lambda s: float(s["pos"]))
     out["compound"] = scores.map(lambda s: float(s["compound"]))
     return out
+
+
+def score_with_lm(text: str) -> dict[str, float]:
+    """Score de texto usando solo el léxico Loughran-McDonald.
+
+    Devuelve {"lm_positive", "lm_negative", "lm_delta"} donde delta = positive - negative.
+    Útil para tener una señal de sentimiento independiente de VADER.
+    """
+    analyzer = get_analyzer()
+    lm_positive = 0
+    lm_negative = 0
+    for word in text.lower().split():
+        word = "".join(c for c in word if c.isalpha())
+        score = analyzer.lexicon.get(word, 0)
+        if score > 0:
+            lm_positive += 1
+        elif score < 0:
+            lm_negative += 1
+    return {
+        "lm_positive": float(lm_positive),
+        "lm_negative": float(lm_negative),
+        "lm_delta": float(lm_positive - lm_negative),
+    }
 
 
 def daily_sentiment(df: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
