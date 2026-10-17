@@ -40,7 +40,9 @@ def fetch_vix(ticker: str = "^VIX") -> pd.DataFrame:
         hist = vix.history(period="5y")
         if hist.empty:
             return pd.DataFrame(columns=["timestamp", "vix_close"])
-        return hist[["Close"]].rename(columns={"Close": "vix_close"}).reset_index()
+        # yfinance uses 'Date' column
+        hist = hist.reset_index().rename(columns={"Date": "timestamp"})
+        return hist[["timestamp", "Close"]].rename(columns={"Close": "vix_close"})
     except Exception:  # pragma: no cover — network
         return pd.DataFrame(columns=["timestamp", "vix_close"])
 
@@ -78,7 +80,8 @@ def fetch_treasury_yield(ticker: str = "^TNX") -> pd.DataFrame:
         hist = tny.history(period="5y")
         if hist.empty:
             return pd.DataFrame(columns=["timestamp", "treasury_yield"])
-        return hist[["Close"]].rename(columns={"Close": "treasury_yield"}).reset_index()
+        hist = hist.reset_index().rename(columns={"Date": "timestamp"})
+        return hist[["timestamp", "Close"]].rename(columns={"Close": "treasury_yield"})
     except Exception:  # pragma: no cover — network
         return pd.DataFrame(columns=["timestamp", "treasury_yield"])
 
@@ -95,24 +98,19 @@ def fetch_usd_index(ticker: str = "DX-Y.NYB") -> pd.DataFrame:
         hist = dx.history(period="5y")
         if hist.empty:
             return pd.DataFrame(columns=["timestamp", "usd_index"])
-        return hist[["Close"]].rename(columns={"Close": "usd_index"}).reset_index()
+        hist = hist.reset_index().rename(columns={"Date": "timestamp"})
+        return hist[["timestamp", "Close"]].rename(columns={"Close": "usd_index"})
     except Exception:  # pragma: no cover — network
         return pd.DataFrame(columns=["timestamp", "usd_index"])
 
 
-# ── Feature builder ──────────────────────────────────────────────────────────
+# ── Feature addition ─────────────────────────────────────────────────────────
 
 MACRO_COLUMNS = [
-    "vix_level",
-    "vix_ma20",
-    "vix_change",
-    "sector_xlk",
-    "sector_xlf",
-    "sector_xle",
-    "treasury_yield",
-    "treasury_change",
-    "usd_index",
-    "usd_change",
+    "vix_level", "vix_ma20", "vix_change",
+    "sector_xlk", "sector_xlf", "sector_xle",
+    "treasury_yield", "treasury_change",
+    "usd_index", "usd_change",
 ]
 
 
@@ -146,18 +144,23 @@ def add_macro_features(
     """
     df = df.sort_values("timestamp").copy()
 
+    # Normalize timestamps (remove timezone, normalize to date)
+    df["_macro_date"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None).dt.normalize()
+
     # 1. VIX
     if vix_data is None and use_yf_fetch:
         vix_data = fetch_vix()
     if vix_data is not None and not vix_data.empty:
-        vix_data = vix_data.rename(columns={"timestamp": "timestamp"})
-        vix_data["timestamp"] = pd.to_datetime(vix_data["timestamp"]).dt.normalize()
-        vix_merge = vix_data.groupby("timestamp")["vix_close"].mean().reset_index()
-        df = df.merge(vix_merge, left_on=pd.to_datetime(df["timestamp"]).dt.normalize(), right_on="timestamp", how="left")
-        df["vix_level"] = df["vix_close"].ffill().values
-        df["vix_ma20"] = df["vix_level"].rolling(20, min_periods=1).mean().values
+        vix_data = vix_data.copy()
+        vix_data["_macro_date"] = pd.to_datetime(vix_data["timestamp"]).dt.tz_localize(None).dt.normalize()
+        vix_merge = vix_data.groupby("_macro_date")["vix_close"].mean().reset_index()
+        vix_merge = vix_merge.rename(columns={"_macro_date": "date"})
+        df = df.merge(vix_merge, left_on="_macro_date", right_on="date", how="left")
+        df = df.drop(columns=["date"])
+        df["vix_level"] = df["vix_close"].ffill().fillna(0.0).values
+        df["vix_ma20"] = df["vix_level"].rolling(20, min_periods=1).mean().fillna(0.0).values
         df["vix_change"] = df["vix_level"].diff().fillna(0.0).values
-        df = df.drop(columns=["vix_close", "timestamp_y"])
+        df = df.drop(columns=["vix_close"])
     else:
         for c in MACRO_COLUMNS[:3]:
             if c not in df.columns:
@@ -167,12 +170,16 @@ def add_macro_features(
     if sector_data is None and use_yf_fetch:
         sector_data = fetch_sector_data()
     if sector_data is not None and not sector_data.empty:
-        sector_data["timestamp"] = pd.to_datetime(sector_data["timestamp"]).dt.normalize()
+        sector_data = sector_data.copy()
+        sector_data["_macro_date"] = pd.to_datetime(sector_data["timestamp"]).dt.tz_localize(None).dt.normalize()
         for col in ["XLK", "XLF", "XLE"]:
             if col in sector_data.columns:
                 prefix = f"sector_{col.lower()}"
-                df = df.merge(sector_data[["timestamp", col]], on="timestamp", how="left")
-                df[f"{prefix}_close"] = df[col].ffill().values
+                sector_merge = sector_data.groupby("_macro_date")[col].mean().reset_index()
+                sector_merge = sector_merge.rename(columns={"_macro_date": "date"})
+                df = df.merge(sector_merge, left_on="_macro_date", right_on="date", how="left")
+                df = df.drop(columns=["date"])
+                df[f"{prefix}_close"] = df[col].ffill().fillna(0.0).values
                 df[prefix] = df[f"{prefix}_close"].pct_change().fillna(0.0).values
                 df = df.drop(columns=[col, f"{prefix}_close"])
             else:
@@ -187,12 +194,15 @@ def add_macro_features(
     if treasury_data is None and use_yf_fetch:
         treasury_data = fetch_treasury_yield()
     if treasury_data is not None and not treasury_data.empty:
-        treasury_data["timestamp"] = pd.to_datetime(treasury_data["timestamp"]).dt.normalize()
-        treasury_merge = treasury_data.groupby("timestamp")["treasury_yield"].mean().reset_index()
-        df = df.merge(treasury_merge, left_on=pd.to_datetime(df["timestamp"]).dt.normalize(), right_on="timestamp", how="left")
-        df["treasury_yield"] = df["treasury_yield_x"].ffill().values
+        treasury_data = treasury_data.copy()
+        treasury_data["_macro_date"] = pd.to_datetime(treasury_data["timestamp"]).dt.tz_localize(None).dt.normalize()
+        treasury_merge = treasury_data.groupby("_macro_date")["treasury_yield"].mean().reset_index()
+        treasury_merge = treasury_merge.rename(columns={"_macro_date": "date", "treasury_yield": "treasury_yield_data"})
+        df = df.merge(treasury_merge, left_on="_macro_date", right_on="date", how="left")
+        df = df.drop(columns=["date"])
+        df["treasury_yield"] = df["treasury_yield_data"].ffill().fillna(0.0).values
         df["treasury_change"] = df["treasury_yield"].diff().fillna(0.0).values
-        df = df.drop(columns=["treasury_yield_x", "timestamp_y"])
+        df = df.drop(columns=["treasury_yield_data"])
     else:
         for c in MACRO_COLUMNS[6:8]:
             if c not in df.columns:
@@ -202,15 +212,20 @@ def add_macro_features(
     if usd_data is None and use_yf_fetch:
         usd_data = fetch_usd_index()
     if usd_data is not None and not usd_data.empty:
-        usd_data["timestamp"] = pd.to_datetime(usd_data["timestamp"]).dt.normalize()
-        usd_merge = usd_data.groupby("timestamp")["usd_index"].mean().reset_index()
-        df = df.merge(usd_merge, left_on=pd.to_datetime(df["timestamp"]).dt.normalize(), right_on="timestamp", how="left")
-        df["usd_index"] = df["usd_index_x"].ffill().values
+        usd_data = usd_data.copy()
+        usd_data["_macro_date"] = pd.to_datetime(usd_data["timestamp"]).dt.tz_localize(None).dt.normalize()
+        usd_merge = usd_data.groupby("_macro_date")["usd_index"].mean().reset_index()
+        usd_merge = usd_merge.rename(columns={"_macro_date": "date", "usd_index": "usd_index_data"})
+        df = df.merge(usd_merge, left_on="_macro_date", right_on="date", how="left")
+        df = df.drop(columns=["date"])
+        df["usd_index"] = df["usd_index_data"].ffill().fillna(0.0).values
         df["usd_change"] = df["usd_index"].diff().fillna(0.0).values
-        df = df.drop(columns=["usd_index_x", "timestamp_y"])
+        df = df.drop(columns=["usd_index_data"])
     else:
         for c in MACRO_COLUMNS[8:10]:
             if c not in df.columns:
                 df[c] = 0.0
 
+    # Clean up
+    df = df.drop(columns=["_macro_date"])
     return df

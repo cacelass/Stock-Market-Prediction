@@ -242,6 +242,17 @@ def add_regime_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def fill_macro_nan(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill NaN values in macro features with 0.0 for early rows."""
+    macro_cols = [c for c in df.columns if any(x in c for x in ['vix', 'sector_', 'treasury', 'usd_'])]
+    for col in macro_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna(0.0)
+            # Replace infinities with 0
+            df[col] = df[col].replace([np.inf, -np.inf], 0.0)
+    return df
+
+
 def build_features_pipeline() -> list[Path]:
     """Lee data/processed/*.csv y escribe data/interim/features_<nombre>.csv.
 
