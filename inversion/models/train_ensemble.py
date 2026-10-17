@@ -84,7 +84,7 @@ def save_ensemble_models(
     scaler_tech: Any,
     scaler_sent: Any | None = None,
     model_paths: Dict[str, Any] | None = None,
-    ensemble_weights: list[float] | None = None,
+    ensemble_weights: list[float] | Dict[str, float] | None = None,
 ) -> Dict[str, Path]:
     """Persist models, scalers, and config to disk.
 
@@ -181,7 +181,7 @@ def train_ensemble_ticker(ticker: str, csv_path: Path, random_state: int = 42) -
             scaler_sent = fit_and_save_scaler(X_train[sent_cols], filename=f"scaler_sent_{ticker}.pkl")
             use_sentiment = True
 
-    # Train ensemble
+    # Train ensemble (RF + HGB)
     results = train_ensemble(X_train_s, y_train.values, X_test_s, y_test.values, ticker, random_state)
 
     # If sentiment features available, also train rf_sent and re-evaluate ensemble with 3 models
@@ -200,9 +200,9 @@ def train_ensemble_ticker(ticker: str, csv_path: Path, random_state: int = 42) -
         _add_model_metrics(results, "rf_sent", rf_sent, scaler_sent.transform(X_test[sent_cols]), y_test.values)
 
         # 3-model ensemble
-        ens_proba_3 = (results["models"]["rf_tech"].predict_proba(X_test_s)[:, 1]
-                       + results["models"]["hgb"].predict_proba(X_test_s)[:, 1]
-                       + ps) / 3.0
+        pr = results["models"]["rf_tech"].predict_proba(X_test_s)[:, 1]
+        ph = results["models"]["hgb"].predict_proba(X_test_s)[:, 1]
+        ens_proba_3 = (pr + ph + ps) / 3.0
         ens_pred_3 = (ens_proba_3 >= 0.5).astype(int)
         try:
             results["metrics"]["ensemble_3model_auc"] = float(roc_auc_score(y_test.values, ens_proba_3))
@@ -210,16 +210,47 @@ def train_ensemble_ticker(ticker: str, csv_path: Path, random_state: int = 42) -
             results["metrics"]["ensemble_3model_auc"] = 0.0
         results["metrics"]["ensemble_3model_accuracy"] = float(accuracy_score(y_test.values, ens_pred_3))
 
+        # Optimize weights for 3-model ensemble
+        from inversion.ensemble.weighted_ensemble import optimize_weights
+        models_for_opt = {"rf_tech": results["models"]["rf_tech"], "hgb": results["models"]["hgb"], "rf_sent": rf_sent}
+        opt_labels, opt_weights = optimize_weights(models_for_opt, X_test_s, y_test.values)
+        results["metrics"]["ensemble_optimized_auc"] = 0.0
+        results["metrics"]["ensemble_optimized_accuracy"] = 0.0
+        results["metrics"]["ensemble_weights"] = dict(zip(opt_labels, opt_weights))
+        if len(opt_weights) > 0:
+            ens_proba_opt = np.zeros(len(y_test))
+            for label, w in zip(opt_labels, opt_weights):
+                try:
+                    if label == "rf_sent":
+                        ens_proba_opt += w * rf_sent.predict_proba(X_test[sent_cols])[:, 1]
+                    else:
+                        ens_proba_opt += w * models_for_opt[label].predict_proba(X_test_s)[:, 1]
+                except Exception:
+                    continue
+            # Normalize by sum of weights
+            w_sum = sum(opt_weights)
+            if w_sum > 0:
+                ens_proba_opt /= w_sum
+            ens_pred_opt = (ens_proba_opt >= 0.5).astype(int)
+            try:
+                results["metrics"]["ensemble_optimized_auc"] = float(roc_auc_score(y_test.values, ens_proba_opt))
+            except Exception:
+                results["metrics"]["ensemble_optimized_auc"] = 0.0
+            results["metrics"]["ensemble_optimized_accuracy"] = float(accuracy_score(y_test.values, ens_pred_opt))
+
     # Save models and config
-    saved = save_ensemble_models(results, ticker, scaler_tech, scaler_sent if has_sentiment else None)
+    ensemble_weights = results.get("metrics", {}).get("ensemble_weights", None)
+    saved = save_ensemble_models(results, ticker, scaler_tech, scaler_sent if has_sentiment else None, ensemble_weights=ensemble_weights)
 
     # Clean model objects from results dict (not JSON-serialisable)
     metrics_only = {k: v for k, v in results.items() if k != "models"}
 
     print(
-        f"   ✔ {ticker}: accuracy={metrics_only['metrics'].get('ensemble_accuracy', 0):.3f} "
-        f"auc={metrics_only['metrics'].get('ensemble_auc', 0):.3f}"
+        f"   ✔ {ticker}: accuracy={metrics_only['metrics'].get('ensemble_3model_accuracy', 0):.3f} "
+        f"auc={metrics_only['metrics'].get('ensemble_3model_auc', 0):.3f}"
     )
+    if ensemble_weights:
+        print(f"         optimized weights: {ensemble_weights}")
 
     return metrics_only
 
