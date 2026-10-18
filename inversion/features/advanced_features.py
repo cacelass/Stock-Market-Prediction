@@ -444,7 +444,7 @@ def add_moments(
     out["return"] = out["return"].fillna(0.0)
 
     for w in windows:
-        for name, func in [("skew", "skew"), ("kurt", "kurtosis")]:
+        for name, func in [("skew", "skew"), ("kurt", "kurt")]:
             col = f"{name}_ret_{w}d"
             MOMENT_COLS.append(col)
             out[col] = (
@@ -491,7 +491,7 @@ def add_rolling_stats(
             ROLLING_STATS_COLS.append(col)
             out[col] = out["return"].rolling(w, min_periods=1).aggregate(agg).fillna(0.0)
 
-        for stat_name, agg in [("skew", "skew"), ("kurt", "kurtosis")]:
+        for stat_name, agg in [("skew", "skew"), ("kurt", "kurt")]:
             col = f"ret_{stat_name}_{w}d"
             if col not in out.columns:
                 ROLLING_STATS_COLS.append(col)
