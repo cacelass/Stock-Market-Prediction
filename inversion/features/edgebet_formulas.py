@@ -16,6 +16,7 @@ Adaptación a stocks:
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 from typing import Dict, Any
 
 try:
@@ -195,3 +196,62 @@ def predict_stock_probability(
         "prob_down": 1.0 - float(np.clip(final_prob, 0.05, 0.95)),
         "prob_large_move": prob_large_move,
     }
+
+
+def add_edgebet_features(df, k_btts: float = 0.8, k_ou: float = 1.0):
+    """Añade features derivadas de las fórmulas de edgebet al dataframe.
+
+    Genera 4 columnas vectorizadas (numpy, sin apply):
+    - eb_prob_up: probabilidad de subida (adaptación BTTS)
+    - eb_prob_large_move: probabilidad de retorno grande (adaptación Over/Under)
+    - eb_prob_combined: probabilidad combinada con RSI y volatilidad (adaptación Raw)
+    - eb_signal: señal compuesta (media ponderada)
+
+    Args:
+        df: DataFrame con columnas close, rsi, volatility_21
+        k_btts: Factor para probabilidad de subida
+        k_ou: Factor para probabilidad over/under
+
+    Returns:
+        DataFrame con 4 columnas nuevas
+    """
+    df = df.copy()
+
+    # ── Signal strength: retorno de 5 días normalizado por volatilidad ──
+    if "close" in df.columns and "volatility_21" in df.columns:
+        ret_5d = df["close"].pct_change(5)
+        vol = df["volatility_21"].clip(lower=1e-8)
+        signal = (ret_5d / vol).fillna(0.0).clip(-3.0, 3.0)
+    else:
+        signal = pd.Series(0.0, index=df.index)
+
+    # ── RSI normalizado a [-1, 1] ──
+    if "rsi" in df.columns:
+        rsi_norm = ((df["rsi"] - 50) / 50.0).fillna(0.0)
+    else:
+        rsi_norm = pd.Series(0.0, index=df.index)
+
+    # ── 1. BTTS adaptation: prob(subida significativa) ──
+    # 1 - exp(-|signal| * (1 + |rsi|) * k)
+    exponent = (signal.abs() * (1.0 + rsi_norm.abs()) * k_btts).clip(0, 30)
+    df["eb_prob_up"] = (1.0 - np.exp(-exponent)).clip(0.0, 1.0)
+
+    # ── 2. Over/Under adaptation: prob(retorno > umbral) ──
+    # 1 - exp(-|signal| / (umbral + epsilon) * k)
+    ou_exponent = (signal.abs() / 0.02 * k_ou).clip(0, 30)
+    df["eb_prob_large_move"] = (1.0 - np.exp(-ou_exponent)).clip(0.0, 1.0)
+
+    # ── 3. Raw probability: base + contribuciones de RSI y vol ──
+    base = 0.5
+    contrib_rsi = rsi_norm * 0.1
+    contrib_vol = -df.get("volatility_21", pd.Series(0.0, index=df.index)) * 0.05
+    df["eb_prob_combined"] = (base + contrib_rsi + contrib_vol).clip(0.05, 0.95)
+
+    # ── 4. Señal compuesta (weighted average) ──
+    df["eb_signal"] = (
+        0.4 * df["eb_prob_up"]
+        + 0.3 * df["eb_prob_large_move"]
+        + 0.3 * df["eb_prob_combined"]
+    )
+
+    return df
