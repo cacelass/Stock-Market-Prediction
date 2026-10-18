@@ -17,6 +17,40 @@ from inversion.features.regime_detection import (
     train_regime_model,
     Regime,
 )
+from inversion.features.advanced_features import (
+    add_advanced_features,
+    ADVANCED_COLUMNS,
+    INTERACTION_COLS,
+    HURST_COLS,
+    ENTROPY_COLS,
+    add_interaction_terms,
+    add_hurst_exponent,
+    add_entropy_features,
+    add_rolls_spread,
+    add_amihud_illiquidity,
+    add_price_impact,
+    add_vwap_deviation,
+    add_volume_price_correlation,
+    add_ofi_proxy,
+    add_realized_vol_ratios,
+    add_garch_features,
+    add_moments,
+    add_rolling_stats,
+)
+from inversion.features.purged_cv import (
+    PurgedKFold,
+    purged_kfold_cv,
+    walk_forward_cv,
+)
+from inversion.features.imbalance_handler import (
+    handle_class_imbalance,
+    compute_focal_weights,
+    threshold_moving,
+)
+from inversion.features.interaction_discovery import (
+    discover_interactions,
+    create_interaction_features,
+)
 
 __all__ = [
     "add_macro_features",
@@ -32,4 +66,30 @@ __all__ = [
     "detect_regimes",
     "train_regime_model",
     "Regime",
+    "add_advanced_features",
+    "ADVANCED_COLUMNS",
+    "INTERACTION_COLS",
+    "HURST_COLS",
+    "ENTROPY_COLS",
+    "add_interaction_terms",
+    "add_hurst_exponent",
+    "add_entropy_features",
+    "add_rolls_spread",
+    "add_amihud_illiquidity",
+    "add_price_impact",
+    "add_vwap_deviation",
+    "add_volume_price_correlation",
+    "add_ofi_proxy",
+    "add_realized_vol_ratios",
+    "add_garch_features",
+    "add_moments",
+    "add_rolling_stats",
+    "PurgedKFold",
+    "purged_kfold_cv",
+    "walk_forward_cv",
+    "handle_class_imbalance",
+    "compute_focal_weights",
+    "threshold_moving",
+    "discover_interactions",
+    "create_interaction_features",
 ]

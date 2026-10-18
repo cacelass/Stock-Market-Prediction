@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from inversion.utils import paths
 from inversion.features.macro_features import add_macro_features, MACRO_COLUMNS
 from inversion.features.regime_detection import detect_regimes, Regime
+from inversion.features.advanced_features import add_advanced_features, ADVANCED_COLUMNS
 
 
 def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -253,7 +254,7 @@ def fill_macro_nan(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def build_features_pipeline() -> list[Path]:
+def build_features_pipeline(include_advanced: bool = False) -> list[Path]:
     """Lee data/processed/*.csv y escribe data/interim/features_<nombre>.csv.
 
     Reproducible por diseño: mismo input → mismo output byte a byte. No hay
@@ -262,6 +263,8 @@ def build_features_pipeline() -> list[Path]:
       - sentimiento diario (SENT-003)
       - features macroeconómicas (macro_features.py)
       - columna de régimen (regime_detection.py)
+      - features avanzadas de microestructura (advanced_features.py,
+        opcional, include_advanced=True)
     """
     paths.PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
     paths.INTERIM_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -274,6 +277,8 @@ def build_features_pipeline() -> list[Path]:
         df = add_sentiment_features(df, ticker=ticker)
         df = add_macro_features(df, use_yf_fetch=False)
         df = add_regime_column(df)
+        if include_advanced:
+            df = add_advanced_features(df)
         out = paths.INTERIM_DATA_DIR / f"features_{csv_file.name}"
         df.to_csv(out, index=False)
         written.append(out)
