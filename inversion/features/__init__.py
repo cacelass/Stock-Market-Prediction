@@ -51,6 +51,10 @@ from inversion.features.interaction_discovery import (
     discover_interactions,
     create_interaction_features,
 )
+from inversion.features.aggressive_selection import (
+    select_top_features_shap,
+    train_with_selected_features,
+)
 
 __all__ = [
     "add_macro_features",
@@ -92,4 +96,6 @@ __all__ = [
     "threshold_moving",
     "discover_interactions",
     "create_interaction_features",
+    "select_top_features_shap",
+    "train_with_selected_features",
 ]
