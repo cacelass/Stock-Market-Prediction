@@ -5,6 +5,7 @@ from inversion.models.train_model import train_calibrated_rf
 from inversion.models.train_linear import train_elasticnet_ticker
 from inversion.models.regime_models import train_regime_models
 from inversion.models.train_regression import train_regression_ticker
+from inversion.models.train_lightgbm import train_lgb_ticker
 
 __all__ = [
     "train_ensemble_ticker",
@@ -14,4 +15,5 @@ __all__ = [
     "train_elasticnet_ticker",
     "train_regime_models",
     "train_regression_ticker",
+    "train_lgb_ticker",
 ]

@@ -12,6 +12,10 @@ from inversion.ensemble.diverse_ensemble import (
     train_diverse_ensemble,
     train_diverse_ensemble_ticker,
 )
+from inversion.ensemble.rf_lgb_ensemble import (
+    train_rf_lgb_ensemble,
+    train_ensemble_lgb_ticker,
+)
 
 __all__ = [
     "train_weighted_ensemble",
@@ -22,4 +26,6 @@ __all__ = [
     "predict_stacking_ensemble",
     "train_diverse_ensemble",
     "train_diverse_ensemble_ticker",
+    "train_rf_lgb_ensemble",
+    "train_ensemble_lgb_ticker",
 ]

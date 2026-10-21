@@ -32,6 +32,7 @@ dependencies = [
     # ── Sentimiento (SENT-001/002): descarga de noticias y puntuación VADER ──
     "nltk",
     "yfinance",
+    "lightgbm>=4.7.0",
 ]
 
 [project.optional-dependencies]
